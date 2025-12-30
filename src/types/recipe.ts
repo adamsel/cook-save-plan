@@ -6,6 +6,10 @@ export interface Ingredient {
   notes?: string;
 }
 
+export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual';
+export type ParsingConfidence = 'high' | 'medium' | 'low';
+export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+
 export interface Recipe {
   id: string;
   title: string;
@@ -24,6 +28,13 @@ export interface Recipe {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  // New fields for better import tracking and categorization
+  importMethod?: ImportMethod;
+  rawImportSnapshot?: string;
+  cuisine?: string;
+  dietary?: string[];
+  mealTypes?: MealType[];
+  author?: string;
 }
 
 export interface MealPlanItem {
