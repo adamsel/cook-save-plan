@@ -1,0 +1,206 @@
+import { useState } from 'react';
+import { Search, Filter, X, Heart, Clock, ChevronDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+
+interface RecipeFiltersProps {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  selectedCategories: string[];
+  onCategoriesChange: (categories: string[]) => void;
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
+  showFavoritesOnly: boolean;
+  onFavoritesChange: (show: boolean) => void;
+  showArchived: boolean;
+  onArchivedChange: (show: boolean) => void;
+  timeFilter: 'all' | 'quick' | 'medium' | 'long';
+  onTimeFilterChange: (filter: 'all' | 'quick' | 'medium' | 'long') => void;
+  categories: string[];
+  tags: string[];
+}
+
+export function RecipeFilters({
+  searchQuery,
+  onSearchChange,
+  selectedCategories,
+  onCategoriesChange,
+  selectedTags,
+  onTagsChange,
+  showFavoritesOnly,
+  onFavoritesChange,
+  showArchived,
+  onArchivedChange,
+  timeFilter,
+  onTimeFilterChange,
+  categories,
+  tags,
+}: RecipeFiltersProps) {
+  const toggleCategory = (category: string) => {
+    onCategoriesChange(
+      selectedCategories.includes(category)
+        ? selectedCategories.filter(c => c !== category)
+        : [...selectedCategories, category]
+    );
+  };
+
+  const toggleTag = (tag: string) => {
+    onTagsChange(
+      selectedTags.includes(tag)
+        ? selectedTags.filter(t => t !== tag)
+        : [...selectedTags, tag]
+    );
+  };
+
+  const clearFilters = () => {
+    onSearchChange('');
+    onCategoriesChange([]);
+    onTagsChange([]);
+    onFavoritesChange(false);
+    onTimeFilterChange('all');
+  };
+
+  const hasActiveFilters = 
+    searchQuery || 
+    selectedCategories.length > 0 || 
+    selectedTags.length > 0 || 
+    showFavoritesOnly || 
+    timeFilter !== 'all';
+
+  return (
+    <div className="space-y-4">
+      {/* Search and main filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search recipes..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {/* Categories dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Filter className="h-4 w-4" />
+                Category
+                {selectedCategories.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                    {selectedCategories.length}
+                  </Badge>
+                )}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Categories</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {categories.map(category => (
+                <DropdownMenuCheckboxItem
+                  key={category}
+                  checked={selectedCategories.includes(category)}
+                  onCheckedChange={() => toggleCategory(category)}
+                >
+                  {category}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Time filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant={timeFilter !== 'all' ? 'secondary' : 'outline'} 
+                className="gap-2"
+              >
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">Time</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuCheckboxItem
+                checked={timeFilter === 'all'}
+                onCheckedChange={() => onTimeFilterChange('all')}
+              >
+                All times
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={timeFilter === 'quick'}
+                onCheckedChange={() => onTimeFilterChange('quick')}
+              >
+                Quick (under 30 min)
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={timeFilter === 'medium'}
+                onCheckedChange={() => onTimeFilterChange('medium')}
+              >
+                Medium (30-60 min)
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={timeFilter === 'long'}
+                onCheckedChange={() => onTimeFilterChange('long')}
+              >
+                Long (over 60 min)
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Favorites toggle */}
+          <Button
+            variant={showFavoritesOnly ? 'default' : 'outline'}
+            size="icon"
+            onClick={() => onFavoritesChange(!showFavoritesOnly)}
+          >
+            <Heart className={cn("h-4 w-4", showFavoritesOnly && "fill-current")} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Tags */}
+      <div className="flex flex-wrap gap-2">
+        {tags.map(tag => (
+          <Badge
+            key={tag}
+            variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+            className="cursor-pointer transition-colors"
+            onClick={() => toggleTag(tag)}
+          >
+            {tag}
+          </Badge>
+        ))}
+      </div>
+
+      {/* Active filters */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Active filters:</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-7 text-destructive hover:text-destructive"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Clear all
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
