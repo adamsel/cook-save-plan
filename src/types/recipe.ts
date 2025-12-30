@@ -9,6 +9,27 @@ export interface Ingredient {
 export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual';
 export type ParsingConfidence = 'high' | 'medium' | 'low';
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+export type NutritionSource = 'provided_by_site' | 'ai_estimate' | 'manual';
+export type NutritionConfidence = 'High' | 'Medium' | 'Low';
+
+export interface NutritionInfo {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
+  saturatedFat?: number;
+  cholesterol?: number;
+}
+
+export interface RecipeNutrition {
+  perServing: NutritionInfo;
+  source: NutritionSource;
+  confidence: NutritionConfidence;
+  notes?: string;
+}
 
 export interface Recipe {
   id: string;
@@ -28,13 +49,15 @@ export interface Recipe {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
-  // New fields for better import tracking and categorization
+  // Import tracking
   importMethod?: ImportMethod;
   rawImportSnapshot?: string;
   cuisine?: string;
   dietary?: string[];
   mealTypes?: MealType[];
   author?: string;
+  // Nutrition
+  nutrition?: RecipeNutrition;
 }
 
 export interface MealPlanItem {
@@ -43,6 +66,7 @@ export interface MealPlanItem {
   day: string; // 'monday', 'tuesday', etc.
   mealSlot: 'breakfast' | 'lunch' | 'dinner';
   servingsMultiplier: number;
+  notes?: string;
 }
 
 export interface MealPlan {

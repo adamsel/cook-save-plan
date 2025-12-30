@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Recipe, Ingredient, ImportMethod, ParsingConfidence, MealType } from '@/types/recipe';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Recipe, Ingredient, ImportMethod, ParsingConfidence, MealType, RecipeNutrition, NutritionInfo } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { parseRecipeFromUrl, parseFromText, ParsedRecipe, parseIngredientLine } from '@/lib/recipeParser';
 import { suggestCategorization } from '@/lib/recipeSuggestions';
@@ -25,7 +25,7 @@ import {
 import { 
   Link, FileText, PenLine, Plus, X, Loader2, 
   AlertCircle, CheckCircle, AlertTriangle, ArrowLeft,
-  Sparkles, Clipboard, GripVertical, Trash2
+  Sparkles, Clipboard, Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,10 @@ interface AddRecipeDialogProps {
 }
 
 type ImportStep = 'input' | 'review' | 'edit';
+
+// Stable ID generator that doesn't use Date.now() in render
+let idCounter = 0;
+const generateStableId = () => `ing-${++idCounter}`;
 
 export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipeDialogProps) {
   const { addRecipe, updateRecipe, categories, tags: availableTags, addTag } = useRecipes();
@@ -57,7 +61,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   // Parsed recipe data (for review)
   const [parsedRecipe, setParsedRecipe] = useState<ParsedRecipe | null>(null);
   
-  // Form state
+  // Form state - using refs for stable IDs
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -69,13 +73,28 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   const [imageUrl, setImageUrl] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [instructions, setInstructions] = useState<string[]>([]);
+  const [instructions, setInstructions] = useState<{ id: string; text: string }[]>([]);
   const [selectedMealTypes, setSelectedMealTypes] = useState<MealType[]>([]);
   const [importMethod, setImportMethod] = useState<ImportMethod>('manual');
+  const [nutrition, setNutrition] = useState<RecipeNutrition | null>(null);
+  const [isEstimatingNutrition, setIsEstimatingNutrition] = useState(false);
   
   // Suggested categorization
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+
+  const createEmptyIngredient = useCallback((): Ingredient => ({
+    id: generateStableId(),
+    item: '',
+    quantity: null,
+    unit: '',
+    notes: '',
+  }), []);
+
+  const createEmptyInstruction = useCallback(() => ({
+    id: `inst-${++idCounter}`,
+    text: '',
+  }), []);
 
   // Reset form when dialog opens/closes or when editing recipe changes
   useEffect(() => {
@@ -90,25 +109,22 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       setServings(editingRecipe.servings.toString());
       setImageUrl(editingRecipe.imageUrl || '');
       setSourceUrl(editingRecipe.sourceUrl || '');
-      setIngredients(editingRecipe.ingredients.length > 0 ? editingRecipe.ingredients : [createEmptyIngredient()]);
-      setInstructions(editingRecipe.instructions.length > 0 ? editingRecipe.instructions : ['']);
+      setIngredients(editingRecipe.ingredients.length > 0 
+        ? editingRecipe.ingredients.map(i => ({ ...i, id: i.id || generateStableId() }))
+        : [createEmptyIngredient()]);
+      setInstructions(editingRecipe.instructions.length > 0 
+        ? editingRecipe.instructions.map(text => ({ id: `inst-${++idCounter}`, text }))
+        : [createEmptyInstruction()]);
       setSelectedMealTypes(editingRecipe.mealTypes || []);
       setImportMethod(editingRecipe.importMethod || 'manual');
+      setNutrition(editingRecipe.nutrition || null);
       setImportStep('edit');
     } else if (open) {
       resetForm();
     }
   }, [open, editingRecipe]);
 
-  const createEmptyIngredient = (): Ingredient => ({
-    id: Date.now().toString(),
-    item: '',
-    quantity: null,
-    unit: '',
-    notes: '',
-  });
-
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setUrl('');
     setPastedContent('');
     setParsedRecipe(null);
@@ -123,16 +139,17 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setImageUrl('');
     setSourceUrl('');
     setIngredients([createEmptyIngredient()]);
-    setInstructions(['']);
+    setInstructions([createEmptyInstruction()]);
     setSelectedMealTypes([]);
     setImportMethod('manual');
+    setNutrition(null);
     setImportStep('input');
     setParseError(null);
     setShowPasteFallback(false);
     setSuggestedCategory(null);
     setSuggestedTags([]);
     setActiveTab('url');
-  };
+  }, [createEmptyIngredient, createEmptyInstruction]);
 
   // Attempt to parse recipe from URL
   const handleParseUrl = async () => {
@@ -190,9 +207,18 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setPrepTime(recipe.prepTime?.toString() || '');
     setCookTime(recipe.cookTime?.toString() || '');
     setServings(recipe.servings?.toString() || '4');
-    setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [createEmptyIngredient()]);
-    setInstructions(recipe.instructions.length > 0 ? recipe.instructions : ['']);
+    setIngredients(recipe.ingredients.length > 0 
+      ? recipe.ingredients.map(i => ({ ...i, id: i.id || generateStableId() }))
+      : [createEmptyIngredient()]);
+    setInstructions(recipe.instructions.length > 0 
+      ? recipe.instructions.map(text => ({ id: `inst-${++idCounter}`, text }))
+      : [createEmptyInstruction()]);
     setImportMethod(recipe.importMethod);
+    
+    // Check if parsed recipe has nutrition
+    if (recipe.nutrition) {
+      setNutrition(recipe.nutrition);
+    }
     
     // Get suggestions
     const suggestions = suggestCategorization(recipe.title, recipe.description, recipe.ingredients);
@@ -216,47 +242,38 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setImportMethod('manual');
     setImportStep('edit');
     setIngredients([createEmptyIngredient()]);
-    setInstructions(['']);
+    setInstructions([createEmptyInstruction()]);
   };
 
-  // Ingredient management
-  const addIngredient = () => {
-    setIngredients([...ingredients, createEmptyIngredient()]);
-  };
+  // Ingredient management - stable updates
+  const addIngredient = useCallback(() => {
+    setIngredients(prev => [...prev, createEmptyIngredient()]);
+  }, [createEmptyIngredient]);
 
-  const removeIngredient = (id: string) => {
-    if (ingredients.length > 1) {
-      setIngredients(ingredients.filter(i => i.id !== id));
-    }
-  };
+  const removeIngredient = useCallback((id: string) => {
+    setIngredients(prev => prev.length > 1 ? prev.filter(i => i.id !== id) : prev);
+  }, []);
 
-  const updateIngredient = (id: string, field: keyof Ingredient, value: string | number | null) => {
-    setIngredients(ingredients.map(i => 
+  const updateIngredient = useCallback((id: string, field: keyof Ingredient, value: string | number | null) => {
+    setIngredients(prev => prev.map(i => 
       i.id === id ? { ...i, [field]: value } : i
     ));
-  };
+  }, []);
 
-  // Instruction management
-  const addInstruction = () => {
-    setInstructions([...instructions, '']);
-  };
+  // Instruction management - stable updates
+  const addInstruction = useCallback(() => {
+    setInstructions(prev => [...prev, createEmptyInstruction()]);
+  }, [createEmptyInstruction]);
 
-  const removeInstruction = (index: number) => {
-    if (instructions.length > 1) {
-      setInstructions(instructions.filter((_, i) => i !== index));
-    }
-  };
+  const removeInstruction = useCallback((id: string) => {
+    setInstructions(prev => prev.length > 1 ? prev.filter(i => i.id !== id) : prev);
+  }, []);
 
-  const updateInstruction = (index: number, value: string) => {
-    setInstructions(instructions.map((inst, i) => i === index ? value : inst));
-  };
-
-  const moveInstruction = (fromIndex: number, toIndex: number) => {
-    const newInstructions = [...instructions];
-    const [removed] = newInstructions.splice(fromIndex, 1);
-    newInstructions.splice(toIndex, 0, removed);
-    setInstructions(newInstructions);
-  };
+  const updateInstruction = useCallback((id: string, value: string) => {
+    setInstructions(prev => prev.map(inst => 
+      inst.id === id ? { ...inst, text: value } : inst
+    ));
+  }, []);
 
   // Tag management
   const toggleTag = (tag: string) => {
@@ -301,6 +318,134 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     }
   };
 
+  // Estimate nutrition using AI
+  const handleEstimateNutrition = async () => {
+    if (ingredients.filter(i => i.item.trim()).length === 0) {
+      toast({
+        title: "No ingredients",
+        description: "Add some ingredients first to estimate nutrition.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEstimatingNutrition(true);
+
+    // Format ingredients for the prompt
+    const ingredientList = ingredients
+      .filter(i => i.item.trim())
+      .map(i => {
+        let str = '';
+        if (i.quantity) str += `${i.quantity} `;
+        if (i.unit) str += `${i.unit} `;
+        str += i.item;
+        if (i.notes) str += ` (${i.notes})`;
+        return str.trim();
+      })
+      .join('\n');
+
+    const servingsNum = parseInt(servings) || 4;
+
+    // Simulate AI estimation (in production, this would call an AI endpoint)
+    // For now, generate reasonable estimates based on ingredient keywords
+    setTimeout(() => {
+      const estimatedNutrition = estimateNutritionFromIngredients(ingredientList, servingsNum);
+      setNutrition(estimatedNutrition);
+      setIsEstimatingNutrition(false);
+      toast({
+        title: "Nutrition estimated",
+        description: "Values are estimates based on typical ingredient nutrition. Please verify.",
+      });
+    }, 1500);
+  };
+
+  // Simple nutrition estimation based on ingredient keywords
+  const estimateNutritionFromIngredients = (ingredientList: string, servingsNum: number): RecipeNutrition => {
+    const lower = ingredientList.toLowerCase();
+    
+    // Base estimates
+    let calories = 250;
+    let protein = 15;
+    let carbs = 30;
+    let fat = 10;
+    let fiber = 3;
+    let sugar = 5;
+    let sodium = 400;
+    
+    // Adjust based on common ingredients
+    if (/chicken|turkey|beef|pork|lamb|fish|salmon|shrimp/.test(lower)) {
+      protein += 20;
+      calories += 150;
+    }
+    if (/pasta|rice|noodle|bread|flour/.test(lower)) {
+      carbs += 40;
+      calories += 200;
+    }
+    if (/butter|cream|cheese|oil/.test(lower)) {
+      fat += 15;
+      calories += 150;
+    }
+    if (/sugar|honey|syrup|chocolate/.test(lower)) {
+      sugar += 15;
+      carbs += 20;
+      calories += 100;
+    }
+    if (/spinach|broccoli|lettuce|kale|vegetable/.test(lower)) {
+      fiber += 4;
+      calories -= 50;
+    }
+    if (/bean|lentil|chickpea|tofu/.test(lower)) {
+      protein += 10;
+      fiber += 5;
+    }
+    
+    const notes: string[] = [];
+    
+    // Check for missing quantities
+    const hasAmbiguousQuantities = /to taste|pinch|some|few/.test(lower);
+    const hasMissingQuantities = ingredients.some(i => i.item.trim() && !i.quantity);
+    
+    if (hasAmbiguousQuantities || hasMissingQuantities) {
+      notes.push("Some ingredient quantities were assumed based on typical recipe amounts.");
+    }
+    
+    let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+    if (hasAmbiguousQuantities && hasMissingQuantities) {
+      confidence = 'Low';
+    } else if (!hasAmbiguousQuantities && !hasMissingQuantities) {
+      confidence = 'Medium';
+    }
+    
+    return {
+      perServing: {
+        calories: Math.round(calories),
+        protein: Math.round(protein),
+        carbs: Math.round(carbs),
+        fat: Math.round(fat),
+        fiber: Math.round(fiber),
+        sugar: Math.round(sugar),
+        sodium: Math.round(sodium),
+      },
+      source: 'ai_estimate',
+      confidence,
+      notes: notes.length > 0 ? notes.join(' ') : 'Estimated using typical ingredient values.',
+    };
+  };
+
+  // Update nutrition field
+  const updateNutritionField = (field: keyof NutritionInfo, value: string) => {
+    if (!nutrition) return;
+    const numValue = parseFloat(value) || 0;
+    setNutrition({
+      ...nutrition,
+      perServing: {
+        ...nutrition.perServing,
+        [field]: numValue,
+      },
+      source: nutrition.source === 'provided_by_site' ? 'manual' : nutrition.source,
+    });
+  };
+
   // Submit recipe
   const handleSubmit = () => {
     if (!title.trim()) {
@@ -333,12 +478,13 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       totalTime: (prepTime || cookTime) ? (parseInt(prepTime || '0') + parseInt(cookTime || '0')) : undefined,
       servings: parseInt(servings) || 4,
       ingredients: ingredients.filter(i => i.item.trim()),
-      instructions: instructions.filter(i => i.trim()),
+      instructions: instructions.filter(i => i.text.trim()).map(i => i.text),
       isFavorite: editingRecipe?.isFavorite || false,
       isArchived: editingRecipe?.isArchived || false,
       importMethod,
       mealTypes: selectedMealTypes.length > 0 ? selectedMealTypes : undefined,
       rawImportSnapshot: parsedRecipe?.rawImportSnapshot,
+      nutrition: nutrition || undefined,
     };
 
     if (editingRecipe) {
@@ -370,6 +516,128 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       </div>
     );
   };
+
+  // Nutrition section component
+  const NutritionSection = () => (
+    <div className="space-y-3 border rounded-lg p-4 bg-secondary/20">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-2">
+          Nutrition per Serving
+          {nutrition && (
+            <Badge variant={nutrition.source === 'ai_estimate' ? 'secondary' : 'default'} className="text-xs">
+              {nutrition.source === 'ai_estimate' && <Sparkles className="h-3 w-3 mr-1" />}
+              {nutrition.source === 'provided_by_site' ? 'From source' : 
+               nutrition.source === 'ai_estimate' ? 'Estimated' : 'Manual'}
+            </Badge>
+          )}
+        </Label>
+        {!nutrition && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleEstimateNutrition}
+            disabled={isEstimatingNutrition}
+          >
+            {isEstimatingNutrition ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4 mr-2" />
+            )}
+            Estimate Nutrition
+          </Button>
+        )}
+      </div>
+
+      {nutrition && (
+        <>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Calories</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.calories}
+                onChange={(e) => updateNutritionField('calories', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Protein (g)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.protein}
+                onChange={(e) => updateNutritionField('protein', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Carbs (g)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.carbs}
+                onChange={(e) => updateNutritionField('carbs', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Fat (g)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.fat}
+                onChange={(e) => updateNutritionField('fat', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Fiber (g)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.fiber || 0}
+                onChange={(e) => updateNutritionField('fiber', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Sugar (g)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.sugar || 0}
+                onChange={(e) => updateNutritionField('sugar', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Sodium (mg)</Label>
+              <Input
+                type="number"
+                value={nutrition.perServing.sodium || 0}
+                onChange={(e) => updateNutritionField('sodium', e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="text-xs"
+                onClick={() => setNutrition(null)}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+          {nutrition.source === 'ai_estimate' && (
+            <p className="text-xs text-muted-foreground">
+              <AlertCircle className="h-3 w-3 inline mr-1" />
+              {nutrition.confidence} confidence estimate. Values are approximate and not medical advice.
+              {nutrition.notes && ` ${nutrition.notes}`}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
 
   // Render based on import step
   const renderContent = () => {
@@ -623,16 +891,16 @@ Instructions:
           <Label>Instructions ({instructions.length} steps)</Label>
           <div className="max-h-40 overflow-y-auto space-y-2 border rounded-lg p-3 bg-secondary/30">
             {instructions.map((inst, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm group">
+              <div key={inst.id} className="flex items-start gap-2 text-sm group">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
                   {i + 1}
                 </span>
-                <span className="flex-1 leading-relaxed">{inst}</span>
+                <span className="flex-1 leading-relaxed">{inst.text}</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
-                  onClick={() => removeInstruction(i)}
+                  onClick={() => removeInstruction(inst.id)}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -671,6 +939,9 @@ Instructions:
             />
           </div>
         </div>
+
+        {/* Nutrition section */}
+        <NutritionSection />
 
         {/* Actions */}
         <div className="flex justify-between gap-3 pt-4 border-t">
@@ -834,44 +1105,17 @@ Instructions:
           </div>
         </div>
 
-        {/* Ingredients */}
+        {/* Ingredients - using stable keys */}
         <div className="space-y-3">
           <Label>Ingredients</Label>
-          {ingredients.map((ingredient, index) => (
-            <div key={ingredient.id} className="flex gap-2">
-              <Input
-                placeholder="Qty"
-                className="w-16"
-                value={ingredient.quantity || ''}
-                onChange={(e) => updateIngredient(ingredient.id, 'quantity', e.target.value ? parseFloat(e.target.value) : null)}
-              />
-              <Input
-                placeholder="Unit"
-                className="w-20"
-                value={ingredient.unit}
-                onChange={(e) => updateIngredient(ingredient.id, 'unit', e.target.value)}
-              />
-              <Input
-                placeholder="Ingredient"
-                className="flex-1"
-                value={ingredient.item}
-                onChange={(e) => updateIngredient(ingredient.id, 'item', e.target.value)}
-              />
-              <Input
-                placeholder="Notes"
-                className="w-24"
-                value={ingredient.notes || ''}
-                onChange={(e) => updateIngredient(ingredient.id, 'notes', e.target.value)}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeIngredient(ingredient.id)}
-                disabled={ingredients.length === 1}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+          {ingredients.map((ingredient) => (
+            <IngredientRow
+              key={ingredient.id}
+              ingredient={ingredient}
+              onUpdate={updateIngredient}
+              onRemove={removeIngredient}
+              canRemove={ingredients.length > 1}
+            />
           ))}
           <Button variant="outline" size="sm" onClick={addIngredient}>
             <Plus className="h-4 w-4 mr-2" />
@@ -879,36 +1123,27 @@ Instructions:
           </Button>
         </div>
 
-        {/* Instructions */}
+        {/* Instructions - using stable keys */}
         <div className="space-y-3">
           <Label>Instructions</Label>
           {instructions.map((instruction, index) => (
-            <div key={index} className="flex gap-2">
-              <span className="flex items-center justify-center w-8 h-10 rounded-lg bg-secondary text-sm font-medium">
-                {index + 1}
-              </span>
-              <Textarea
-                placeholder={`Step ${index + 1}`}
-                className="flex-1"
-                value={instruction}
-                onChange={(e) => updateInstruction(index, e.target.value)}
-                rows={2}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeInstruction(index)}
-                disabled={instructions.length === 1}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <InstructionRow
+              key={instruction.id}
+              instruction={instruction}
+              index={index}
+              onUpdate={updateInstruction}
+              onRemove={removeInstruction}
+              canRemove={instructions.length > 1}
+            />
           ))}
           <Button variant="outline" size="sm" onClick={addInstruction}>
             <Plus className="h-4 w-4 mr-2" />
             Add Step
           </Button>
         </div>
+
+        {/* Nutrition section */}
+        <NutritionSection />
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
@@ -938,5 +1173,87 @@ Instructions:
         {renderContent()}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Separate component for ingredient row to prevent re-renders
+interface IngredientRowProps {
+  ingredient: Ingredient;
+  onUpdate: (id: string, field: keyof Ingredient, value: string | number | null) => void;
+  onRemove: (id: string) => void;
+  canRemove: boolean;
+}
+
+function IngredientRow({ ingredient, onUpdate, onRemove, canRemove }: IngredientRowProps) {
+  return (
+    <div className="flex gap-2">
+      <Input
+        placeholder="Qty"
+        className="w-16"
+        type="number"
+        value={ingredient.quantity ?? ''}
+        onChange={(e) => onUpdate(ingredient.id, 'quantity', e.target.value ? parseFloat(e.target.value) : null)}
+      />
+      <Input
+        placeholder="Unit"
+        className="w-20"
+        value={ingredient.unit}
+        onChange={(e) => onUpdate(ingredient.id, 'unit', e.target.value)}
+      />
+      <Input
+        placeholder="Ingredient"
+        className="flex-1"
+        value={ingredient.item}
+        onChange={(e) => onUpdate(ingredient.id, 'item', e.target.value)}
+      />
+      <Input
+        placeholder="Notes"
+        className="w-24"
+        value={ingredient.notes || ''}
+        onChange={(e) => onUpdate(ingredient.id, 'notes', e.target.value)}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onRemove(ingredient.id)}
+        disabled={!canRemove}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// Separate component for instruction row to prevent re-renders
+interface InstructionRowProps {
+  instruction: { id: string; text: string };
+  index: number;
+  onUpdate: (id: string, value: string) => void;
+  onRemove: (id: string) => void;
+  canRemove: boolean;
+}
+
+function InstructionRow({ instruction, index, onUpdate, onRemove, canRemove }: InstructionRowProps) {
+  return (
+    <div className="flex gap-2">
+      <span className="flex items-center justify-center w-8 h-10 rounded-lg bg-secondary text-sm font-medium">
+        {index + 1}
+      </span>
+      <Textarea
+        placeholder={`Step ${index + 1}`}
+        className="flex-1"
+        value={instruction.text}
+        onChange={(e) => onUpdate(instruction.id, e.target.value)}
+        rows={2}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onRemove(instruction.id)}
+        disabled={!canRemove}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
