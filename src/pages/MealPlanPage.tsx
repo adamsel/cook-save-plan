@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot, Recipe } from '@/types/recipe';
+import { DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot, Recipe, MealPlanItem } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,17 @@ import {
   Clock, 
   Users,
   Minus,
-  Plus
+  Plus,
+  MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
+
+interface PlannedRecipeDisplay {
+  recipe: Recipe;
+  item: MealPlanItem;
+}
 
 export default function MealPlanPage() {
   const { recipes, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem } = useRecipes();
@@ -24,6 +31,8 @@ export default function MealPlanPage() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState<Recipe | null>(null);
+  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   
   const mealPlan = getCurrentMealPlan();
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -40,11 +49,15 @@ export default function MealPlanPage() {
     );
   }, [recipes, searchQuery]);
 
-  const getRecipeForSlot = (day: DayOfWeek, slot: MealSlot) => {
-    const item = mealPlan.items.find(i => i.day === day && i.mealSlot === slot);
-    if (!item) return null;
-    const recipe = recipes.find(r => r.id === item.recipeId);
-    return recipe ? { ...recipe, mealPlanItemId: item.id, servingsMultiplier: item.servingsMultiplier } : null;
+  // Get all recipes for a slot (supports multiple)
+  const getRecipesForSlot = (day: DayOfWeek, slot: MealSlot): PlannedRecipeDisplay[] => {
+    const items = mealPlan.items.filter(i => i.day === day && i.mealSlot === slot);
+    return items
+      .map(item => {
+        const recipe = recipes.find(r => r.id === item.recipeId);
+        return recipe ? { recipe, item } : null;
+      })
+      .filter((r): r is PlannedRecipeDisplay => r !== null);
   };
 
   const handleDrop = (e: React.DragEvent, day: string, slot: 'breakfast' | 'lunch' | 'dinner') => {
@@ -80,6 +93,10 @@ export default function MealPlanPage() {
     }
   };
 
+  const toggleSlotExpansion = (slotId: string) => {
+    setExpandedSlots(prev => ({ ...prev, [slotId]: !prev[slotId] }));
+  };
+
   const dayLabels: Record<string, string> = {
     monday: 'Monday',
     tuesday: 'Tuesday',
@@ -88,6 +105,29 @@ export default function MealPlanPage() {
     friday: 'Friday',
     saturday: 'Saturday',
     sunday: 'Sunday',
+  };
+
+  // Calculate daily nutrition totals
+  const getDailyNutrition = (day: DayOfWeek) => {
+    let calories = 0;
+    let protein = 0;
+    let carbs = 0;
+    let fat = 0;
+
+    MEAL_SLOTS.forEach(slot => {
+      const plannedRecipes = getRecipesForSlot(day, slot);
+      plannedRecipes.forEach(({ recipe, item }) => {
+        if (recipe.nutrition) {
+          const mult = item.servingsMultiplier;
+          calories += recipe.nutrition.perServing.calories * mult;
+          protein += recipe.nutrition.perServing.protein * mult;
+          carbs += recipe.nutrition.perServing.carbs * mult;
+          fat += recipe.nutrition.perServing.fat * mult;
+        }
+      });
+    });
+
+    return { calories: Math.round(calories), protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat) };
   };
 
   return (
@@ -146,6 +186,16 @@ export default function MealPlanPage() {
                           {recipe.servings}
                         </span>
                       </div>
+                      {/* Quick add button for mobile */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-1 h-6 text-xs lg:hidden"
+                        onClick={() => setSelectedRecipeForPlan(recipe)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add to plan
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -159,14 +209,22 @@ export default function MealPlanPage() {
           <div className="min-w-[700px]">
             {/* Header */}
             <div className="grid grid-cols-7 gap-2 mb-2">
-              {DAYS_OF_WEEK.map((day, index) => (
-                <div key={day} className="text-center">
-                  <div className="font-semibold text-sm">{dayLabels[day]}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {format(addDays(weekStart, index), 'MMM d')}
+              {DAYS_OF_WEEK.map((day, index) => {
+                const dailyNutrition = getDailyNutrition(day);
+                return (
+                  <div key={day} className="text-center">
+                    <div className="font-semibold text-sm">{dayLabels[day]}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(addDays(weekStart, index), 'MMM d')}
+                    </div>
+                    {dailyNutrition.calories > 0 && (
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        {dailyNutrition.calories} cal
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Meal slots */}
@@ -178,8 +236,12 @@ export default function MealPlanPage() {
                 <div className="grid grid-cols-7 gap-2">
                   {DAYS_OF_WEEK.map(day => {
                     const slotId = `${day}-${slot}`;
-                    const plannedRecipe = getRecipeForSlot(day, slot);
+                    const plannedRecipes = getRecipesForSlot(day, slot);
                     const isOver = dragOverSlot === slotId;
+                    const hasRecipes = plannedRecipes.length > 0;
+                    const isExpanded = expandedSlots[slotId];
+                    const displayRecipes = isExpanded ? plannedRecipes : plannedRecipes.slice(0, 2);
+                    const hiddenCount = plannedRecipes.length - 2;
 
                     return (
                       <div
@@ -189,56 +251,70 @@ export default function MealPlanPage() {
                         onDragLeave={handleDragLeave}
                         className={cn(
                           "min-h-[100px] rounded-xl border-2 border-dashed transition-all p-2",
-                          plannedRecipe 
+                          hasRecipes 
                             ? "border-transparent bg-card shadow-sm" 
                             : "border-border/50 bg-muted/30",
                           isOver && "border-primary bg-primary/5 drop-zone-active"
                         )}
                       >
-                        {plannedRecipe ? (
-                          <div className="h-full">
-                            <div className="flex items-start justify-between gap-1">
-                              <h4 className="font-medium text-xs leading-tight line-clamp-2">
-                                {plannedRecipe.title}
-                              </h4>
-                              <button
-                                onClick={() => removeFromMealPlan(plannedRecipe.mealPlanItemId)}
-                                className="shrink-0 p-1 rounded hover:bg-muted -mr-1 -mt-1"
-                              >
-                                <X className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                            </div>
-                            
-                            {plannedRecipe.imageUrl && (
-                              <img
-                                src={plannedRecipe.imageUrl}
-                                alt=""
-                                className="w-full h-10 object-cover rounded-lg mt-1"
-                              />
-                            )}
+                        {hasRecipes ? (
+                          <div className="space-y-2">
+                            {displayRecipes.map(({ recipe, item }) => (
+                              <div key={item.id} className="bg-secondary/50 rounded-lg p-2">
+                                <div className="flex items-start justify-between gap-1">
+                                  <h4 className="font-medium text-xs leading-tight line-clamp-2">
+                                    {recipe.title}
+                                  </h4>
+                                  <button
+                                    onClick={() => removeFromMealPlan(item.id)}
+                                    className="shrink-0 p-1 rounded hover:bg-muted -mr-1 -mt-1"
+                                  >
+                                    <X className="h-3 w-3 text-muted-foreground" />
+                                  </button>
+                                </div>
 
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-[10px] text-muted-foreground">
-                                {plannedRecipe.servings * plannedRecipe.servingsMultiplier} servings
-                              </span>
-                              <div className="flex items-center gap-0.5">
-                                <button
-                                  onClick={() => updateServings(plannedRecipe.mealPlanItemId, -0.5)}
-                                  className="p-0.5 rounded hover:bg-muted"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="text-[10px] w-5 text-center">
-                                  {plannedRecipe.servingsMultiplier}x
-                                </span>
-                                <button
-                                  onClick={() => updateServings(plannedRecipe.mealPlanItemId, 0.5)}
-                                  className="p-0.5 rounded hover:bg-muted"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </button>
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {recipe.servings * item.servingsMultiplier} srv
+                                  </span>
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      onClick={() => updateServings(item.id, -0.5)}
+                                      className="p-0.5 rounded hover:bg-muted"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </button>
+                                    <span className="text-[10px] w-5 text-center">
+                                      {item.servingsMultiplier}x
+                                    </span>
+                                    <button
+                                      onClick={() => updateServings(item.id, 0.5)}
+                                      className="p-0.5 rounded hover:bg-muted"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
+                            ))}
+                            
+                            {hiddenCount > 0 && !isExpanded && (
+                              <button
+                                onClick={() => toggleSlotExpansion(slotId)}
+                                className="text-[10px] text-primary hover:underline w-full text-center"
+                              >
+                                +{hiddenCount} more
+                              </button>
+                            )}
+                            
+                            {isExpanded && plannedRecipes.length > 2 && (
+                              <button
+                                onClick={() => toggleSlotExpansion(slotId)}
+                                className="text-[10px] text-muted-foreground hover:underline w-full text-center"
+                              >
+                                Show less
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
@@ -254,6 +330,13 @@ export default function MealPlanPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile add to plan dialog */}
+      <MealPlanDialog
+        open={!!selectedRecipeForPlan}
+        onOpenChange={() => setSelectedRecipeForPlan(null)}
+        recipe={selectedRecipeForPlan}
+      />
     </div>
   );
 }

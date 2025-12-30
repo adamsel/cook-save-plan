@@ -1,4 +1,4 @@
-import { Ingredient } from '@/types/recipe';
+import { Ingredient, RecipeNutrition } from '@/types/recipe';
 
 export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual';
 export type ParsingConfidence = 'high' | 'medium' | 'low';
@@ -18,6 +18,7 @@ export interface ParsedRecipe {
   importMethod: ImportMethod;
   confidence: ParsingConfidence;
   rawImportSnapshot?: string;
+  nutrition?: RecipeNutrition;
 }
 
 // Parse ISO 8601 duration (PT30M, PT1H30M, etc.) to minutes

@@ -87,41 +87,20 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const addToMealPlan = (recipeId: string, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner') => {
     const currentPlan = getCurrentMealPlan();
     
-    // Check if slot already has a recipe
-    const existingItem = currentPlan.items.find(
-      item => item.day === day && item.mealSlot === mealSlot
-    );
+    // Always add as new item (supports multiple recipes per slot)
+    const newItem: MealPlanItem = {
+      id: generateId(),
+      recipeId,
+      day,
+      mealSlot,
+      servingsMultiplier: 1,
+    };
     
-    if (existingItem) {
-      // Replace existing
-      setMealPlans(prev => prev.map(mp => 
-        mp.id === currentPlan.id 
-          ? {
-              ...mp,
-              items: mp.items.map(item => 
-                item.id === existingItem.id 
-                  ? { ...item, recipeId }
-                  : item
-              )
-            }
-          : mp
-      ));
-    } else {
-      // Add new
-      const newItem: MealPlanItem = {
-        id: generateId(),
-        recipeId,
-        day,
-        mealSlot,
-        servingsMultiplier: 1,
-      };
-      
-      setMealPlans(prev => prev.map(mp => 
-        mp.id === currentPlan.id 
-          ? { ...mp, items: [...mp.items, newItem] }
-          : mp
-      ));
-    }
+    setMealPlans(prev => prev.map(mp => 
+      mp.id === currentPlan.id 
+        ? { ...mp, items: [...mp.items, newItem] }
+        : mp
+    ));
   };
 
   const removeFromMealPlan = (itemId: string) => {
