@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Search, Filter, X, Heart, Clock, ChevronDown } from 'lucide-react';
+import { Search, Filter, X, Heart, Clock, ChevronDown, SortAsc, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +9,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+
+export type SortOption = 'recent' | 'oldest' | 'favorites' | 'prep-time' | 'title';
 
 interface RecipeFiltersProps {
   searchQuery: string;
@@ -28,6 +31,11 @@ interface RecipeFiltersProps {
   onTimeFilterChange: (filter: 'all' | 'quick' | 'medium' | 'long') => void;
   categories: string[];
   tags: string[];
+  sortBy: SortOption;
+  onSortChange: (sort: SortOption) => void;
+  showMissingCategory: boolean;
+  onMissingCategoryChange: (show: boolean) => void;
+  missingCategoryCount?: number;
 }
 
 export function RecipeFilters({
@@ -45,6 +53,11 @@ export function RecipeFilters({
   onTimeFilterChange,
   categories,
   tags,
+  sortBy,
+  onSortChange,
+  showMissingCategory,
+  onMissingCategoryChange,
+  missingCategoryCount = 0,
 }: RecipeFiltersProps) {
   const toggleCategory = (category: string) => {
     onCategoriesChange(
@@ -68,6 +81,7 @@ export function RecipeFilters({
     onTagsChange([]);
     onFavoritesChange(false);
     onTimeFilterChange('all');
+    onMissingCategoryChange(false);
   };
 
   const hasActiveFilters = 
@@ -75,7 +89,16 @@ export function RecipeFilters({
     selectedCategories.length > 0 || 
     selectedTags.length > 0 || 
     showFavoritesOnly || 
-    timeFilter !== 'all';
+    timeFilter !== 'all' ||
+    showMissingCategory;
+
+  const sortLabels: Record<SortOption, string> = {
+    'recent': 'Recently Added',
+    'oldest': 'Oldest First',
+    'favorites': 'Favorites First',
+    'prep-time': 'Prep Time',
+    'title': 'Title A-Z',
+  };
 
   return (
     <div className="space-y-4">
@@ -84,14 +107,36 @@ export function RecipeFilters({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search recipes..."
+            placeholder="Search recipes, ingredients, tags..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Sort dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <SortAsc className="h-4 w-4" />
+                <span className="hidden sm:inline">{sortLabels[sortBy]}</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => onSortChange(v as SortOption)}>
+                {Object.entries(sortLabels).map(([value, label]) => (
+                  <DropdownMenuRadioItem key={value} value={value}>
+                    {label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Categories dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -169,6 +214,22 @@ export function RecipeFilters({
           >
             <Heart className={cn("h-4 w-4", showFavoritesOnly && "fill-current")} />
           </Button>
+
+          {/* Missing category filter */}
+          {missingCategoryCount > 0 && (
+            <Button
+              variant={showMissingCategory ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={() => onMissingCategoryChange(!showMissingCategory)}
+              className="gap-2"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Uncategorized</span>
+              <Badge variant={showMissingCategory ? 'secondary' : 'outline'} className="h-5 px-1.5">
+                {missingCategoryCount}
+              </Badge>
+            </Button>
+          )}
         </div>
       </div>
 
