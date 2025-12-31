@@ -5,6 +5,7 @@ import { RecipeCard } from '@/components/recipes/RecipeCard';
 import { RecipeFilters, SortOption } from '@/components/recipes/RecipeFilters';
 import { AddRecipeDialog } from '@/components/recipes/AddRecipeDialog';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
+import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,8 @@ export default function RecipesPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [mealPlanRecipe, setMealPlanRecipe] = useState<Recipe | null>(null);
   const [showMealPlanDialog, setShowMealPlanDialog] = useState(false);
+  const [viewingRecipe, setViewingRecipe] = useState<Recipe | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
 
   // Bulk edit state
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
@@ -307,6 +310,10 @@ export default function RecipesPage() {
                 onEdit={handleEdit}
                 onDelete={deleteRecipe}
                 onAddToMealPlan={handleAddToMealPlan}
+                onViewDetails={(recipe) => {
+                  setViewingRecipe(recipe);
+                  setShowDetailDialog(true);
+                }}
               />
             </div>
           ))}
@@ -335,6 +342,23 @@ export default function RecipesPage() {
         open={showMealPlanDialog}
         onOpenChange={setShowMealPlanDialog}
         recipe={mealPlanRecipe}
+      />
+
+      <RecipeDetailDialog
+        recipe={viewingRecipe}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+        onToggleFavorite={toggleFavorite}
+        onToggleArchive={toggleArchive}
+        onEdit={(recipe) => {
+          setShowDetailDialog(false);
+          handleEdit(recipe);
+        }}
+        onDelete={deleteRecipe}
+        onAddToMealPlan={(recipe) => {
+          setShowDetailDialog(false);
+          handleAddToMealPlan(recipe);
+        }}
       />
     </div>
   );
