@@ -18,6 +18,7 @@ interface RecipeCardProps {
   onEdit: (recipe: Recipe) => void;
   onDelete: (id: string) => void;
   onAddToMealPlan: (recipe: Recipe) => void;
+  onViewDetails: (recipe: Recipe) => void;
   isDragging?: boolean;
 }
 
@@ -28,15 +29,17 @@ export function RecipeCard({
   onEdit,
   onDelete,
   onAddToMealPlan,
+  onViewDetails,
   isDragging = false,
 }: RecipeCardProps) {
   return (
     <div
       className={cn(
-        "group relative bg-card rounded-2xl border border-border/50 overflow-hidden recipe-card-hover",
+        "group relative bg-card rounded-2xl border border-border/50 overflow-hidden recipe-card-hover cursor-pointer",
         isDragging && "drag-ghost"
       )}
       draggable
+      onClick={() => onViewDetails(recipe)}
       onDragStart={(e) => {
         e.dataTransfer.setData('recipeId', recipe.id);
         e.dataTransfer.effectAllowed = 'copy';
