@@ -18,11 +18,13 @@ import {
   Heart,
   Utensils,
   Calendar,
-  History
+  History,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
+import { WeeklySummary } from '@/components/recipes/WeeklySummary';
 
 interface PlannedRecipeDisplay {
   recipe: Recipe;
@@ -32,7 +34,7 @@ interface PlannedRecipeDisplay {
 type FilterType = 'all' | 'favorites' | 'quick' | 'category';
 
 export default function MealPlanPage() {
-  const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories } = useRecipes();
+  const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories, pantryStaples } = useRecipes();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,6 +44,7 @@ export default function MealPlanPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const [showSummary, setShowSummary] = useState(true);
   
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
@@ -191,6 +194,15 @@ export default function MealPlanPage() {
                 Plan your week, track your meals
               </p>
             </div>
+            <Button
+              variant={showSummary ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowSummary(!showSummary)}
+              className="gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Weekly Summary
+            </Button>
           </div>
           
           {/* Week Navigation */}
@@ -544,6 +556,17 @@ export default function MealPlanPage() {
                 </div>
               ))}
             </div>
+            
+            {/* Weekly Summary Panel */}
+            {showSummary && (
+              <div className="mt-6">
+                <WeeklySummary
+                  recipes={recipes}
+                  mealPlanItems={selectedWeekPlan.items}
+                  pantryStaples={pantryStaples}
+                />
+              </div>
+            )}
           </div>
         </div>
 
