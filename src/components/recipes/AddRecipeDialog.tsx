@@ -5,6 +5,7 @@ import { parseRecipeFromUrl, parseFromText, ParsedRecipe } from '@/lib/recipePar
 import { suggestCategorization } from '@/lib/recipeSuggestions';
 import { IngredientEditor, parseMultipleIngredients } from './IngredientEditor';
 import { InstructionEditor, InstructionStep, parseMultipleInstructions } from './InstructionEditor';
+import { RecipeAIChat } from './RecipeAIChat';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ interface AddRecipeDialogProps {
   editingRecipe?: Recipe | null;
 }
 
-type ImportStep = 'input' | 'review' | 'edit';
+type ImportStep = 'chat' | 'input' | 'review' | 'edit';
 
 // Stable ID generator
 const generateId = (): string => {
@@ -169,7 +170,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setSelectedMealTypes([]);
     setImportMethod('manual');
     setNutrition(null);
-    setImportStep('input');
+    setImportStep('chat'); // Default to AI chat
     setParseError(null);
     setShowPasteFallback(false);
     setSuggestedCategory(null);
@@ -678,6 +679,45 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     </div>
   );
 
+  // Handle recipe from AI chat
+  const handleAIRecipeReady = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Load the AI-generated recipe into the edit form for final review
+    setTitle(recipeData.title);
+    setDescription(recipeData.description || '');
+    setCategory(recipeData.category || '');
+    setSelectedTags(recipeData.tags || []);
+    setPrepTime(recipeData.prepTime?.toString() || '');
+    setCookTime(recipeData.cookTime?.toString() || '');
+    setServings(recipeData.servings.toString());
+    setImageUrl(recipeData.imageUrl || '');
+    setSourceUrl(recipeData.sourceUrl || '');
+    
+    // Ensure stable IDs for ingredients
+    const loadedIngredients = recipeData.ingredients.length > 0 
+      ? recipeData.ingredients.map(i => ({
+          ...i,
+          id: i.id || `ing-${generateId()}`
+        }))
+      : [createEmptyIngredient()];
+    setIngredients(loadedIngredients);
+    
+    // Convert instructions to InstructionStep format
+    const loadedInstructions = recipeData.instructions.length > 0 
+      ? recipeData.instructions.map(text => ({
+          id: `step-${generateId()}`,
+          text
+        }))
+      : [createEmptyInstruction()];
+    setInstructions(loadedInstructions);
+    
+    setSelectedMealTypes(recipeData.mealTypes || []);
+    setImportMethod(recipeData.importMethod || 'text');
+    setNutrition(recipeData.nutrition || null);
+    
+    // Move to edit form for final review
+    setImportStep('edit');
+  };
+
   // Render based on import step
   const renderContent = () => {
     if (editingRecipe) {
@@ -685,6 +725,13 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     }
 
     switch (importStep) {
+      case 'chat':
+        return (
+          <RecipeAIChat 
+            onRecipeReady={handleAIRecipeReady}
+            onCancel={() => onOpenChange(false)}
+          />
+        );
       case 'input':
         return <InputStep />;
       case 'review':
@@ -1187,12 +1234,17 @@ Instructions:
       if (!isOpen) resetForm();
       onOpenChange(isOpen);
     }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-serif text-2xl">
-            {editingRecipe ? 'Edit Recipe' : 'Add New Recipe'}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className={cn(
+        "max-h-[90vh] overflow-y-auto",
+        importStep === 'chat' ? "max-w-3xl" : "max-w-2xl"
+      )}>
+        {importStep !== 'chat' && (
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">
+              {editingRecipe ? 'Edit Recipe' : importStep === 'edit' ? 'Review & Save Recipe' : 'Add New Recipe'}
+            </DialogTitle>
+          </DialogHeader>
+        )}
 
         {renderContent()}
       </DialogContent>
