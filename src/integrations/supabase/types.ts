@@ -14,7 +14,241 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      meal_plan_items: {
+        Row: {
+          created_at: string
+          day: string
+          id: string
+          meal_plan_id: string
+          meal_slot: string
+          notes: string | null
+          recipe_id: string
+          servings_multiplier: number
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          id?: string
+          meal_plan_id: string
+          meal_slot: string
+          notes?: string | null
+          recipe_id: string
+          servings_multiplier?: number
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          id?: string
+          meal_plan_id?: string
+          meal_slot?: string
+          notes?: string | null
+          recipe_id?: string
+          servings_multiplier?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_items_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plans: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recipe_shares: {
+        Row: {
+          can_edit: boolean
+          created_at: string
+          id: string
+          recipe_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Insert: {
+          can_edit?: boolean
+          created_at?: string
+          id?: string
+          recipe_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Update: {
+          can_edit?: boolean
+          created_at?: string
+          id?: string
+          recipe_id?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_shares_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          author: string | null
+          category: string
+          cook_time: number | null
+          created_at: string
+          cuisine: string | null
+          description: string | null
+          dietary: string[] | null
+          id: string
+          image_url: string | null
+          import_method: string | null
+          ingredients: Json
+          instructions: string[] | null
+          is_archived: boolean
+          is_favorite: boolean
+          is_library: boolean
+          is_public: boolean
+          meal_types: string[] | null
+          nutrition: Json | null
+          original_recipe_id: string | null
+          prep_time: number | null
+          raw_import_snapshot: string | null
+          servings: number
+          source_url: string | null
+          tags: string[] | null
+          title: string
+          total_time: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          author?: string | null
+          category?: string
+          cook_time?: number | null
+          created_at?: string
+          cuisine?: string | null
+          description?: string | null
+          dietary?: string[] | null
+          id?: string
+          image_url?: string | null
+          import_method?: string | null
+          ingredients?: Json
+          instructions?: string[] | null
+          is_archived?: boolean
+          is_favorite?: boolean
+          is_library?: boolean
+          is_public?: boolean
+          meal_types?: string[] | null
+          nutrition?: Json | null
+          original_recipe_id?: string | null
+          prep_time?: number | null
+          raw_import_snapshot?: string | null
+          servings?: number
+          source_url?: string | null
+          tags?: string[] | null
+          title: string
+          total_time?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          author?: string | null
+          category?: string
+          cook_time?: number | null
+          created_at?: string
+          cuisine?: string | null
+          description?: string | null
+          dietary?: string[] | null
+          id?: string
+          image_url?: string | null
+          import_method?: string | null
+          ingredients?: Json
+          instructions?: string[] | null
+          is_archived?: boolean
+          is_favorite?: boolean
+          is_library?: boolean
+          is_public?: boolean
+          meal_types?: string[] | null
+          nutrition?: Json | null
+          original_recipe_id?: string | null
+          prep_time?: number | null
+          raw_import_snapshot?: string | null
+          servings?: number
+          source_url?: string | null
+          tags?: string[] | null
+          title?: string
+          total_time?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipes_original_recipe_id_fkey"
+            columns: ["original_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
