@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
-import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek } from '@/types/recipe';
+import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,7 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
-  UtensilsCrossed,
+  ChevronLeft,
   Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -27,9 +27,10 @@ import {
 } from '@/components/ui/collapsible';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { format, startOfWeek, addWeeks, endOfWeek } from 'date-fns';
 
 export default function ShoppingListPage() {
-  const { recipes, getCurrentMealPlan, pantryStaples, aisleCategories } = useRecipes();
+  const { recipes, getMealPlanForWeek, mealPlans, pantryStaples, aisleCategories } = useRecipes();
   const { toast } = useToast();
   
   const [checkedItems, setCheckedItems] = useLocalStorage<Record<string, boolean>>('shoppingListChecked', {});
@@ -39,21 +40,42 @@ export default function ShoppingListPage() {
   const [groupByAisle, setGroupByAisle] = useState(true);
   const [excludeStaples, setExcludeStaples] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
 
-  const mealPlan = getCurrentMealPlan();
+  const today = new Date();
+  const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
+  const selectedWeekEnd = endOfWeek(selectedWeekStart, { weekStartsOn: 1 });
+  const isCurrentWeek = selectedWeekOffset === 0;
+
+  // Fetch meal plan when week changes
+  useEffect(() => {
+    const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+    
+    // First check if we already have it in mealPlans
+    const existingPlan = mealPlans.find(mp => mp.weekStartDate === weekStartStr);
+    if (existingPlan) {
+      setMealPlan(existingPlan);
+    } else {
+      getMealPlanForWeek(weekStartStr).then(plan => {
+        setMealPlan(plan);
+      });
+    }
+  }, [selectedWeekOffset, getMealPlanForWeek, mealPlans, selectedWeekStart]);
+
+  const effectiveMealPlan = mealPlan || { id: '', weekStartDate: '', items: [] };
 
   // Generate shopping list from meal plan
   const shoppingList = useMemo(() => {
     const itemsMap = new Map<string, ShoppingListItem>();
 
     // Filter meal plan items by selected days
-    const filteredPlanItems = mealPlan.items.filter(item => 
+    const filteredPlanItems = effectiveMealPlan.items.filter(item => 
       selectedDays.includes(item.day as DayOfWeek)
     );
 
     filteredPlanItems.forEach(planItem => {
       const recipe = recipes.find(r => r.id === planItem.recipeId);
-      if (!recipe) return;
       if (!recipe) return;
 
       recipe.ingredients.forEach(ingredient => {
@@ -108,7 +130,7 @@ export default function ShoppingListPage() {
       ...item,
       checked: checkedItems[item.id] || false,
     }));
-  }, [mealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
+  }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
 
   const toggleDay = (day: DayOfWeek) => {
     setSelectedDays(prev => {
@@ -231,6 +253,57 @@ export default function ShoppingListPage() {
             ? `${checkedCount} of ${totalCount} items checked`
             : 'No items in your shopping list'}
         </p>
+      </div>
+
+      {/* Week Selector */}
+      <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedWeekOffset(prev => prev - 1)}
+            className="h-8 w-8"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="font-medium">
+                {isCurrentWeek ? 'This Week' : selectedWeekOffset > 0 ? 'Next Week' : 'Previous Week'}
+              </span>
+              {isCurrentWeek && (
+                <Badge variant="secondary" className="text-xs">Current</Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {format(selectedWeekStart, 'MMM d')} - {format(selectedWeekEnd, 'MMM d, yyyy')}
+            </p>
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedWeekOffset(prev => prev + 1)}
+            className="h-8 w-8"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        {!isCurrentWeek && (
+          <div className="flex justify-center mt-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setSelectedWeekOffset(0)}
+              className="text-xs"
+            >
+              Back to This Week
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Day Selection */}
