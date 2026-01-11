@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
-import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES } from '@/types/recipe';
+import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,7 @@ export default function ShoppingListPage() {
   
   const [checkedItems, setCheckedItems] = useLocalStorage<Record<string, boolean>>('shoppingListChecked', {});
   const [customItems, setCustomItems] = useLocalStorage<ShoppingListItem[]>('customShoppingItems', []);
+  const [selectedDays, setSelectedDays] = useLocalStorage<DayOfWeek[]>('shoppingListDays', [...DAYS_OF_WEEK]);
   const [newItemText, setNewItemText] = useState('');
   const [groupByAisle, setGroupByAisle] = useState(true);
   const [excludeStaples, setExcludeStaples] = useState(false);
@@ -44,8 +46,14 @@ export default function ShoppingListPage() {
   const shoppingList = useMemo(() => {
     const itemsMap = new Map<string, ShoppingListItem>();
 
-    mealPlan.items.forEach(planItem => {
+    // Filter meal plan items by selected days
+    const filteredPlanItems = mealPlan.items.filter(item => 
+      selectedDays.includes(item.day as DayOfWeek)
+    );
+
+    filteredPlanItems.forEach(planItem => {
       const recipe = recipes.find(r => r.id === planItem.recipeId);
+      if (!recipe) return;
       if (!recipe) return;
 
       recipe.ingredients.forEach(ingredient => {
@@ -100,7 +108,20 @@ export default function ShoppingListPage() {
       ...item,
       checked: checkedItems[item.id] || false,
     }));
-  }, [mealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples]);
+  }, [mealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
+
+  const toggleDay = (day: DayOfWeek) => {
+    setSelectedDays(prev => {
+      if (prev.includes(day)) {
+        return prev.length > 1 ? prev.filter(d => d !== day) : prev; // Keep at least one day
+      }
+      return [...prev, day];
+    });
+  };
+
+  const selectAllDays = () => setSelectedDays([...DAYS_OF_WEEK]);
+  const selectWeekdays = () => setSelectedDays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+  const selectWeekend = () => setSelectedDays(['saturday', 'sunday']);
 
   // Group items by category
   const groupedItems = useMemo(() => {
@@ -210,6 +231,35 @@ export default function ShoppingListPage() {
             ? `${checkedCount} of ${totalCount} items checked`
             : 'No items in your shopping list'}
         </p>
+      </div>
+
+      {/* Day Selection */}
+      <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar className="h-4 w-4 text-primary" />
+          <span className="font-medium text-sm">Days to include</span>
+          <div className="flex-1" />
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectAllDays}>All</Button>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectWeekdays}>Weekdays</Button>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectWeekend}>Weekend</Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {DAYS_OF_WEEK.map(day => (
+            <Badge
+              key={day}
+              variant={selectedDays.includes(day) ? 'default' : 'outline'}
+              className={cn(
+                "cursor-pointer capitalize transition-colors",
+                selectedDays.includes(day) && "bg-primary"
+              )}
+              onClick={() => toggleDay(day)}
+            >
+              {day.slice(0, 3)}
+            </Badge>
+          ))}
+        </div>
       </div>
 
       {/* Controls */}
