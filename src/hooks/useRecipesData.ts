@@ -126,11 +126,17 @@ export function useRecipesData() {
     return (data as unknown as DbRecipe[]).map(dbToRecipe);
   }, [user]);
 
-  // Fetch library recipes (public)
+  // Fetch library recipes (public) - exclude raw_import_snapshot for security
   const fetchLibraryRecipes = useCallback(async () => {
+    // Explicitly select safe columns to prevent raw_import_snapshot from being exposed
     const { data, error } = await supabase
       .from('recipes')
-      .select('*')
+      .select(`
+        id, user_id, title, source_url, image_url, description, category, tags,
+        prep_time, cook_time, total_time, servings, ingredients, instructions,
+        is_favorite, is_archived, cuisine, dietary, meal_types, author, nutrition,
+        import_method, is_public, is_library, original_recipe_id, created_at, updated_at
+      `)
       .or('is_public.eq.true,is_library.eq.true')
       .order('created_at', { ascending: false });
     
@@ -139,7 +145,8 @@ export function useRecipesData() {
       return [];
     }
     
-    return (data as unknown as DbRecipe[]).map(dbToRecipe);
+    // Map to DbRecipe with raw_import_snapshot explicitly null for safety
+    return (data as unknown as DbRecipe[]).map(row => dbToRecipe({ ...row, raw_import_snapshot: null }));
   }, []);
 
   // Fetch shared recipes (shared with current user)
