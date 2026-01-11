@@ -232,6 +232,39 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        
+        // SSRF protection: block internal and cloud metadata addresses
+        const hostname = urlObj.hostname.toLowerCase();
+        const blockedHosts = [
+          'localhost',
+          '127.0.0.1',
+          '0.0.0.0',
+          '169.254.169.254',
+          'metadata.google.internal',
+          'metadata',
+          '::1',
+          '[::1]',
+        ];
+        
+        if (blockedHosts.includes(hostname)) {
+          return new Response(
+            JSON.stringify({ error: "Invalid URL: internal addresses not allowed" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // Block private IP ranges
+        if (
+          hostname.startsWith('10.') ||
+          hostname.startsWith('192.168.') ||
+          /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+          hostname.startsWith('169.254.')
+        ) {
+          return new Response(
+            JSON.stringify({ error: "Invalid URL: private IP addresses not allowed" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       } catch {
         return new Response(
           JSON.stringify({ error: "Invalid URL format" }),
