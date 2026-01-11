@@ -176,7 +176,69 @@ serve(async (req) => {
     const userId = claimsData.claims.sub;
     console.log("Authenticated request from user:", userId);
 
-    const { messages, url } = await req.json();
+    const body = await req.json();
+    const { messages, url } = body;
+
+    // Validate messages array
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Invalid messages: must be a non-empty array" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (messages.length > 50) {
+      return new Response(
+        JSON.stringify({ error: "Too many messages: maximum 50 allowed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate each message
+    for (const msg of messages) {
+      if (!msg.role || !['user', 'assistant', 'system'].includes(msg.role)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid message role: must be 'user', 'assistant', or 'system'" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (typeof msg.content !== 'string') {
+        return new Response(
+          JSON.stringify({ error: "Invalid message content: must be a string" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (msg.content.length > 10000) {
+        return new Response(
+          JSON.stringify({ error: "Message too long: maximum 10000 characters per message" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Validate URL if provided
+    if (url !== undefined && url !== null && url !== '') {
+      if (typeof url !== 'string') {
+        return new Response(
+          JSON.stringify({ error: "Invalid URL: must be a string" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const urlObj = new URL(url);
+        if (!['http:', 'https:'].includes(urlObj.protocol)) {
+          return new Response(
+            JSON.stringify({ error: "Invalid URL: must use http or https protocol" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid URL format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
