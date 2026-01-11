@@ -50,6 +50,8 @@ export default function MealPlanPage() {
   const today = new Date();
   const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
   const isCurrentWeek = selectedWeekOffset === 0;
+  const isFutureWeek = selectedWeekOffset > 0;
+  const canEdit = isCurrentWeek || isFutureWeek;
   
   // Get meal plan for selected week
   const selectedWeekPlan = useMemo(() => {
@@ -100,10 +102,10 @@ export default function MealPlanPage() {
 
   const handleDrop = (e: React.DragEvent, day: string, slot: 'breakfast' | 'lunch' | 'dinner') => {
     e.preventDefault();
-    if (!isCurrentWeek) {
+    if (!canEdit) {
       toast({
         title: "Cannot modify past weeks",
-        description: "You can only add recipes to the current week.",
+        description: "You can only add recipes to current or future weeks.",
         variant: "destructive"
       });
       setDragOverSlot(null);
@@ -112,7 +114,8 @@ export default function MealPlanPage() {
     
     const recipeId = e.dataTransfer.getData('recipeId');
     if (recipeId) {
-      addToMealPlan(recipeId, day, slot);
+      const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+      addToMealPlan(recipeId, day, slot, weekStartStr);
       const recipe = recipes.find(r => r.id === recipeId);
       if (recipe) {
         toast({
@@ -126,7 +129,7 @@ export default function MealPlanPage() {
 
   const handleDragOver = (e: React.DragEvent, slotId: string) => {
     e.preventDefault();
-    if (isCurrentWeek) {
+    if (canEdit) {
       setDragOverSlot(slotId);
     }
   };
@@ -459,7 +462,7 @@ export default function MealPlanPage() {
                               ? "border-transparent bg-card shadow-sm" 
                               : "border-border/40 bg-muted/20 hover:bg-muted/30",
                             isOver && "border-primary bg-primary/5 scale-[1.02]",
-                            !isCurrentWeek && "opacity-80"
+                            !canEdit && "opacity-80"
                           )}
                         >
                           {hasRecipes ? (
@@ -486,7 +489,7 @@ export default function MealPlanPage() {
                                       <h4 className="font-medium text-xs leading-tight line-clamp-2">
                                         {recipe.title}
                                       </h4>
-                                      {isCurrentWeek && (
+                                      {canEdit && (
                                         <button
                                           onClick={() => removeFromMealPlan(item.id)}
                                           className="shrink-0 p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -496,7 +499,7 @@ export default function MealPlanPage() {
                                       )}
                                     </div>
 
-                                    {isCurrentWeek && (
+                                    {canEdit && (
                                       <div className="flex items-center justify-between mt-1.5">
                                         <span className="text-[10px] text-muted-foreground">
                                           {Math.round(recipe.servings * item.servingsMultiplier)} srv
@@ -545,7 +548,7 @@ export default function MealPlanPage() {
                           ) : (
                             <div className="h-full flex items-center justify-center">
                               <span className="text-xs text-muted-foreground/60">
-                                {isCurrentWeek ? 'Drop recipe' : '—'}
+                                {canEdit ? 'Drop recipe' : '—'}
                               </span>
                             </div>
                           )}
