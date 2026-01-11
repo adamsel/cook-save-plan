@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -216,11 +217,24 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
     const detectedUrl = detectUrl(trimmedInput);
 
     try {
+      // Get the user's session token for authenticated requests
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please sign in to use the AI recipe assistant.',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           messages: messages.filter(m => m.id !== 'welcome').concat(userMessage).map(m => ({
