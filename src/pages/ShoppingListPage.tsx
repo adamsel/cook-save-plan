@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
 import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan } from '@/types/recipe';
+import { getIngredientKey, getDisplayName } from '@/lib/ingredientNormalizer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -65,9 +66,10 @@ export default function ShoppingListPage() {
 
   const effectiveMealPlan = mealPlan || { id: '', weekStartDate: '', items: [] };
 
-  // Generate shopping list from meal plan
+  // Generate shopping list from meal plan with ingredient normalization
   const shoppingList = useMemo(() => {
-    const itemsMap = new Map<string, ShoppingListItem>();
+    // Track items by normalized key, with original names for display
+    const itemsMap = new Map<string, ShoppingListItem & { originalNames: string[] }>();
 
     // Filter meal plan items by selected days
     const filteredPlanItems = effectiveMealPlan.items.filter(item => 
@@ -79,36 +81,35 @@ export default function ShoppingListPage() {
       if (!recipe) return;
 
       recipe.ingredients.forEach(ingredient => {
-        const key = ingredient.item.toLowerCase().trim();
+        // Use normalized key for grouping similar ingredients
+        const normalizedKey = getIngredientKey(ingredient.item);
+        const originalKey = ingredient.item.toLowerCase().trim();
         
         // Skip pantry staples if excluded
-        if (excludeStaples && pantryStaples.some(s => key.includes(s.toLowerCase()))) {
+        if (excludeStaples && pantryStaples.some(s => 
+          normalizedKey.includes(s.toLowerCase()) || originalKey.includes(s.toLowerCase())
+        )) {
           return;
         }
 
-        const existing = itemsMap.get(key);
+        // Create a compound key that includes both normalized ingredient and unit
+        const mapKey = `${normalizedKey}::${ingredient.unit.toLowerCase()}`;
+        const existing = itemsMap.get(mapKey);
         const quantity = ingredient.quantity ? ingredient.quantity * planItem.servingsMultiplier : null;
 
-        if (existing && existing.unit === ingredient.unit && quantity !== null && existing.quantity !== null) {
-          // Merge quantities if units match
-          existing.quantity += quantity;
+        if (existing) {
+          // Merge quantities
+          if (quantity !== null && existing.quantity !== null) {
+            existing.quantity += quantity;
+          }
           existing.recipeIds = [...new Set([...existing.recipeIds, recipe.id])];
-        } else if (existing) {
-          // Keep as separate line if units don't match
-          const newKey = `${key}-${ingredient.unit}-${Date.now()}`;
-          itemsMap.set(newKey, {
-            id: newKey,
-            ingredient: ingredient.item,
-            quantity,
-            unit: ingredient.unit,
-            recipeIds: [recipe.id],
-            checked: false,
-            category: categorizeIngredient(ingredient.item),
-            isCustom: false,
-          });
+          // Track original names for display
+          if (!existing.originalNames.includes(ingredient.item)) {
+            existing.originalNames.push(ingredient.item);
+          }
         } else {
-          itemsMap.set(key, {
-            id: key,
+          itemsMap.set(mapKey, {
+            id: mapKey,
             ingredient: ingredient.item,
             quantity,
             unit: ingredient.unit,
@@ -116,6 +117,7 @@ export default function ShoppingListPage() {
             checked: false,
             category: categorizeIngredient(ingredient.item),
             isCustom: false,
+            originalNames: [ingredient.item],
           });
         }
       });
@@ -123,11 +125,14 @@ export default function ShoppingListPage() {
 
     // Add custom items
     customItems.forEach(item => {
-      itemsMap.set(item.id, item);
+      const customKey = `custom::${item.id}`;
+      itemsMap.set(customKey, { ...item, originalNames: [item.ingredient] });
     });
 
     return Array.from(itemsMap.values()).map(item => ({
       ...item,
+      // Use the shortest/simplest original name for display
+      ingredient: getDisplayName(item.ingredient, item.originalNames),
       checked: checkedItems[item.id] || false,
     }));
   }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
