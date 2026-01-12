@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
 import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan } from '@/types/recipe';
-import { getIngredientKey, getDisplayName } from '@/lib/ingredientNormalizer';
+import { mergeIngredients, type RawIngredientInput } from '@/lib/ingredientNormalizer/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -66,75 +66,73 @@ export default function ShoppingListPage() {
 
   const effectiveMealPlan = mealPlan || { id: '', weekStartDate: '', items: [] };
 
-  // Generate shopping list from meal plan with ingredient normalization
+  // Generate shopping list from meal plan with smart ingredient normalization and merging
   const shoppingList = useMemo(() => {
-    // Track items by normalized key, with original names for display
-    const itemsMap = new Map<string, ShoppingListItem & { originalNames: string[] }>();
-
     // Filter meal plan items by selected days
     const filteredPlanItems = effectiveMealPlan.items.filter(item => 
       selectedDays.includes(item.day as DayOfWeek)
     );
 
+    // Collect all ingredients for smart merging
+    const rawIngredients: RawIngredientInput[] = [];
+    
     filteredPlanItems.forEach(planItem => {
       const recipe = recipes.find(r => r.id === planItem.recipeId);
       if (!recipe) return;
 
       recipe.ingredients.forEach(ingredient => {
-        // Use normalized key for grouping similar ingredients
-        const normalizedKey = getIngredientKey(ingredient.item);
-        const originalKey = ingredient.item.toLowerCase().trim();
-        
-        // Skip pantry staples if excluded
-        if (excludeStaples && pantryStaples.some(s => 
-          normalizedKey.includes(s.toLowerCase()) || originalKey.includes(s.toLowerCase())
-        )) {
-          return;
-        }
-
-        // Create a compound key that includes both normalized ingredient and unit
-        const mapKey = `${normalizedKey}::${ingredient.unit.toLowerCase()}`;
-        const existing = itemsMap.get(mapKey);
-        const quantity = ingredient.quantity ? ingredient.quantity * planItem.servingsMultiplier : null;
-
-        if (existing) {
-          // Merge quantities
-          if (quantity !== null && existing.quantity !== null) {
-            existing.quantity += quantity;
-          }
-          existing.recipeIds = [...new Set([...existing.recipeIds, recipe.id])];
-          // Track original names for display
-          if (!existing.originalNames.includes(ingredient.item)) {
-            existing.originalNames.push(ingredient.item);
-          }
-        } else {
-          itemsMap.set(mapKey, {
-            id: mapKey,
-            ingredient: ingredient.item,
-            quantity,
-            unit: ingredient.unit,
-            recipeIds: [recipe.id],
-            checked: false,
-            category: categorizeIngredient(ingredient.item),
-            isCustom: false,
-            originalNames: [ingredient.item],
-          });
-        }
+        rawIngredients.push({
+          item: ingredient.item,
+          quantity: ingredient.quantity,
+          unit: ingredient.unit,
+          recipeId: recipe.id,
+          servingsMultiplier: planItem.servingsMultiplier,
+        });
       });
     });
 
+    // Use the smart merging system
+    const mergedIngredients = mergeIngredients(rawIngredients);
+    
+    // Convert to ShoppingListItem format and filter staples
+    const items: ShoppingListItem[] = mergedIngredients
+      .filter(item => {
+        if (!excludeStaples) return true;
+        // Check if item matches any pantry staple
+        const key = item.key.toLowerCase();
+        return !pantryStaples.some(staple => 
+          key.includes(staple.toLowerCase()) || 
+          item.originalNames.some(n => n.toLowerCase().includes(staple.toLowerCase()))
+        );
+      })
+      .map(item => {
+        // Extract the primary quantity for display
+        const primaryQty = item.quantities[0];
+        
+        return {
+          id: item.key,
+          ingredient: item.displayName,
+          quantity: primaryQty?.value ?? null,
+          unit: primaryQty?.unit ?? '',
+          recipeIds: item.recipeIds,
+          checked: checkedItems[item.key] || false,
+          category: item.category,
+          isCustom: false,
+          // Store the formatted total for display
+          _totalDisplay: item.totalDisplay,
+          _originalNames: item.originalNames,
+        } as ShoppingListItem & { _totalDisplay?: string; _originalNames?: string[] };
+      });
+
     // Add custom items
     customItems.forEach(item => {
-      const customKey = `custom::${item.id}`;
-      itemsMap.set(customKey, { ...item, originalNames: [item.ingredient] });
+      items.push({
+        ...item,
+        checked: checkedItems[item.id] || false,
+      });
     });
 
-    return Array.from(itemsMap.values()).map(item => ({
-      ...item,
-      // Use the shortest/simplest original name for display
-      ingredient: getDisplayName(item.ingredient, item.originalNames),
-      checked: checkedItems[item.id] || false,
-    }));
+    return items;
   }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
 
   const toggleDay = (day: DayOfWeek) => {
@@ -207,22 +205,10 @@ export default function ShoppingListPage() {
 
   const removeCustomItem = (id: string) => {
     setCustomItems(prev => prev.filter(i => i.id !== id));
-  };
-
   const clearChecked = () => {
     setCheckedItems({});
     toast({ title: "List reset", description: "All items unchecked." });
   };
-
-  const copyToClipboard = () => {
-    const text = shoppingList
-      .map(item => {
-        const qty = item.quantity ? `${item.quantity} ${item.unit}` : '';
-        return `${item.checked ? '☑' : '☐'} ${qty} ${item.ingredient}`.trim();
-      })
-      .join('\n');
-
-    navigator.clipboard.writeText(text);
     toast({ title: "Copied!", description: "Shopping list copied to clipboard." });
   };
 
@@ -432,11 +418,11 @@ export default function ShoppingListPage() {
                         "flex-1",
                         item.checked && "line-through text-muted-foreground"
                       )}>
-                        {item.quantity && (
-                          <span className="font-medium">
-                            {item.quantity} {item.unit}{' '}
-                          </span>
-                        )}
+                        {(() => {
+                          const extItem = item as ShoppingListItem & { _totalDisplay?: string };
+                          const qty = extItem._totalDisplay || (item.quantity ? `${item.quantity} ${item.unit}` : '');
+                          return qty && <span className="font-medium">{qty} </span>;
+                        })()}
                         {item.ingredient}
                       </span>
                       {item.recipeIds.length > 0 && (
