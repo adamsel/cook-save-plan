@@ -215,12 +215,13 @@ export const UNIT_CONVERSIONS: Record<string, ConversionFactor> = {
   '': { toBase: 1, type: 'unknown' },
 };
 
-// Unit display preferences (from base units)
+// Unit display preferences (from base units) - prefer practical cooking units over ml
 export const VOLUME_DISPLAY_THRESHOLDS = [
   { min: 0, max: 15, unit: 'tsp', factor: 1 / 4.929 },
   { min: 15, max: 60, unit: 'tbsp', factor: 1 / 14.787 },
-  { min: 60, max: 250, unit: 'ml', factor: 1 },
-  { min: 250, max: 1000, unit: 'cup', factor: 1 / 236.588 },
+  { min: 60, max: 120, unit: 'tbsp', factor: 1 / 14.787 },  // ~4 tbsp instead of ml
+  { min: 120, max: 500, unit: 'cup', factor: 1 / 236.588 },
+  { min: 500, max: 1000, unit: 'cup', factor: 1 / 236.588 },
   { min: 1000, max: Infinity, unit: 'l', factor: 1 / 1000 },
 ];
 
