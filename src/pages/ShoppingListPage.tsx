@@ -205,10 +205,22 @@ export default function ShoppingListPage() {
 
   const removeCustomItem = (id: string) => {
     setCustomItems(prev => prev.filter(i => i.id !== id));
+  };
+
   const clearChecked = () => {
     setCheckedItems({});
     toast({ title: "List reset", description: "All items unchecked." });
   };
+
+  const copyToClipboard = () => {
+    const text = shoppingList
+      .filter(i => !i.checked)
+      .map(i => {
+        const item = i as ShoppingListItem & { _totalDisplay?: string };
+        return item._totalDisplay || `${i.quantity || ''} ${i.unit || ''} ${i.ingredient}`.trim();
+      })
+      .join('\n');
+    navigator.clipboard.writeText(text);
     toast({ title: "Copied!", description: "Shopping list copied to clipboard." });
   };
 
