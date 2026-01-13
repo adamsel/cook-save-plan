@@ -19,12 +19,14 @@ import {
   Utensils,
   Calendar,
   History,
-  BarChart3
+  BarChart3,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
 import { WeeklySummary } from '@/components/recipes/WeeklySummary';
+import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 
 interface PlannedRecipeDisplay {
   recipe: Recipe;
@@ -34,12 +36,13 @@ interface PlannedRecipeDisplay {
 type FilterType = 'all' | 'favorites' | 'quick' | 'category';
 
 export default function MealPlanPage() {
-  const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories, pantryStaples } = useRecipes();
+  const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories, pantryStaples, toggleFavorite, toggleArchive, deleteRecipe } = useRecipes();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState<Recipe | null>(null);
+  const [selectedRecipeForView, setSelectedRecipeForView] = useState<Recipe | null>(null);
   const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -470,7 +473,8 @@ export default function MealPlanPage() {
                               {displayRecipes.map(({ recipe, item }) => (
                                 <div 
                                   key={item.id} 
-                                  className="group relative bg-secondary/50 rounded-lg overflow-hidden"
+                                  className="group relative bg-secondary/50 rounded-lg overflow-hidden cursor-pointer hover:bg-secondary/70 transition-colors"
+                                  onClick={() => setSelectedRecipeForView(recipe)}
                                 >
                                   {/* Recipe Image */}
                                   {recipe.imageUrl && (
@@ -491,7 +495,10 @@ export default function MealPlanPage() {
                                       </h4>
                                       {canEdit && (
                                         <button
-                                          onClick={() => removeFromMealPlan(item.id)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeFromMealPlan(item.id);
+                                          }}
                                           className="shrink-0 p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                           <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
@@ -504,7 +511,7 @@ export default function MealPlanPage() {
                                         <span className="text-[10px] text-muted-foreground">
                                           {Math.round(recipe.servings * item.servingsMultiplier)} srv
                                         </span>
-                                        <div className="flex items-center gap-0.5">
+                                        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                                           <button
                                             onClick={() => updateServings(item.id, -0.5)}
                                             className="p-0.5 rounded hover:bg-muted"
@@ -578,6 +585,21 @@ export default function MealPlanPage() {
           open={!!selectedRecipeForPlan}
           onOpenChange={() => setSelectedRecipeForPlan(null)}
           recipe={selectedRecipeForPlan}
+        />
+
+        {/* Recipe detail dialog */}
+        <RecipeDetailDialog
+          recipe={selectedRecipeForView}
+          open={!!selectedRecipeForView}
+          onOpenChange={(open) => !open && setSelectedRecipeForView(null)}
+          onToggleFavorite={toggleFavorite}
+          onToggleArchive={toggleArchive}
+          onEdit={() => {}}
+          onDelete={deleteRecipe}
+          onAddToMealPlan={(recipe) => {
+            setSelectedRecipeForView(null);
+            setSelectedRecipeForPlan(recipe);
+          }}
         />
       </div>
     </div>
