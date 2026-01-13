@@ -235,8 +235,8 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
         continue;
       }
       
-      // Format the quantity for display
-      const formatted = formatQuantity(q.baseValue, q.type, q.unit);
+      // Format the quantity for display - pass ingredient name for herb detection
+      const formatted = formatQuantity(q.baseValue, q.type, q.unit, key);
       quantities.push({
         value: formatted.value,
         unit: formatted.unit,
