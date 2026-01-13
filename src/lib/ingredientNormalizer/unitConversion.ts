@@ -287,35 +287,65 @@ export function areUnitsCompatible(unit1: string, unit2: string): boolean {
 
 /**
  * Format a quantity for display with smart unit selection
+ * Rounds up to nearest whole number for cleaner shopping lists
  */
-export function formatQuantity(baseValue: number, type: 'volume' | 'weight' | 'count' | 'container' | 'unknown', preferredUnit?: string): { value: number; unit: string } {
-  // For counts and containers, just round to reasonable precision
+export function formatQuantity(
+  baseValue: number, 
+  type: 'volume' | 'weight' | 'count' | 'container' | 'unknown', 
+  preferredUnit?: string,
+  ingredientName?: string
+): { value: number; unit: string } {
+  // Check if this is an herb or similar that shouldn't use ml
+  const isHerbOrSpice = ingredientName && /basil|cilantro|parsley|mint|dill|thyme|rosemary|oregano|sage|tarragon|chive|coriander|herb/.test(ingredientName.toLowerCase());
+  
+  // For counts and containers, round up to nearest whole
   if (type === 'count' || type === 'container' || type === 'unknown') {
-    const rounded = Math.round(baseValue * 10) / 10;
+    const rounded = Math.ceil(baseValue);
     return { value: rounded, unit: preferredUnit || '' };
   }
   
   // For volume, select appropriate unit based on amount
   if (type === 'volume') {
+    // For herbs/spices, prefer tbsp/tsp over ml
+    if (isHerbOrSpice) {
+      if (baseValue <= 15) {
+        // 15ml = 1 tbsp, so use tsp for smaller
+        const tspValue = Math.ceil(baseValue / 4.929);
+        return { value: tspValue, unit: 'tsp' };
+      } else if (baseValue <= 60) {
+        const tbspValue = Math.ceil(baseValue / 14.787);
+        return { value: tbspValue, unit: 'tbsp' };
+      } else {
+        // For larger amounts, use bunch or handful
+        return { value: 1, unit: 'bunch' };
+      }
+    }
+    
     for (const threshold of VOLUME_DISPLAY_THRESHOLDS) {
       if (baseValue >= threshold.min && baseValue < threshold.max) {
-        const value = Math.round(baseValue * threshold.factor * 10) / 10;
+        const rawValue = baseValue * threshold.factor;
+        // Round up to nearest whole, or nearest 0.5 for small values
+        const value = rawValue < 4 ? Math.ceil(rawValue * 2) / 2 : Math.ceil(rawValue);
         return { value, unit: threshold.unit };
       }
     }
     // Fallback
-    return { value: Math.round(baseValue / 1000 * 10) / 10, unit: 'l' };
+    return { value: Math.ceil(baseValue / 1000), unit: 'l' };
   }
   
-  // For weight, select appropriate unit based on amount
+  // For weight, select appropriate unit and round up
   if (type === 'weight') {
     if (baseValue >= 1000) {
-      return { value: Math.round(baseValue / 1000 * 10) / 10, unit: 'kg' };
+      // Round up to nearest 0.5 kg for large amounts
+      const kgValue = baseValue / 1000;
+      return { value: Math.ceil(kgValue * 2) / 2, unit: 'kg' };
     }
-    return { value: Math.round(baseValue), unit: 'g' };
+    // Round up to nearest 10g for cleaner numbers
+    const rounded = Math.ceil(baseValue / 10) * 10;
+    return { value: rounded, unit: 'g' };
   }
   
-  return { value: baseValue, unit: preferredUnit || '' };
+  return { value: Math.ceil(baseValue), unit: preferredUnit || '' };
 }
 
 /**
