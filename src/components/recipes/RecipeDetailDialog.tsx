@@ -1,5 +1,5 @@
 import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,9 +17,11 @@ interface RecipeDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onToggleFavorite: (id: string) => void;
   onToggleArchive: (id: string) => void;
-  onEdit: (recipe: Recipe) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (recipe: Recipe) => void;
+  onDelete?: (id: string) => void;
   onAddToMealPlan: (recipe: Recipe) => void;
+  isLibraryRecipe?: boolean;
+  onCopyToPersonal?: (recipe: Recipe) => void;
 }
 
 export function RecipeDetailDialog({
@@ -31,6 +33,8 @@ export function RecipeDetailDialog({
   onEdit,
   onDelete,
   onAddToMealPlan,
+  isLibraryRecipe = false,
+  onCopyToPersonal,
 }: RecipeDetailDialogProps) {
   if (!recipe) return null;
 
@@ -54,18 +58,30 @@ export function RecipeDetailDialog({
               </div>
             )}
             
-            {/* Favorite button */}
-            <button
-              onClick={() => onToggleFavorite(recipe.id)}
-              className={cn(
-                "absolute top-4 right-4 p-3 rounded-full backdrop-blur-sm transition-all",
-                recipe.isFavorite 
-                  ? "bg-accent text-accent-foreground" 
-                  : "bg-background/80 text-muted-foreground hover:text-accent"
-              )}
-            >
-              <Heart className={cn("h-5 w-5", recipe.isFavorite && "fill-current")} />
-            </button>
+            {/* Library badge */}
+            {isLibraryRecipe && (
+              <Badge 
+                className="absolute top-4 left-4 bg-primary/90 text-primary-foreground"
+              >
+                <Library className="h-3 w-3 mr-1" />
+                Library Recipe
+              </Badge>
+            )}
+            
+            {/* Favorite button - only show for personal recipes */}
+            {!isLibraryRecipe && (
+              <button
+                onClick={() => onToggleFavorite(recipe.id)}
+                className={cn(
+                  "absolute top-4 right-4 p-3 rounded-full backdrop-blur-sm transition-all",
+                  recipe.isFavorite 
+                    ? "bg-accent text-accent-foreground" 
+                    : "bg-background/80 text-muted-foreground hover:text-accent"
+                )}
+              >
+                <Heart className={cn("h-5 w-5", recipe.isFavorite && "fill-current")} />
+              </button>
+            )}
           </div>
 
           <div className="p-6">
@@ -230,25 +246,41 @@ export function RecipeDetailDialog({
                 <Calendar className="h-4 w-4 mr-2" />
                 Add to Meal Plan
               </Button>
-              <Button variant="outline" onClick={() => onEdit(recipe)}>
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-              <Button variant="outline" onClick={() => onToggleArchive(recipe.id)}>
-                <Archive className="h-4 w-4 mr-2" />
-                {recipe.isArchived ? 'Unarchive' : 'Archive'}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="text-destructive hover:text-destructive"
-                onClick={() => {
-                  onDelete(recipe.id);
-                  onOpenChange(false);
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              
+              {isLibraryRecipe && onCopyToPersonal && (
+                <Button variant="outline" onClick={() => onCopyToPersonal(recipe)}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to My Recipes
+                </Button>
+              )}
+              
+              {!isLibraryRecipe && onEdit && (
+                <Button variant="outline" onClick={() => onEdit(recipe)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+              
+              {!isLibraryRecipe && (
+                <Button variant="outline" onClick={() => onToggleArchive(recipe.id)}>
+                  <Archive className="h-4 w-4 mr-2" />
+                  {recipe.isArchived ? 'Unarchive' : 'Archive'}
+                </Button>
+              )}
+              
+              {!isLibraryRecipe && onDelete && (
+                <Button 
+                  variant="outline" 
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    onDelete(recipe.id);
+                    onOpenChange(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
             </div>
           </div>
         </ScrollArea>

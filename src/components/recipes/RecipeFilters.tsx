@@ -36,6 +36,7 @@ interface RecipeFiltersProps {
   showMissingCategory: boolean;
   onMissingCategoryChange: (show: boolean) => void;
   missingCategoryCount?: number;
+  hidePersonalFilters?: boolean;
 }
 
 export function RecipeFilters({
@@ -58,6 +59,7 @@ export function RecipeFilters({
   showMissingCategory,
   onMissingCategoryChange,
   missingCategoryCount = 0,
+  hidePersonalFilters = false,
 }: RecipeFiltersProps) {
   const toggleCategory = (category: string) => {
     onCategoriesChange(
@@ -206,17 +208,19 @@ export function RecipeFilters({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Favorites toggle */}
-          <Button
-            variant={showFavoritesOnly ? 'default' : 'outline'}
-            size="icon"
-            onClick={() => onFavoritesChange(!showFavoritesOnly)}
-          >
-            <Heart className={cn("h-4 w-4", showFavoritesOnly && "fill-current")} />
-          </Button>
+          {/* Favorites toggle - only show for personal recipes */}
+          {!hidePersonalFilters && (
+            <Button
+              variant={showFavoritesOnly ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => onFavoritesChange(!showFavoritesOnly)}
+            >
+              <Heart className={cn("h-4 w-4", showFavoritesOnly && "fill-current")} />
+            </Button>
+          )}
 
-          {/* Missing category filter */}
-          {missingCategoryCount > 0 && (
+          {/* Missing category filter - only show for personal recipes */}
+          {!hidePersonalFilters && missingCategoryCount > 0 && (
             <Button
               variant={showMissingCategory ? 'destructive' : 'outline'}
               size="sm"

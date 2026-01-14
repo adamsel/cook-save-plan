@@ -1,5 +1,5 @@
 import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2 } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -20,6 +20,8 @@ interface RecipeCardProps {
   onAddToMealPlan: (recipe: Recipe) => void;
   onViewDetails: (recipe: Recipe) => void;
   isDragging?: boolean;
+  isLibraryRecipe?: boolean;
+  onCopyToPersonal?: (recipe: Recipe) => void;
 }
 
 export function RecipeCard({
@@ -31,6 +33,8 @@ export function RecipeCard({
   onAddToMealPlan,
   onViewDetails,
   isDragging = false,
+  isLibraryRecipe = false,
+  onCopyToPersonal,
 }: RecipeCardProps) {
   return (
     <div
@@ -59,21 +63,23 @@ export function RecipeCard({
           </div>
         )}
         
-        {/* Favorite button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite(recipe.id);
-          }}
-          className={cn(
-            "absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all",
-            recipe.isFavorite 
-              ? "bg-accent text-accent-foreground" 
-              : "bg-background/80 text-muted-foreground hover:text-accent"
-          )}
-        >
-          <Heart className={cn("h-4 w-4", recipe.isFavorite && "fill-current")} />
-        </button>
+        {/* Favorite button - only show for personal recipes */}
+        {!isLibraryRecipe && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(recipe.id);
+            }}
+            className={cn(
+              "absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all",
+              recipe.isFavorite 
+                ? "bg-accent text-accent-foreground" 
+                : "bg-background/80 text-muted-foreground hover:text-accent"
+            )}
+          >
+            <Heart className={cn("h-4 w-4", recipe.isFavorite && "fill-current")} />
+          </button>
+        )}
 
         {/* Source link */}
         {recipe.sourceUrl && (
@@ -103,26 +109,53 @@ export function RecipeCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onAddToMealPlan(recipe)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                onAddToMealPlan(recipe);
+              }}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Add to Meal Plan
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(recipe)}>
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleArchive(recipe.id)}>
-                <Archive className="h-4 w-4 mr-2" />
-                {recipe.isArchived ? 'Unarchive' : 'Archive'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => onDelete(recipe.id)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
+              
+              {isLibraryRecipe && onCopyToPersonal && (
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  onCopyToPersonal(recipe);
+                }}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to My Recipes
+                </DropdownMenuItem>
+              )}
+              
+              {!isLibraryRecipe && (
+                <>
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(recipe);
+                  }}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleArchive(recipe.id);
+                  }}>
+                    <Archive className="h-4 w-4 mr-2" />
+                    {recipe.isArchived ? 'Unarchive' : 'Archive'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(recipe.id);
+                    }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
