@@ -20,7 +20,9 @@ import {
   Calendar,
   History,
   BarChart3,
-  Eye
+  Eye,
+  PanelLeftClose,
+  PanelLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +50,7 @@ export default function MealPlanPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [showSummary, setShowSummary] = useState(true);
+  const [showRecipePanel, setShowRecipePanel] = useState(true);
   
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
@@ -200,15 +203,30 @@ export default function MealPlanPage() {
                 Plan your week, track your meals
               </p>
             </div>
-            <Button
-              variant={showSummary ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowSummary(!showSummary)}
-              className="gap-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Weekly Summary
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showRecipePanel ? 'outline' : 'default'}
+                size="sm"
+                onClick={() => setShowRecipePanel(!showRecipePanel)}
+                className="gap-2"
+              >
+                {showRecipePanel ? (
+                  <PanelLeftClose className="h-4 w-4" />
+                ) : (
+                  <PanelLeft className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{showRecipePanel ? 'Hide Recipes' : 'Show Recipes'}</span>
+              </Button>
+              <Button
+                variant={showSummary ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowSummary(!showSummary)}
+                className="gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Weekly Summary
+              </Button>
+            </div>
           </div>
           
           {/* Week Navigation */}
@@ -265,6 +283,7 @@ export default function MealPlanPage() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Recipe sidebar */}
+          {showRecipePanel && (
           <div className="lg:w-80 shrink-0">
             <div className="sticky top-20 space-y-4 bg-card p-4 rounded-2xl border border-border/50 shadow-sm">
               <div className="flex items-center gap-2">
@@ -392,6 +411,7 @@ export default function MealPlanPage() {
               </ScrollArea>
             </div>
           </div>
+          )}
 
           {/* Calendar grid */}
           <div className="flex-1 overflow-x-auto">
