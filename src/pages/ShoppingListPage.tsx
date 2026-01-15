@@ -446,9 +446,9 @@ export default function ShoppingListPage() {
                         })()}
                         {item.ingredient}
                       </span>
-                      {item.recipeIds.length > 0 && (
+                      {item.recipeIds.length > 0 ? (
                         <Popover>
-                          <PopoverTrigger asChild>
+                          <PopoverTrigger>
                             <Badge 
                               variant="outline" 
                               className="text-xs cursor-pointer hover:bg-muted transition-colors"
@@ -456,29 +456,46 @@ export default function ShoppingListPage() {
                               {item.recipeIds.length} recipe{item.recipeIds.length > 1 ? 's' : ''}
                             </Badge>
                           </PopoverTrigger>
-                          <PopoverContent className="w-64 p-2" align="end">
+                          <PopoverContent className="w-72 p-2" align="end">
                             <div className="space-y-1">
+                              {/* DEBUG LINE - Remove after testing */}
+                              <p className="text-[10px] font-mono bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-1 rounded break-all">
+                                Ingredient: {item.ingredient}, recipeIds: {item.recipeIds.join(', ')}, recipesFound: {item.recipeIds.filter(id => recipes.find(r => r.id === id)).length}
+                              </p>
+                              
                               <p className="text-xs font-medium text-muted-foreground px-2 py-1">
                                 Used in:
                               </p>
-                              {item.recipeIds.map(recipeId => {
-                                const recipe = recipes.find(r => r.id === recipeId);
-                                if (!recipe) return null;
-                                return (
-                                  <button
-                                    key={recipeId}
-                                    onClick={() => setSelectedRecipe(recipe)}
-                                    className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left"
-                                  >
-                                    <UtensilsCrossed className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                    <span className="text-sm truncate">{recipe.title}</span>
-                                  </button>
-                                );
-                              })}
+                              {item.recipeIds.length === 0 ? (
+                                <p className="text-sm text-muted-foreground px-2 py-2">
+                                  No recipes use this ingredient
+                                </p>
+                              ) : (
+                                item.recipeIds.map(recipeId => {
+                                  const recipe = recipes.find(r => r.id === recipeId);
+                                  if (!recipe) {
+                                    return (
+                                      <div key={recipeId} className="text-xs text-muted-foreground px-2 py-1">
+                                        Recipe not found: {recipeId.slice(0, 8)}...
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      key={recipeId}
+                                      onClick={() => setSelectedRecipe(recipe)}
+                                      className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left"
+                                    >
+                                      <UtensilsCrossed className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                      <span className="text-sm truncate">{recipe.title}</span>
+                                    </button>
+                                  );
+                                })
+                              )}
                             </div>
                           </PopoverContent>
                         </Popover>
-                      )}
+                      ) : null}
                       {item.isCustom && (
                         <button
                           onClick={() => removeCustomItem(item.id)}
