@@ -16,8 +16,16 @@ import {
   ChevronRight,
   Package,
   ChevronLeft,
-  Calendar
+  Calendar,
+  UtensilsCrossed
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
+import { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -43,6 +51,7 @@ export default function ShoppingListPage() {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   const today = new Date();
   const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
@@ -438,9 +447,37 @@ export default function ShoppingListPage() {
                         {item.ingredient}
                       </span>
                       {item.recipeIds.length > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          {item.recipeIds.length} recipe{item.recipeIds.length > 1 ? 's' : ''}
-                        </Badge>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs cursor-pointer hover:bg-muted transition-colors"
+                            >
+                              {item.recipeIds.length} recipe{item.recipeIds.length > 1 ? 's' : ''}
+                            </Badge>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-2" align="end">
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                Used in:
+                              </p>
+                              {item.recipeIds.map(recipeId => {
+                                const recipe = recipes.find(r => r.id === recipeId);
+                                if (!recipe) return null;
+                                return (
+                                  <button
+                                    key={recipeId}
+                                    onClick={() => setSelectedRecipe(recipe)}
+                                    className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left"
+                                  >
+                                    <UtensilsCrossed className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-sm truncate">{recipe.title}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
                       {item.isCustom && (
                         <button
@@ -468,6 +505,17 @@ export default function ShoppingListPage() {
           </p>
         </div>
       )}
+
+      {/* Recipe Detail Dialog */}
+      <RecipeDetailDialog
+        recipe={selectedRecipe}
+        open={!!selectedRecipe}
+        onOpenChange={(open) => !open && setSelectedRecipe(null)}
+        onToggleFavorite={() => {}}
+        onToggleArchive={() => {}}
+        onAddToMealPlan={() => {}}
+        isLibraryRecipe={false}
+      />
     </div>
   );
 }
