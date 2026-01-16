@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Recipe, Ingredient } from '@/types/recipe';
+import { Recipe } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { RecipeCard } from '@/components/recipes/RecipeCard';
 import { RecipeFilters, SortOption } from '@/components/recipes/RecipeFilters';
@@ -10,7 +10,7 @@ import { SpoonacularRecipeCard } from '@/components/recipes/SpoonacularRecipeCar
 import { SpoonacularRecipeDetailDialog } from '@/components/recipes/SpoonacularRecipeDetailDialog';
 import { SpoonacularSearchForm } from '@/components/recipes/SpoonacularSearchForm';
 import { useSpoonacularRecipes, SpoonacularRecipeSearchResult, SpoonacularRecipeDetails } from '@/hooks/useSpoonacularRecipes';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, Library, BookUser, Copy, Globe, Loader2 } from 'lucide-react';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,19 +23,17 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-type RecipeTab = 'personal' | 'library' | 'discover';
+type RecipeTab = 'personal' | 'discover';
 
 export default function RecipesPage() {
   const { 
     recipes, 
-    libraryRecipes, 
     categories, 
     tags, 
     toggleFavorite, 
     toggleArchive, 
     deleteRecipe, 
     updateRecipe,
-    copyToPersonal,
     addRecipe,
   } = useRecipes();
   const { toast } = useToast();
@@ -80,8 +78,8 @@ export default function RecipesPage() {
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkTag, setBulkTag] = useState('');
 
-  // Get recipes based on active tab
-  const sourceRecipes = activeTab === 'personal' ? recipes : libraryRecipes;
+  // Get recipes for display
+  const sourceRecipes = recipes;
 
   // Count uncategorized recipes
   const missingCategoryCount = useMemo(() => 
@@ -169,15 +167,6 @@ export default function RecipesPage() {
     setShowMealPlanDialog(true);
   };
 
-  const handleCopyToPersonal = async (recipe: Recipe) => {
-    const copied = await copyToPersonal(recipe.id);
-    if (copied) {
-      toast({
-        title: "Recipe copied",
-        description: `"${recipe.title}" has been added to your personal recipes.`,
-      });
-    }
-  };
 
   const toggleRecipeSelection = (recipeId: string) => {
     setSelectedRecipes(prev => {
@@ -230,8 +219,6 @@ export default function RecipesPage() {
     setBulkTag('');
   };
 
-  // Check if the viewing recipe is from library
-  const isLibraryRecipe = viewingRecipe && libraryRecipes.some(r => r.id === viewingRecipe.id);
 
   // Handle clicking on a Spoonacular recipe card
   const handleSpoonacularCardClick = async (recipe: SpoonacularRecipeSearchResult) => {
@@ -285,7 +272,7 @@ export default function RecipesPage() {
   }) => {
     searchSpoonacular({
       ...params,
-      number: 12,
+      number: 100, // Show up to 100 recipes matching filters
     });
   };
 
@@ -306,11 +293,6 @@ export default function RecipesPage() {
               <BookUser className="h-4 w-4" />
               My Recipes
               <Badge variant="secondary" className="ml-1">{recipes.length}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="library" className="gap-2">
-              <Library className="h-4 w-4" />
-              Library
-              <Badge variant="secondary" className="ml-1">{libraryRecipes.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="discover" className="gap-2">
               <Globe className="h-4 w-4" />
@@ -460,7 +442,7 @@ export default function RecipesPage() {
             showMissingCategory={showMissingCategory}
             onMissingCategoryChange={setShowMissingCategory}
             missingCategoryCount={missingCategoryCount}
-            hidePersonalFilters={activeTab === 'library'}
+            hidePersonalFilters={false}
           />
 
           {filteredRecipes.length > 0 ? (
@@ -484,28 +466,18 @@ export default function RecipesPage() {
                       </div>
                     </div>
                   )}
-                  {activeTab === 'library' && (
-                    <Badge 
-                      variant="secondary" 
-                      className="absolute top-2 left-2 z-10 bg-primary/90 text-primary-foreground"
-                    >
-                      <Library className="h-3 w-3 mr-1" />
-                      Library
-                    </Badge>
-                  )}
                   <RecipeCard
                     recipe={recipe}
-                    onToggleFavorite={activeTab === 'personal' ? toggleFavorite : () => {}}
-                    onToggleArchive={activeTab === 'personal' ? toggleArchive : () => {}}
-                    onEdit={activeTab === 'personal' ? handleEdit : () => {}}
-                    onDelete={activeTab === 'personal' ? deleteRecipe : () => {}}
+                    onToggleFavorite={toggleFavorite}
+                    onToggleArchive={toggleArchive}
+                    onEdit={handleEdit}
+                    onDelete={deleteRecipe}
                     onAddToMealPlan={handleAddToMealPlan}
                     onViewDetails={(recipe) => {
                       setViewingRecipe(recipe);
                       setShowDetailDialog(true);
                     }}
-                    isLibraryRecipe={activeTab === 'library'}
-                    onCopyToPersonal={handleCopyToPersonal}
+                    isLibraryRecipe={false}
                   />
                 </div>
               ))}
@@ -517,11 +489,9 @@ export default function RecipesPage() {
               </div>
               <h3 className="font-serif text-xl font-semibold mb-2">No recipes found</h3>
               <p className="text-muted-foreground max-w-md">
-                {activeTab === 'library' 
-                  ? "No library recipes match your filters."
-                  : searchQuery || selectedCategories.length > 0 || selectedTags.length > 0
-                    ? "Try adjusting your filters or search terms."
-                    : "Start building your recipe collection by adding your first recipe."}
+                {searchQuery || selectedCategories.length > 0 || selectedTags.length > 0
+                  ? "Try adjusting your filters or search terms."
+                  : "Start building your recipe collection by adding your first recipe."}
               </p>
             </div>
           )}
@@ -544,19 +514,18 @@ export default function RecipesPage() {
         recipe={viewingRecipe}
         open={showDetailDialog}
         onOpenChange={setShowDetailDialog}
-        onToggleFavorite={isLibraryRecipe ? () => {} : toggleFavorite}
-        onToggleArchive={isLibraryRecipe ? () => {} : toggleArchive}
-        onEdit={isLibraryRecipe ? undefined : (recipe) => {
+        onToggleFavorite={toggleFavorite}
+        onToggleArchive={toggleArchive}
+        onEdit={(recipe) => {
           setShowDetailDialog(false);
           handleEdit(recipe);
         }}
-        onDelete={isLibraryRecipe ? undefined : deleteRecipe}
+        onDelete={deleteRecipe}
         onAddToMealPlan={(recipe) => {
           setShowDetailDialog(false);
           handleAddToMealPlan(recipe);
         }}
-        isLibraryRecipe={isLibraryRecipe}
-        onCopyToPersonal={isLibraryRecipe ? handleCopyToPersonal : undefined}
+        isLibraryRecipe={false}
       />
 
       {/* Spoonacular Recipe Detail Dialog */}
