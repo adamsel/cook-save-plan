@@ -105,6 +105,7 @@ serve(async (req) => {
       intolerances: url.searchParams.get("intolerances") || undefined,
       maxReadyTime: url.searchParams.get("maxReadyTime") || undefined,
       number: url.searchParams.get("number") || "12",
+      sort: url.searchParams.get("sort") || undefined,
     };
 
     // Check cache first
@@ -129,6 +130,7 @@ serve(async (req) => {
     if (params.diet) spoonacularUrl.searchParams.set("diet", params.diet);
     if (params.intolerances) spoonacularUrl.searchParams.set("intolerances", params.intolerances);
     if (params.maxReadyTime) spoonacularUrl.searchParams.set("maxReadyTime", params.maxReadyTime);
+    if (params.sort) spoonacularUrl.searchParams.set("sort", params.sort);
     spoonacularUrl.searchParams.set("number", params.number);
 
     console.log("Fetching from Spoonacular:", spoonacularUrl.pathname + spoonacularUrl.search.replace(apiKey, "***"));

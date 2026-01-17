@@ -61,6 +61,7 @@ export function useSpoonacularRecipes() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
   const searchRecipes = useCallback(async (params: SearchParams) => {
     setIsSearching(true);
@@ -165,12 +166,60 @@ export function useSpoonacularRecipes() {
     setSearchError(null);
   }, []);
 
+  // Load popular/random recipes for initial display
+  const loadPopularRecipes = useCallback(async () => {
+    if (hasLoadedInitial) return;
+    
+    setIsSearching(true);
+    setSearchError(null);
+    
+    try {
+      // Search for popular cuisines/meal types to get a good variety
+      const popularQueries = ['popular', 'dinner', 'healthy', 'quick', 'easy'];
+      const randomQuery = popularQueries[Math.floor(Math.random() * popularQueries.length)];
+      
+      const searchParams = new URLSearchParams();
+      searchParams.set('query', randomQuery);
+      searchParams.set('number', '24');
+      searchParams.set('sort', 'popularity');
+      
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spoonacular-search?${searchParams.toString()}`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to load recipes' }));
+        throw new Error(errorData.error || `Failed to load: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      setSearchResults(result.results || []);
+      setTotalResults(result.totalResults || 0);
+      setHasLoadedInitial(true);
+      
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load recipes';
+      setSearchError(message);
+      return null;
+    } finally {
+      setIsSearching(false);
+    }
+  }, [hasLoadedInitial]);
+
   return {
     // Search state
     searchResults,
     totalResults,
     isSearching,
     searchError,
+    hasLoadedInitial,
     
     // Details state
     selectedRecipe,
@@ -182,5 +231,6 @@ export function useSpoonacularRecipes() {
     getRecipeDetails,
     clearSelectedRecipe,
     clearSearch,
+    loadPopularRecipes,
   };
 }
