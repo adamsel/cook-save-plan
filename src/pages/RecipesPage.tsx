@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Recipe } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { RecipeCard } from '@/components/recipes/RecipeCard';
@@ -50,9 +50,18 @@ export default function RecipesPage() {
     searchRecipes: searchSpoonacular,
     getRecipeDetails: getSpoonacularDetails,
     clearSelectedRecipe: clearSpoonacularRecipe,
+    loadPopularRecipes,
+    hasLoadedInitial,
   } = useSpoonacularRecipes();
 
   const [activeTab, setActiveTab] = useState<RecipeTab>('personal');
+
+  // Load popular recipes when Discover tab is first opened
+  useEffect(() => {
+    if (activeTab === 'discover' && !hasLoadedInitial) {
+      loadPopularRecipes();
+    }
+  }, [activeTab, hasLoadedInitial, loadPopularRecipes]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
