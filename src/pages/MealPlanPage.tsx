@@ -43,6 +43,7 @@ export default function MealPlanPage() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [draggingItem, setDraggingItem] = useState<{ itemId: string; recipeId: string } | null>(null);
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState<Recipe | null>(null);
   const [selectedRecipeForView, setSelectedRecipeForView] = useState<Recipe | null>(null);
   const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
@@ -115,11 +116,26 @@ export default function MealPlanPage() {
         variant: "destructive"
       });
       setDragOverSlot(null);
+      setDraggingItem(null);
       return;
     }
     
     const recipeId = e.dataTransfer.getData('recipeId');
-    if (recipeId) {
+    const itemId = e.dataTransfer.getData('itemId');
+    
+    // Moving an existing meal plan item
+    if (itemId && draggingItem) {
+      updateMealPlanItem(itemId, { day, mealSlot: slot });
+      const recipe = recipes.find(r => r.id === draggingItem.recipeId);
+      if (recipe) {
+        toast({
+          title: "Moved recipe",
+          description: `${recipe.title} moved to ${day} ${slot}.`,
+        });
+      }
+    } 
+    // Adding a new recipe from sidebar
+    else if (recipeId) {
       const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
       addToMealPlan(recipeId, day, slot, weekStartStr);
       const recipe = recipes.find(r => r.id === recipeId);
@@ -130,7 +146,20 @@ export default function MealPlanPage() {
         });
       }
     }
+    
     setDragOverSlot(null);
+    setDraggingItem(null);
+  };
+
+  const handleMealItemDragStart = (e: React.DragEvent, item: MealPlanItem, recipe: Recipe) => {
+    e.dataTransfer.setData('itemId', item.id);
+    e.dataTransfer.setData('recipeId', recipe.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingItem({ itemId: item.id, recipeId: recipe.id });
+  };
+
+  const handleMealItemDragEnd = () => {
+    setDraggingItem(null);
   };
 
   const handleDragOver = (e: React.DragEvent, slotId: string) => {
@@ -493,7 +522,14 @@ export default function MealPlanPage() {
                               {displayRecipes.map(({ recipe, item }) => (
                                 <div 
                                   key={item.id} 
-                                  className="group relative bg-secondary/50 rounded-lg overflow-hidden cursor-pointer hover:bg-secondary/70 transition-colors"
+                                  draggable={canEdit}
+                                  onDragStart={(e) => handleMealItemDragStart(e, item, recipe)}
+                                  onDragEnd={handleMealItemDragEnd}
+                                  className={cn(
+                                    "group relative bg-secondary/50 rounded-lg overflow-hidden cursor-pointer hover:bg-secondary/70 transition-all",
+                                    canEdit && "cursor-grab active:cursor-grabbing",
+                                    draggingItem?.itemId === item.id && "opacity-50 ring-2 ring-primary"
+                                  )}
                                   onClick={() => setSelectedRecipeForView(recipe)}
                                 >
                                   {/* Recipe Image */}
