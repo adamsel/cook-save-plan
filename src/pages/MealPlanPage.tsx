@@ -107,7 +107,7 @@ export default function MealPlanPage() {
       .filter((r): r is PlannedRecipeDisplay => r !== null);
   };
 
-  const handleDrop = (e: React.DragEvent, day: string, slot: 'breakfast' | 'lunch' | 'dinner') => {
+  const handleDrop = (e: React.DragEvent, day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
     e.preventDefault();
     if (!canEdit) {
       toast({

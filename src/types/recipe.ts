@@ -64,7 +64,7 @@ export interface MealPlanItem {
   id: string;
   recipeId: string;
   day: string; // 'monday', 'tuesday', etc.
-  mealSlot: 'breakfast' | 'lunch' | 'dinner';
+  mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   servingsMultiplier: number;
   notes?: string;
 }
@@ -98,7 +98,7 @@ export interface AppState {
 export const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 export type DayOfWeek = typeof DAYS_OF_WEEK[number];
 
-export const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'] as const;
+export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner'] as const;
 export type MealSlot = typeof MEAL_SLOTS[number];
 
 export const DEFAULT_CATEGORIES = [

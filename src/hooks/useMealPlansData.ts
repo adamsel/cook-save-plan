@@ -152,7 +152,7 @@ export function useMealPlansData() {
   const addToMealPlan = async (
     recipeId: string, 
     day: string, 
-    mealSlot: 'breakfast' | 'lunch' | 'dinner',
+    mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack',
     weekStartDate?: string
   ) => {
     if (!user) {
