@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { RecipeProvider } from "@/context/RecipeContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Navigation } from "@/components/layout/Navigation";
 import { AddRecipeDialog } from "@/components/recipes/AddRecipeDialog";
 import Dashboard from "@/pages/Dashboard";
@@ -33,7 +34,7 @@ const App = () => {
                 <Routes>
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="*" element={
-                    <>
+                    <ProtectedRoute>
                       <Navigation onAddRecipe={() => setShowAddRecipe(true)} />
                       <Routes>
                         <Route path="/" element={<Dashboard onAddRecipe={() => setShowAddRecipe(true)} />} />
@@ -43,7 +44,7 @@ const App = () => {
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
-                    </>
+                    </ProtectedRoute>
                   } />
                 </Routes>
               </div>
