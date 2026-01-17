@@ -22,7 +22,7 @@ export function MealPlanDialog({ open, onOpenChange, recipe }: MealPlanDialogPro
 
   if (!recipe) return null;
 
-  const handleAddToSlot = (day: string, slot: 'breakfast' | 'lunch' | 'dinner') => {
+  const handleAddToSlot = (day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
     addToMealPlan(recipe.id, day, slot);
     toast({
       title: "Added to meal plan",

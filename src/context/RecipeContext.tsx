@@ -35,7 +35,7 @@ interface RecipeContextType {
   // Meal Plan Actions
   getCurrentMealPlan: () => MealPlan;
   getMealPlanForWeek: (weekStartDate: string) => Promise<MealPlan | null>;
-  addToMealPlan: (recipeId: string, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner', weekStartDate?: string) => Promise<MealPlanItem | null>;
+  addToMealPlan: (recipeId: string, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack', weekStartDate?: string) => Promise<MealPlanItem | null>;
   removeFromMealPlan: (itemId: string) => Promise<void>;
   updateMealPlanItem: (itemId: string, updates: Partial<MealPlanItem>) => Promise<void>;
   
@@ -169,7 +169,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const addToMealPlan = async (
     recipeId: string, 
     day: string, 
-    mealSlot: 'breakfast' | 'lunch' | 'dinner',
+    mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack',
     weekStartDate?: string
   ) => {
     if (user) {
