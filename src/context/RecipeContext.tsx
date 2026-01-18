@@ -195,6 +195,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       day,
       mealSlot,
       servingsMultiplier: 1,
+      leftoverMeals: 0,
     };
     
     setLocalMealPlans(prev => prev.map(mp => 
