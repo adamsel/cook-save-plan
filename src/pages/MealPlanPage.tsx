@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot, Recipe, MealPlanItem } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameWeek } from 'date-fns';
+import { format, startOfWeek, addDays, addWeeks, isSameWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -13,14 +13,12 @@ import {
   X, 
   Clock, 
   Users,
-  Minus,
   Plus,
   Heart,
   Utensils,
   Calendar,
   History,
   BarChart3,
-  Eye,
   PanelLeftClose,
   PanelLeft
 } from 'lucide-react';
@@ -29,6 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
 import { WeeklySummary } from '@/components/recipes/WeeklySummary';
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
+import { MealItemCard } from '@/components/recipes/MealItemCard';
+import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 
 interface PlannedRecipeDisplay {
   recipe: Recipe;
@@ -40,6 +40,7 @@ type FilterType = 'all' | 'favorites' | 'quick' | 'category';
 export default function MealPlanPage() {
   const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories, pantryStaples, toggleFavorite, toggleArchive, deleteRecipe } = useRecipes();
   const { toast } = useToast();
+  const { householdSize } = useHouseholdSettings();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
@@ -173,12 +174,12 @@ export default function MealPlanPage() {
     setDragOverSlot(null);
   };
 
-  const updateServings = (itemId: string, delta: number) => {
-    const item = selectedWeekPlan.items.find(i => i.id === itemId);
-    if (item) {
-      const newMultiplier = Math.max(0.5, Math.min(4, item.servingsMultiplier + delta));
-      updateMealPlanItem(itemId, { servingsMultiplier: newMultiplier });
-    }
+  const updateServings = (itemId: string, newMultiplier: number) => {
+    updateMealPlanItem(itemId, { servingsMultiplier: newMultiplier });
+  };
+
+  const updateLeftovers = (itemId: string, leftoverMeals: number) => {
+    updateMealPlanItem(itemId, { leftoverMeals });
   };
 
   const toggleSlotExpansion = (slotId: string) => {
@@ -520,74 +521,20 @@ export default function MealPlanPage() {
                           {hasRecipes ? (
                             <div className="space-y-2">
                               {displayRecipes.map(({ recipe, item }) => (
-                                <div 
-                                  key={item.id} 
-                                  draggable={canEdit}
+                                <MealItemCard
+                                  key={item.id}
+                                  recipe={recipe}
+                                  item={item}
+                                  canEdit={canEdit}
+                                  householdSize={householdSize}
+                                  isDragging={draggingItem?.itemId === item.id}
                                   onDragStart={(e) => handleMealItemDragStart(e, item, recipe)}
                                   onDragEnd={handleMealItemDragEnd}
-                                  className={cn(
-                                    "group relative bg-secondary/50 rounded-lg overflow-hidden cursor-pointer hover:bg-secondary/70 transition-all",
-                                    canEdit && "cursor-grab active:cursor-grabbing",
-                                    draggingItem?.itemId === item.id && "opacity-50 ring-2 ring-primary"
-                                  )}
                                   onClick={() => setSelectedRecipeForView(recipe)}
-                                >
-                                  {/* Recipe Image */}
-                                  {recipe.imageUrl && (
-                                    <div className="relative h-12 w-full">
-                                      <img
-                                        src={recipe.imageUrl}
-                                        alt=""
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                    </div>
-                                  )}
-                                  
-                                  <div className="p-2">
-                                    <div className="flex items-start justify-between gap-1">
-                                      <h4 className="font-medium text-xs leading-tight line-clamp-2">
-                                        {recipe.title}
-                                      </h4>
-                                      {canEdit && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeFromMealPlan(item.id);
-                                          }}
-                                          className="shrink-0 p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                                        </button>
-                                      )}
-                                    </div>
-
-                                    {canEdit && (
-                                      <div className="flex items-center justify-between mt-1.5">
-                                        <span className="text-[10px] text-muted-foreground">
-                                          {Math.round(recipe.servings * item.servingsMultiplier)} srv
-                                        </span>
-                                        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                          <button
-                                            onClick={() => updateServings(item.id, -0.5)}
-                                            className="p-0.5 rounded hover:bg-muted"
-                                          >
-                                            <Minus className="h-3 w-3" />
-                                          </button>
-                                          <span className="text-[10px] w-5 text-center font-medium">
-                                            {item.servingsMultiplier}x
-                                          </span>
-                                          <button
-                                            onClick={() => updateServings(item.id, 0.5)}
-                                            className="p-0.5 rounded hover:bg-muted"
-                                          >
-                                            <Plus className="h-3 w-3" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
+                                  onRemove={() => removeFromMealPlan(item.id)}
+                                  onUpdateServings={(multiplier) => updateServings(item.id, multiplier)}
+                                  onUpdateLeftovers={(leftovers) => updateLeftovers(item.id, leftovers)}
+                                />
                               ))}
                               
                               {hiddenCount > 0 && !isExpanded && (

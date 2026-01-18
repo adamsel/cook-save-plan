@@ -20,6 +20,7 @@ interface DbMealPlanItem {
   day: string;
   meal_slot: string;
   servings_multiplier: number;
+  leftover_meals: number;
   notes: string | null;
   created_at: string;
 }
@@ -39,8 +40,9 @@ export function useMealPlansData() {
       id: item.id,
       recipeId: item.recipe_id,
       day: item.day,
-      mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner',
+      mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
       servingsMultiplier: Number(item.servings_multiplier),
+      leftoverMeals: Number(item.leftover_meals || 0),
       notes: item.notes || undefined,
     })),
   });
@@ -194,8 +196,9 @@ export function useMealPlansData() {
       id: item.id,
       recipeId: item.recipe_id,
       day: item.day,
-      mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner',
+      mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
       servingsMultiplier: Number(item.servings_multiplier),
+      leftoverMeals: Number(item.leftover_meals || 0),
     };
     
     setMealPlans(prev => prev.map(mp => 
@@ -233,6 +236,7 @@ export function useMealPlansData() {
   const updateMealPlanItem = async (itemId: string, updates: Partial<MealPlanItem>) => {
     const dbUpdates: Record<string, unknown> = {};
     if (updates.servingsMultiplier !== undefined) dbUpdates.servings_multiplier = updates.servingsMultiplier;
+    if (updates.leftoverMeals !== undefined) dbUpdates.leftover_meals = updates.leftoverMeals;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.day !== undefined) dbUpdates.day = updates.day;
     if (updates.mealSlot !== undefined) dbUpdates.meal_slot = updates.mealSlot;

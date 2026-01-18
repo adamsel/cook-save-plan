@@ -1,22 +1,27 @@
 import { useState } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
+import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { 
   Settings, 
   Tags, 
   Package, 
   Plus, 
   X,
-  Save
+  Save,
+  Users,
+  Minus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const { categories, tags, pantryStaples, addCategory, addTag, updatePantryStaples } = useRecipes();
+  const { householdSize, suggestLeftoversForLunch, updateSettings } = useHouseholdSettings();
   const { toast } = useToast();
 
   const [newCategory, setNewCategory] = useState('');
@@ -66,6 +71,64 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-8">
+        {/* Household Settings */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            <h2 className="font-serif text-xl font-semibold">Household</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Set your household size to get smart serving suggestions when meal planning.
+          </p>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div>
+                <Label className="font-medium">Household size</Label>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Dinner servings will default to this number
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-background rounded-lg p-1 border">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateSettings({ householdSize: Math.max(1, householdSize - 1) })}
+                  disabled={householdSize <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-8 text-center font-semibold text-lg">{householdSize}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateSettings({ householdSize: Math.min(10, householdSize + 1) })}
+                  disabled={householdSize >= 10}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div>
+                <Label className="font-medium">Suggest leftovers for lunch</Label>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  When adding dinner, suggest making extra for tomorrow's lunch
+                </p>
+              </div>
+              <Switch
+                checked={suggestLeftoversForLunch}
+                onCheckedChange={(checked) => updateSettings({ suggestLeftoversForLunch: checked })}
+              />
+            </div>
+          </div>
+        </section>
+
+        <Separator />
+
         {/* Categories */}
         <section className="space-y-4">
           <div className="flex items-center gap-2">

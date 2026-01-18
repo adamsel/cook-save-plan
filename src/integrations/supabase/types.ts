@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           day: string
           id: string
+          leftover_meals: number
           meal_plan_id: string
           meal_slot: string
           notes: string | null
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           day: string
           id?: string
+          leftover_meals?: number
           meal_plan_id: string
           meal_slot: string
           notes?: string | null
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           day?: string
           id?: string
+          leftover_meals?: number
           meal_plan_id?: string
           meal_slot?: string
           notes?: string | null

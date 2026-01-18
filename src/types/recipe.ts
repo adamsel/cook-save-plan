@@ -66,7 +66,16 @@ export interface MealPlanItem {
   day: string; // 'monday', 'tuesday', etc.
   mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   servingsMultiplier: number;
+  leftoverMeals: number; // Number of additional meals (leftovers) this provides
   notes?: string;
+}
+
+// Calculated meal info for display
+export interface MealServingsInfo {
+  baseServings: number; // Recipe's base servings
+  plannedServings: number; // baseServings * multiplier
+  leftoverMeals: number;
+  totalMeals: number; // 1 (primary) + leftoverMeals
 }
 
 export interface MealPlan {

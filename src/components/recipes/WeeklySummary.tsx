@@ -36,6 +36,9 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
     let totalPrepTime = 0;
     let totalCookTime = 0;
     let mealsPlanned = 0;
+    let totalMealsIncludingLeftovers = 0;
+    let leftoverMealsCount = 0;
+    const mealSlotCounts = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 };
     const ingredientsMap = new Map<string, AggregatedIngredient>();
     const recipesUsed = new Set<string>();
 
@@ -45,8 +48,18 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
 
       recipesUsed.add(recipe.id);
       mealsPlanned++;
+      
+      // Count total meals including leftovers
+      const leftoverCount = item.leftoverMeals || 0;
+      totalMealsIncludingLeftovers += 1 + leftoverCount;
+      leftoverMealsCount += leftoverCount;
+      
+      // Track by meal slot
+      if (item.mealSlot in mealSlotCounts) {
+        mealSlotCounts[item.mealSlot as keyof typeof mealSlotCounts]++;
+      }
 
-      // Nutrition
+      // Nutrition (scales with servings)
       if (recipe.nutrition) {
         const multiplier = item.servingsMultiplier;
         totalCalories += recipe.nutrition.perServing.calories * recipe.servings * multiplier;
@@ -62,7 +75,7 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
         totalCookTime += recipe.cookTime || 0;
       }
 
-      // Ingredients
+      // Ingredients - scale by servingsMultiplier
       recipe.ingredients.forEach(ing => {
         const normalizedItem = ing.item.toLowerCase().trim();
         
@@ -109,6 +122,27 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
       };
     }).sort((a, b) => a.item.localeCompare(b.item));
 
+    // Generate meal planning insight
+    const getMealSummaryText = () => {
+      const parts: string[] = [];
+      if (mealSlotCounts.dinner > 0) {
+        parts.push(`${mealSlotCounts.dinner} dinner${mealSlotCounts.dinner > 1 ? 's' : ''}`);
+      }
+      if (mealSlotCounts.lunch > 0) {
+        parts.push(`${mealSlotCounts.lunch} lunch${mealSlotCounts.lunch > 1 ? 'es' : ''}`);
+      }
+      if (mealSlotCounts.breakfast > 0) {
+        parts.push(`${mealSlotCounts.breakfast} breakfast${mealSlotCounts.breakfast > 1 ? 's' : ''}`);
+      }
+      if (mealSlotCounts.snack > 0) {
+        parts.push(`${mealSlotCounts.snack} snack${mealSlotCounts.snack > 1 ? 's' : ''}`);
+      }
+      if (leftoverMealsCount > 0) {
+        parts.push(`${leftoverMealsCount} leftover meal${leftoverMealsCount > 1 ? 's' : ''}`);
+      }
+      return parts.join(', ');
+    };
+
     return {
       totalCalories: Math.round(totalCalories),
       totalProtein: Math.round(totalProtein),
@@ -117,9 +151,13 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
       totalPrepTime,
       totalCookTime,
       mealsPlanned,
-      uniqueRecipes: recipesUsed.size / 2, // Divided by 2 because we also add _time entries
+      totalMealsIncludingLeftovers,
+      leftoverMealsCount,
+      uniqueRecipes: recipesUsed.size / 2,
       shoppingList,
       avgCaloriesPerDay: Math.round(totalCalories / 7),
+      mealSummaryText: getMealSummaryText(),
+      mealSlotCounts,
     };
   }, [recipes, mealPlanItems, pantryStaples]);
 
@@ -151,10 +189,12 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
         <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
           <div className="flex items-center gap-2 text-primary mb-1">
             <Utensils className="h-4 w-4" />
-            <span className="text-xs font-medium">Meals Planned</span>
+            <span className="text-xs font-medium">Total Meals</span>
           </div>
-          <div className="text-2xl font-bold text-primary">{summary.mealsPlanned}</div>
-          <div className="text-xs text-muted-foreground">{Math.round(summary.uniqueRecipes)} recipes</div>
+          <div className="text-2xl font-bold text-primary">{summary.totalMealsIncludingLeftovers}</div>
+          <div className="text-xs text-muted-foreground">
+            {summary.mealsPlanned} cooked{summary.leftoverMealsCount > 0 && ` + ${summary.leftoverMealsCount} leftovers`}
+          </div>
         </div>
         
         <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
@@ -166,6 +206,16 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
           <div className="text-xs text-muted-foreground">{summary.totalPrepTime + summary.totalCookTime} min total</div>
         </div>
       </div>
+
+      {/* Meal Summary Text */}
+      {summary.mealSummaryText && (
+        <div className="mb-5 p-3 rounded-lg bg-muted/30 border border-border/30">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">This week:</span>{' '}
+            {summary.mealSummaryText}
+          </p>
+        </div>
+      )}
 
       {/* Nutrition Breakdown */}
       <div className="mb-5">
