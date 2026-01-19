@@ -68,6 +68,9 @@ export interface MealPlanItem {
   servingsMultiplier: number;
   leftoverMeals: number; // Number of additional meals (leftovers) this provides
   notes?: string;
+  // Virtual field for display - not stored in DB
+  isLeftover?: boolean;
+  sourceItemId?: string; // Links leftover to its source meal
 }
 
 // Calculated meal info for display
@@ -76,6 +79,14 @@ export interface MealServingsInfo {
   plannedServings: number; // baseServings * multiplier
   leftoverMeals: number;
   totalMeals: number; // 1 (primary) + leftoverMeals
+}
+
+// Display item that includes both real items and virtual leftover cards
+export interface DisplayMealItem {
+  item: MealPlanItem;
+  recipe: Recipe;
+  isLeftover: boolean;
+  sourceItem?: MealPlanItem; // The original item this leftover comes from
 }
 
 export interface MealPlan {
