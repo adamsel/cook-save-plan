@@ -25,7 +25,7 @@ export function MealCard({
 }: MealCardProps) {
   const plannedServings = Math.round(recipe.servings * item.servingsMultiplier);
   const totalMeals = 1 + (item.leftoverMeals || 0);
-  const isAdjusted = item.servingsMultiplier !== 1;
+  const isAdjusted = plannedServings !== householdSize;
 
   return (
     <div
@@ -36,19 +36,17 @@ export function MealCard({
       className={cn(
         "group relative rounded-xl overflow-hidden transition-all cursor-pointer",
         isLeftover 
-          ? "bg-muted/40 border-2 border-dashed border-border/60" 
-          : "bg-card border border-border/40 shadow-sm hover:shadow-md",
-        isDragging && "opacity-50 ring-2 ring-primary scale-[1.02]",
-        !isLeftover && "hover:border-border"
+          ? "bg-muted/30 border-2 border-dashed border-muted-foreground/20" 
+          : "bg-card border border-border/50 shadow-sm hover:shadow-md hover:border-border",
+        isDragging && "opacity-50 ring-2 ring-primary scale-[1.02]"
       )}
     >
-      {/* Compact layout */}
       <div className="p-3">
         <div className="flex gap-3">
           {/* Recipe thumbnail */}
           <div className={cn(
             "relative w-12 h-12 rounded-lg overflow-hidden shrink-0",
-            isLeftover ? "opacity-70" : ""
+            isLeftover && "opacity-60"
           )}>
             {recipe.imageUrl ? (
               <img
@@ -63,9 +61,9 @@ export function MealCard({
             )}
           </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {/* Recipe title */}
+          {/* Content with clear hierarchy */}
+          <div className="flex-1 min-w-0 space-y-0.5">
+            {/* PRIMARY: Recipe title */}
             <h4 className={cn(
               "font-medium text-sm leading-tight line-clamp-1",
               isLeftover && "text-muted-foreground"
@@ -73,33 +71,26 @@ export function MealCard({
               {recipe.title}
             </h4>
 
-            {/* Meal info - secondary */}
-            <div className="flex items-center gap-2 mt-1">
-              {isLeftover ? (
-                <span className="text-xs text-muted-foreground italic">
-                  Leftover
-                </span>
-              ) : (
-                <>
-                  <span className="text-xs text-muted-foreground">
-                    {plannedServings} servings
+            {/* SECONDARY: Feeds info or leftover label */}
+            {isLeftover ? (
+              <p className="text-xs text-muted-foreground/80 italic">
+                Leftover from previous day
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Feeds {totalMeals} meal{totalMeals > 1 ? 's' : ''}
+                {totalMeals > 1 && (
+                  <span className="text-muted-foreground/60">
+                    {' '}· {item.leftoverMeals} leftover{item.leftoverMeals > 1 ? 's' : ''}
                   </span>
-                  {totalMeals > 1 && (
-                    <>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-xs text-muted-foreground">
-                        {totalMeals} meals
-                      </span>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+              </p>
+            )}
 
-            {/* Adjusted indicator - tertiary */}
-            {isAdjusted && !isLeftover && (
-              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                Adjusted from original recipe
+            {/* TERTIARY: Adjusted serving note */}
+            {!isLeftover && isAdjusted && (
+              <p className="text-[10px] text-muted-foreground/60">
+                {plannedServings} servings · adjusted
               </p>
             )}
           </div>
