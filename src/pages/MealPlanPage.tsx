@@ -1,5 +1,13 @@
-import { useState, useMemo } from 'react';
-import { DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot, Recipe, MealPlanItem } from '@/types/recipe';
+import { useState, useMemo, useCallback } from 'react';
+import { 
+  DAYS_OF_WEEK, 
+  MEAL_SLOTS, 
+  DayOfWeek, 
+  MealSlot, 
+  Recipe, 
+  MealPlanItem,
+  DisplayMealItem 
+} from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { format, startOfWeek, addDays, addWeeks, isSameWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -10,7 +18,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Search, 
-  X, 
   Clock, 
   Users,
   Plus,
@@ -27,18 +34,26 @@ import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
 import { WeeklySummary } from '@/components/recipes/WeeklySummary';
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
-import { MealItemCard } from '@/components/recipes/MealItemCard';
+import { MealCard } from '@/components/recipes/MealCard';
+import { MealEditSheet } from '@/components/recipes/MealEditSheet';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
-
-interface PlannedRecipeDisplay {
-  recipe: Recipe;
-  item: MealPlanItem;
-}
 
 type FilterType = 'all' | 'favorites' | 'quick' | 'category';
 
 export default function MealPlanPage() {
-  const { recipes, mealPlans, getCurrentMealPlan, addToMealPlan, removeFromMealPlan, updateMealPlanItem, categories, pantryStaples, toggleFavorite, toggleArchive, deleteRecipe } = useRecipes();
+  const { 
+    recipes, 
+    mealPlans, 
+    getCurrentMealPlan, 
+    addToMealPlan, 
+    removeFromMealPlan, 
+    updateMealPlanItem, 
+    categories, 
+    pantryStaples, 
+    toggleFavorite, 
+    toggleArchive, 
+    deleteRecipe 
+  } = useRecipes();
   const { toast } = useToast();
   const { householdSize } = useHouseholdSettings();
   
@@ -47,12 +62,14 @@ export default function MealPlanPage() {
   const [draggingItem, setDraggingItem] = useState<{ itemId: string; recipeId: string } | null>(null);
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState<Recipe | null>(null);
   const [selectedRecipeForView, setSelectedRecipeForView] = useState<Recipe | null>(null);
-  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
+  
+  // Side panel editing state
+  const [editingItem, setEditingItem] = useState<{ item: MealPlanItem; recipe: Recipe } | null>(null);
   
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
@@ -67,10 +84,80 @@ export default function MealPlanPage() {
     return mealPlans.find(mp => mp.weekStartDate === weekStartStr) || { id: '', weekStartDate: weekStartStr, items: [] };
   }, [mealPlans, selectedWeekStart]);
 
+  // Generate display items including virtual leftover cards
+  const displayItemsMap = useMemo(() => {
+    const map = new Map<string, DisplayMealItem[]>();
+    
+    // Initialize all slots
+    DAYS_OF_WEEK.forEach(day => {
+      MEAL_SLOTS.forEach(slot => {
+        map.set(`${day}-${slot}`, []);
+      });
+    });
+    
+    // Add real items first
+    selectedWeekPlan.items.forEach(item => {
+      const recipe = recipes.find(r => r.id === item.recipeId);
+      if (!recipe) return;
+      
+      const key = `${item.day}-${item.mealSlot}`;
+      const existing = map.get(key) || [];
+      existing.push({
+        item,
+        recipe,
+        isLeftover: false,
+      });
+      map.set(key, existing);
+    });
+    
+    // Generate virtual leftover cards
+    selectedWeekPlan.items.forEach(item => {
+      if (item.leftoverMeals <= 0) return;
+      
+      const recipe = recipes.find(r => r.id === item.recipeId);
+      if (!recipe) return;
+      
+      const dayIndex = DAYS_OF_WEEK.indexOf(item.day as DayOfWeek);
+      
+      // Create leftover cards for each leftover meal
+      for (let i = 0; i < item.leftoverMeals; i++) {
+        // Try to place leftovers in lunch slots on subsequent days
+        const targetDayIndex = dayIndex + 1 + i;
+        if (targetDayIndex >= DAYS_OF_WEEK.length) continue; // Skip if beyond the week
+        
+        const targetDay = DAYS_OF_WEEK[targetDayIndex];
+        // Default leftovers to lunch
+        const targetSlot: MealSlot = 'lunch';
+        const key = `${targetDay}-${targetSlot}`;
+        
+        const leftoverItem: MealPlanItem = {
+          id: `${item.id}-leftover-${i}`,
+          recipeId: item.recipeId,
+          day: targetDay,
+          mealSlot: targetSlot,
+          servingsMultiplier: item.servingsMultiplier,
+          leftoverMeals: 0,
+          isLeftover: true,
+          sourceItemId: item.id,
+        };
+        
+        const existing = map.get(key) || [];
+        existing.push({
+          item: leftoverItem,
+          recipe,
+          isLeftover: true,
+          sourceItem: item,
+        });
+        map.set(key, existing);
+      }
+    });
+    
+    return map;
+  }, [selectedWeekPlan.items, recipes]);
+
   const filteredRecipes = useMemo(() => {
     let filtered = recipes.filter(r => !r.isArchived);
     
-    // Apply filter
     switch (activeFilter) {
       case 'favorites':
         filtered = filtered.filter(r => r.isFavorite);
@@ -85,7 +172,6 @@ export default function MealPlanPage() {
         break;
     }
     
-    // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(r => 
@@ -98,17 +184,11 @@ export default function MealPlanPage() {
     return filtered;
   }, [recipes, searchQuery, activeFilter, selectedCategory]);
 
-  const getRecipesForSlot = (day: DayOfWeek, slot: MealSlot): PlannedRecipeDisplay[] => {
-    const items = selectedWeekPlan.items.filter(i => i.day === day && i.mealSlot === slot);
-    return items
-      .map(item => {
-        const recipe = recipes.find(r => r.id === item.recipeId);
-        return recipe ? { recipe, item } : null;
-      })
-      .filter((r): r is PlannedRecipeDisplay => r !== null);
+  const getDisplayItemsForSlot = (day: DayOfWeek, slot: MealSlot): DisplayMealItem[] => {
+    return displayItemsMap.get(`${day}-${slot}`) || [];
   };
 
-  const handleDrop = (e: React.DragEvent, day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+  const handleDrop = async (e: React.DragEvent, day: string, slot: MealSlot) => {
     e.preventDefault();
     if (!canEdit) {
       toast({
@@ -130,20 +210,26 @@ export default function MealPlanPage() {
       const recipe = recipes.find(r => r.id === draggingItem.recipeId);
       if (recipe) {
         toast({
-          title: "Moved recipe",
-          description: `${recipe.title} moved to ${day} ${slot}.`,
+          title: "Moved",
+          description: `${recipe.title} → ${day} ${slot}`,
         });
       }
     } 
-    // Adding a new recipe from sidebar
+    // Adding a new recipe - auto-set servings to household size
     else if (recipeId) {
-      const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-      addToMealPlan(recipeId, day, slot, weekStartStr);
       const recipe = recipes.find(r => r.id === recipeId);
-      if (recipe) {
+      const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+      const result = await addToMealPlan(recipeId, day, slot, weekStartStr);
+      
+      // Auto-adjust to household size
+      if (result && recipe) {
+        const multiplier = householdSize / recipe.servings;
+        if (multiplier !== 1) {
+          updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+        }
         toast({
-          title: "Added to meal plan",
-          description: `${recipe.title} added to ${day} ${slot}.`,
+          title: "Added",
+          description: `${recipe.title} added for ${householdSize} servings`,
         });
       }
     }
@@ -153,6 +239,10 @@ export default function MealPlanPage() {
   };
 
   const handleMealItemDragStart = (e: React.DragEvent, item: MealPlanItem, recipe: Recipe) => {
+    if (item.isLeftover) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('itemId', item.id);
     e.dataTransfer.setData('recipeId', recipe.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -174,16 +264,21 @@ export default function MealPlanPage() {
     setDragOverSlot(null);
   };
 
+  const handleCardClick = (displayItem: DisplayMealItem) => {
+    if (displayItem.isLeftover && displayItem.sourceItem) {
+      // Click on leftover opens the source item for editing
+      setEditingItem({ item: displayItem.sourceItem, recipe: displayItem.recipe });
+    } else {
+      setEditingItem({ item: displayItem.item, recipe: displayItem.recipe });
+    }
+  };
+
   const updateServings = (itemId: string, newMultiplier: number) => {
     updateMealPlanItem(itemId, { servingsMultiplier: newMultiplier });
   };
 
   const updateLeftovers = (itemId: string, leftoverMeals: number) => {
     updateMealPlanItem(itemId, { leftoverMeals });
-  };
-
-  const toggleSlotExpansion = (slotId: string) => {
-    setExpandedSlots(prev => ({ ...prev, [slotId]: !prev[slotId] }));
   };
 
   const dayLabels: Record<string, string> = {
@@ -196,19 +291,18 @@ export default function MealPlanPage() {
     sunday: 'Sun',
   };
 
-  const slotIcons: Record<string, typeof Utensils> = {
-    breakfast: Utensils,
-    lunch: Utensils,
-    dinner: Utensils,
-  };
-
   const getDailyNutrition = (day: DayOfWeek) => {
     let calories = 0;
     MEAL_SLOTS.forEach(slot => {
-      const plannedRecipes = getRecipesForSlot(day, slot);
-      plannedRecipes.forEach(({ recipe, item }) => {
+      const displayItems = getDisplayItemsForSlot(day, slot);
+      displayItems.forEach(({ recipe, item, isLeftover }) => {
         if (recipe.nutrition) {
-          calories += recipe.nutrition.perServing.calories * item.servingsMultiplier;
+          // Don't double-count leftovers - they come from the same cooking
+          // Only count if it's the primary meal
+          if (!isLeftover) {
+            const totalMeals = 1 + (item.leftoverMeals || 0);
+            calories += recipe.nutrition.perServing.calories * item.servingsMultiplier;
+          }
         }
       });
     });
@@ -450,7 +544,7 @@ export default function MealPlanPage() {
               <div className="grid grid-cols-7 gap-2 mb-3">
                 {DAYS_OF_WEEK.map((day, index) => {
                   const date = addDays(selectedWeekStart, index);
-                  const isToday = isSameWeek(date, today) && date.getDay() === today.getDay();
+                  const isToday = isSameWeek(date, today, { weekStartsOn: 1 }) && date.getDate() === today.getDate();
                   const dailyNutrition = getDailyNutrition(day);
                   
                   return (
@@ -496,12 +590,9 @@ export default function MealPlanPage() {
                   <div className="grid grid-cols-7 gap-2">
                     {DAYS_OF_WEEK.map(day => {
                       const slotId = `${day}-${slot}`;
-                      const plannedRecipes = getRecipesForSlot(day, slot);
+                      const displayItems = getDisplayItemsForSlot(day, slot);
                       const isOver = dragOverSlot === slotId;
-                      const hasRecipes = plannedRecipes.length > 0;
-                      const isExpanded = expandedSlots[slotId];
-                      const displayRecipes = isExpanded ? plannedRecipes : plannedRecipes.slice(0, 2);
-                      const hiddenCount = plannedRecipes.length - 2;
+                      const hasItems = displayItems.length > 0;
 
                       return (
                         <div
@@ -510,50 +601,29 @@ export default function MealPlanPage() {
                           onDragOver={(e) => handleDragOver(e, slotId)}
                           onDragLeave={handleDragLeave}
                           className={cn(
-                            "min-h-[120px] rounded-xl border-2 border-dashed transition-all p-2",
-                            hasRecipes 
-                              ? "border-transparent bg-card shadow-sm" 
+                            "min-h-[100px] rounded-xl border-2 border-dashed transition-all p-1.5",
+                            hasItems 
+                              ? "border-transparent bg-transparent" 
                               : "border-border/40 bg-muted/20 hover:bg-muted/30",
                             isOver && "border-primary bg-primary/5 scale-[1.02]",
                             !canEdit && "opacity-80"
                           )}
                         >
-                          {hasRecipes ? (
-                            <div className="space-y-2">
-                              {displayRecipes.map(({ recipe, item }) => (
-                                <MealItemCard
-                                  key={item.id}
-                                  recipe={recipe}
-                                  item={item}
-                                  canEdit={canEdit}
+                          {hasItems ? (
+                            <div className="space-y-1.5">
+                              {displayItems.map((displayItem) => (
+                                <MealCard
+                                  key={displayItem.item.id}
+                                  recipe={displayItem.recipe}
+                                  item={displayItem.item}
+                                  isLeftover={displayItem.isLeftover}
                                   householdSize={householdSize}
-                                  isDragging={draggingItem?.itemId === item.id}
-                                  onDragStart={(e) => handleMealItemDragStart(e, item, recipe)}
+                                  isDragging={draggingItem?.itemId === displayItem.item.id}
+                                  onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe)}
                                   onDragEnd={handleMealItemDragEnd}
-                                  onClick={() => setSelectedRecipeForView(recipe)}
-                                  onRemove={() => removeFromMealPlan(item.id)}
-                                  onUpdateServings={(multiplier) => updateServings(item.id, multiplier)}
-                                  onUpdateLeftovers={(leftovers) => updateLeftovers(item.id, leftovers)}
+                                  onClick={() => handleCardClick(displayItem)}
                                 />
                               ))}
-                              
-                              {hiddenCount > 0 && !isExpanded && (
-                                <button
-                                  onClick={() => toggleSlotExpansion(slotId)}
-                                  className="text-[10px] text-primary hover:underline w-full text-center font-medium"
-                                >
-                                  +{hiddenCount} more
-                                </button>
-                              )}
-                              
-                              {isExpanded && plannedRecipes.length > 2 && (
-                                <button
-                                  onClick={() => toggleSlotExpansion(slotId)}
-                                  className="text-[10px] text-muted-foreground hover:underline w-full text-center"
-                                >
-                                  Show less
-                                </button>
-                              )}
                             </div>
                           ) : (
                             <div className="h-full flex items-center justify-center">
@@ -602,6 +672,25 @@ export default function MealPlanPage() {
           onAddToMealPlan={(recipe) => {
             setSelectedRecipeForView(null);
             setSelectedRecipeForPlan(recipe);
+          }}
+        />
+
+        {/* Meal edit side panel */}
+        <MealEditSheet
+          open={!!editingItem}
+          onOpenChange={(open) => !open && setEditingItem(null)}
+          recipe={editingItem?.recipe || null}
+          item={editingItem?.item || null}
+          householdSize={householdSize}
+          onUpdateServings={updateServings}
+          onUpdateLeftovers={updateLeftovers}
+          onRemove={(itemId) => {
+            removeFromMealPlan(itemId);
+            setEditingItem(null);
+          }}
+          onViewRecipe={(recipe) => {
+            setEditingItem(null);
+            setSelectedRecipeForView(recipe);
           }}
         />
       </div>

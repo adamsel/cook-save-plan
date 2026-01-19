@@ -256,7 +256,7 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
 
       {/* Shopping List Preview */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" />
             Shopping List
@@ -265,6 +265,11 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples }: WeeklyS
             {summary.shoppingList.length} items
           </Badge>
         </div>
+        
+        {/* Calculation basis */}
+        <p className="text-xs text-muted-foreground mb-3 italic">
+          Based on {summary.mealSummaryText || 'your planned meals'}
+        </p>
         
         <ScrollArea className="h-[180px]">
           <div className="space-y-1 pr-3">
