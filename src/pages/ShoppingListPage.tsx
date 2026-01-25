@@ -479,6 +479,7 @@ export default function ShoppingListPage() {
         <div className="flex-1" />
 
         <div className="flex gap-2">
+          {/* AI Cleanup button hidden until Edge Function is deployed
           <Button
             variant="outline"
             size="sm"
@@ -492,6 +493,7 @@ export default function ShoppingListPage() {
             )}
             Smart Cleanup
           </Button>
+          */}
           <Button variant="outline" size="sm" onClick={clearChecked}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset
