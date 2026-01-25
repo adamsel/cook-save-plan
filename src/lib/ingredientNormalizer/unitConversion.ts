@@ -215,6 +215,78 @@ export const UNIT_CONVERSIONS: Record<string, ConversionFactor> = {
   '': { toBase: 1, type: 'unknown' },
 };
 
+// Items that should only use count units, never volume (tbsp, cup, etc.)
+const COUNT_ONLY_ITEMS = [
+  // Produce
+  'onion', 'red onion', 'white onion', 'yellow onion',
+  'pepper', 'bell pepper', 'red bell pepper', 'green bell pepper',
+  'tomato', 'potato', 'carrot', 'celery', 'cucumber', 'zucchini',
+  'eggplant', 'squash', 'mushroom', 'radish', 'beet', 'turnip',
+  'avocado', 'apple', 'lemon', 'lime', 'orange', 'banana',
+  // Meats (should never be measured in cups/tbsp)
+  'chicken breast', 'chicken thigh', 'bacon', 'sausage',
+  'steak', 'pork chop', 'lamb chop', 'fish fillet',
+  // Eggs
+  'egg',
+];
+
+// Volume to weight conversion for common ingredients (tbsp → grams)
+const VOLUME_TO_WEIGHT: Record<string, { tbsp: number; tsp: number; cup: number }> = {
+  'butter': { tbsp: 14, tsp: 5, cup: 227 },
+  'oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'olive oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'neutral oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'honey': { tbsp: 21, tsp: 7, cup: 340 },
+  'flour': { tbsp: 8, tsp: 2.6, cup: 125 },
+  'sugar': { tbsp: 12.5, tsp: 4, cup: 200 },
+  'brown sugar': { tbsp: 12, tsp: 4, cup: 200 },
+  'confectioners sugar': { tbsp: 8, tsp: 2.5, cup: 120 },
+};
+
+/**
+ * Check if an ingredient should only use count units (not volume like tbsp/cup)
+ */
+function isCountOnlyItem(ingredientName: string): boolean {
+  const lower = ingredientName.toLowerCase();
+  return COUNT_ONLY_ITEMS.some(p => lower.includes(p));
+}
+
+/**
+ * Check if we can convert volume to weight for this ingredient
+ */
+function getVolumeToWeightFactor(ingredientName: string): { tbsp: number; tsp: number; cup: number } | null {
+  const lower = ingredientName.toLowerCase();
+  for (const [ingredient, factors] of Object.entries(VOLUME_TO_WEIGHT)) {
+    if (lower.includes(ingredient)) {
+      return factors;
+    }
+  }
+  return null;
+}
+
+/**
+ * Convert volume to weight for ingredients that should be measured by weight (e.g., butter)
+ * Returns the weight in grams if conversion is possible, null otherwise
+ */
+export function convertVolumeToWeight(
+  volumeInMl: number,
+  ingredientName: string
+): number | null {
+  const factors = getVolumeToWeightFactor(ingredientName);
+  if (!factors) return null;
+
+  // volumeInMl to tbsp, then to grams
+  const tbspEquivalent = volumeInMl / 14.787;
+  return tbspEquivalent * factors.tbsp;
+}
+
+/**
+ * Check if ingredient should prefer weight over volume for consolidation
+ */
+export function shouldPreferWeight(ingredientName: string): boolean {
+  return getVolumeToWeightFactor(ingredientName) !== null;
+}
+
 // Unit display preferences (from base units) - prefer practical cooking units over ml
 export const VOLUME_DISPLAY_THRESHOLDS = [
   { min: 0, max: 15, unit: 'tsp', factor: 1 / 4.929 },
@@ -291,20 +363,42 @@ export function areUnitsCompatible(unit1: string, unit2: string): boolean {
  * Rounds up to nearest whole number for cleaner shopping lists
  */
 export function formatQuantity(
-  baseValue: number, 
-  type: 'volume' | 'weight' | 'count' | 'container' | 'unknown', 
+  baseValue: number,
+  type: 'volume' | 'weight' | 'count' | 'container' | 'unknown',
   preferredUnit?: string,
   ingredientName?: string
 ): { value: number; unit: string } {
   // Check if this is an herb or similar that shouldn't use ml
   const isHerbOrSpice = ingredientName && /basil|cilantro|parsley|mint|dill|thyme|rosemary|oregano|sage|tarragon|chive|coriander|herb/.test(ingredientName.toLowerCase());
-  
+
   // For counts and containers, round up to nearest whole
   if (type === 'count' || type === 'container' || type === 'unknown') {
     const rounded = Math.ceil(baseValue);
     return { value: rounded, unit: preferredUnit || '' };
   }
-  
+
+  // For volume, check special cases first
+  if (type === 'volume' && ingredientName) {
+    // Convert volume to count for items that shouldn't use volume (e.g., "4 tbsp red onion" → "1 red onion")
+    if (isCountOnlyItem(ingredientName)) {
+      // Approximate: small volume amounts (< 60ml / 4tbsp) = 1 item
+      // Larger amounts may need more items
+      const itemCount = baseValue < 60 ? 1 : Math.ceil(baseValue / 120);
+      return { value: itemCount, unit: '' };
+    }
+
+    // Convert volume to weight for butter/oil (prefer grams for consolidation)
+    const weightFactors = getVolumeToWeightFactor(ingredientName);
+    if (weightFactors) {
+      // baseValue is in ml, convert via tbsp (14.787ml per tbsp)
+      const tbspEquivalent = baseValue / 14.787;
+      const grams = tbspEquivalent * weightFactors.tbsp;
+      // Round up to nearest 10g
+      const rounded = Math.ceil(grams / 10) * 10;
+      return { value: rounded, unit: 'g' };
+    }
+  }
+
   // For volume, select appropriate unit based on amount
   if (type === 'volume') {
     // For herbs/spices, prefer tbsp/tsp over ml
@@ -321,7 +415,7 @@ export function formatQuantity(
         return { value: 1, unit: 'bunch' };
       }
     }
-    
+
     for (const threshold of VOLUME_DISPLAY_THRESHOLDS) {
       if (baseValue >= threshold.min && baseValue < threshold.max) {
         const rawValue = baseValue * threshold.factor;
@@ -333,7 +427,7 @@ export function formatQuantity(
     // Fallback
     return { value: Math.ceil(baseValue / 1000), unit: 'l' };
   }
-  
+
   // For weight, select appropriate unit and round up
   if (type === 'weight') {
     if (baseValue >= 1000) {
@@ -345,7 +439,7 @@ export function formatQuantity(
     const rounded = Math.ceil(baseValue / 10) * 10;
     return { value: rounded, unit: 'g' };
   }
-  
+
   return { value: Math.ceil(baseValue), unit: preferredUnit || '' };
 }
 

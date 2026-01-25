@@ -161,10 +161,12 @@ export const DEFAULT_PANTRY_STAPLES = [
   'pepper',
   'olive oil',
   'vegetable oil',
+  'neutral oil',
   'butter',
   'garlic',
   'onion',
   'sugar',
   'flour',
-  'water'
+  'water',
+  'ice',
 ];

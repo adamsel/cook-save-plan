@@ -2,14 +2,16 @@
 // Combines alias mapping, unit conversion, and smart merging
 
 import { INGREDIENT_ALIASES, DESCRIPTORS_TO_REMOVE } from './aliases';
-import { 
-  normalizeUnit, 
-  toBaseUnits, 
-  areUnitsCompatible, 
-  formatQuantity, 
+import {
+  normalizeUnit,
+  toBaseUnits,
+  areUnitsCompatible,
+  formatQuantity,
   formatQuantityString,
   getUnitInfo,
-  type NormalizedQuantity 
+  convertVolumeToWeight,
+  shouldPreferWeight,
+  type NormalizedQuantity
 } from './unitConversion';
 
 export { normalizeUnit, formatQuantityString } from './unitConversion';
@@ -128,6 +130,26 @@ export interface MergedIngredient {
   totalDisplay: string;
   recipeIds: string[];
   category: string;
+  alternatives: string[];  // e.g., ["almond butter"] for "peanut butter or almond butter"
+  alternativeNote?: string; // e.g., "butter already on list" for "coconut oil or butter"
+}
+
+/**
+ * Parse "or" alternatives from ingredient strings
+ * Examples:
+ *   "peanut butter or almond butter" → { primary: "peanut butter", alternatives: ["almond butter"] }
+ *   "coconut oil (or butter)" → { primary: "coconut oil", alternatives: ["butter"] }
+ */
+function parseAlternatives(item: string): { primary: string; alternatives: string[] } {
+  // Match patterns like "X or Y" or "X (or Y)"
+  const orMatch = item.match(/^(.+?)\s+(?:\()?or\s+(.+?)(?:\))?$/i);
+  if (orMatch) {
+    return {
+      primary: orMatch[1].trim(),
+      alternatives: [orMatch[2].trim()]
+    };
+  }
+  return { primary: item, alternatives: [] };
 }
 
 export interface MergedQuantity {
@@ -153,29 +175,59 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     originalNames: Set<string>;
     quantities: Map<string, NormalizedQuantity & { count: number }>;
     recipeIds: Set<string>;
+    alternatives: Set<string>;
   }>();
-  
+
+  // First pass: collect all normalized keys (to check if alternatives are already on list)
+  const allKeys = new Set<string>();
   for (const input of inputs) {
-    const key = getIngredientKey(input.item);
+    const { primary } = parseAlternatives(input.item);
+    allKeys.add(getIngredientKey(primary));
+  }
+
+  for (const input of inputs) {
+    // Parse "or" alternatives from the ingredient name
+    const { primary, alternatives } = parseAlternatives(input.item);
+    const key = getIngredientKey(primary);
     const multiplier = input.servingsMultiplier ?? 1;
-    
+
     if (!groups.has(key)) {
       groups.set(key, {
         originalNames: new Set(),
         quantities: new Map(),
         recipeIds: new Set(),
+        alternatives: new Set(),
       });
     }
-    
+
     const group = groups.get(key)!;
-    group.originalNames.add(input.item);
+    group.originalNames.add(primary); // Store primary name, not the full "X or Y" string
     group.recipeIds.add(input.recipeId);
+
+    // Track alternatives
+    for (const alt of alternatives) {
+      group.alternatives.add(alt);
+    }
     
     if (input.quantity !== null) {
       const normalizedUnit = normalizeUnit(input.unit);
-      const quantity = toBaseUnits(input.quantity * multiplier, normalizedUnit);
-      const unitInfo = getUnitInfo(normalizedUnit);
-      
+      let quantity = toBaseUnits(input.quantity * multiplier, normalizedUnit);
+      let unitInfo = getUnitInfo(normalizedUnit);
+
+      // Convert volume to weight for ingredients like butter (for better consolidation)
+      if (unitInfo.type === 'volume' && shouldPreferWeight(key)) {
+        const weightInGrams = convertVolumeToWeight(quantity.baseValue, key);
+        if (weightInGrams !== null) {
+          quantity = {
+            value: weightInGrams,
+            unit: 'g',
+            type: 'weight',
+            baseValue: weightInGrams,
+          };
+          unitInfo = { toBase: 1, type: 'weight' };
+        }
+      }
+
       // Group by unit type for merging
       const typeKey = unitInfo.type;
       const existing = group.quantities.get(typeKey);
@@ -227,28 +279,46 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     const displayName = getDisplayName(key, originalNames);
     
     const quantities: MergedQuantity[] = [];
-    const displayParts: string[] = [];
-    
+
+    // First pass: format each quantity and group by display unit to SUM values
+    const unitTotals = new Map<string, { value: number; type: 'volume' | 'weight' | 'count' | 'container' | 'unknown' }>();
+
     for (const [, q] of group.quantities) {
       if (q.type === 'unknown' || q.baseValue === 0) {
         // No specific quantity
         continue;
       }
-      
+
       // Format the quantity for display - pass ingredient name for herb detection
       const formatted = formatQuantity(q.baseValue, q.type, q.unit, key);
+
+      // Sum by display unit (so "50g + 10g + 60g" becomes "120g")
+      const existing = unitTotals.get(formatted.unit);
+      if (existing) {
+        existing.value += formatted.value;
+      } else {
+        unitTotals.set(formatted.unit, {
+          value: formatted.value,
+          type: q.type,
+        });
+      }
+    }
+
+    // Build quantities array and display parts from summed totals
+    const displayParts: string[] = [];
+    for (const [unit, total] of unitTotals) {
       quantities.push({
-        value: formatted.value,
-        unit: formatted.unit,
-        type: q.type,
+        value: total.value,
+        unit: unit,
+        type: total.type,
       });
-      
-      const displayStr = formatQuantityString(formatted.value, formatted.unit);
+
+      const displayStr = formatQuantityString(total.value, unit);
       if (displayStr) {
         displayParts.push(displayStr);
       }
     }
-    
+
     // Create total display string
     let totalDisplay = '';
     if (displayParts.length > 0) {
@@ -262,6 +332,19 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
       }
     }
     
+    // Process alternatives and check if any are already on the shopping list
+    const alternatives = Array.from(group.alternatives);
+    let alternativeNote: string | undefined;
+
+    // Check if any alternative is already in allKeys (on the shopping list)
+    for (const alt of alternatives) {
+      const altKey = getIngredientKey(alt);
+      if (allKeys.has(altKey) && altKey !== key) {
+        alternativeNote = `${alt} already on list`;
+        break;
+      }
+    }
+
     results.push({
       key,
       displayName,
@@ -270,73 +353,90 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
       totalDisplay,
       recipeIds: Array.from(group.recipeIds),
       category: categorizeIngredient(key),
+      alternatives,
+      alternativeNote,
     });
   }
-  
+
   return results;
 }
 
 /**
  * Categorize an ingredient into a shopping aisle
+ * Order matters: check SPECIFIC patterns before GENERIC ones
  */
 function categorizeIngredient(ingredient: string): string {
   const lower = ingredient.toLowerCase();
-  
-  // Proteins
-  if (/chicken|beef|pork|lamb|turkey|duck|fish|salmon|tuna|shrimp|prawn|crab|lobster|bacon|ham|sausage|ground meat|mince/.test(lower)) {
+
+  // === SPECIFIC PATTERNS FIRST (to avoid false matches) ===
+
+  // Condiments & Sauces (check BEFORE "fish" matches Meat)
+  if (/sauce|ketchup|mustard|mayo|mayonnaise|vinegar|dressing|relish|salsa|hot sauce|soy sauce|fish sauce|oyster sauce|hoisin|teriyaki|worcestershire|sriracha/.test(lower)) {
+    return 'Condiments';
+  }
+
+  // Beverages & Broths (check BEFORE "beef"/"chicken" matches Meat)
+  if (/broth|stock|water|juice|soda|coffee|tea|wine|beer/.test(lower)) {
+    return 'Beverages';
+  }
+
+  // Spices & Seasonings (check "powder", "ground", "dried" BEFORE Produce)
+  if (/powder|ground |dried |salt|pepper|oregano|cumin|paprika|cinnamon|nutmeg|cayenne|chili powder|curry|turmeric|coriander|cardamom|clove|allspice|bay leaf|sage|tarragon|garlic powder|onion powder|ginger powder|seasoning|spice/.test(lower)) {
+    return 'Spices & Seasonings';
+  }
+
+  // === NOW CHECK GENERIC PATTERNS ===
+
+  // Proteins (safe now that sauces/broths are filtered)
+  if (/chicken|beef|pork|lamb|turkey|duck|salmon|tuna|shrimp|prawn|crab|lobster|bacon|ham|sausage|ground meat|mince|fish fillet|cod|tilapia|halibut/.test(lower)) {
     return 'Meat & Seafood';
   }
-  
+
   // Dairy
   if (/milk|cream|butter|cheese|yogurt|yoghurt|egg|sour cream|cottage cheese|ricotta|mascarpone/.test(lower)) {
     return 'Dairy';
   }
-  
-  // Produce
-  if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|basil|cilantro|parsley|mint|dill|thyme|rosemary|oregano|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|scallion|green onion|leek|shallot/.test(lower)) {
+
+  // Produce (added radish, beet, turnip, parsnip)
+  if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|scallion|green onion|leek|shallot|radish|beet|turnip|parsnip|asparagus|artichoke|corn|pea|bean sprout/.test(lower)) {
     return 'Produce';
   }
-  
+
+  // Fresh herbs go to Produce (not dried spices)
+  if (/fresh basil|fresh cilantro|fresh parsley|fresh mint|fresh dill|fresh thyme|fresh rosemary|fresh oregano|fresh sage|basil leaves|cilantro leaves|parsley leaves|mint leaves/.test(lower)) {
+    return 'Produce';
+  }
+
   // Bakery
   if (/bread|bagel|tortilla|roll|bun|pita|naan|croissant|muffin|baguette/.test(lower)) {
     return 'Bakery';
   }
-  
+
   // Frozen
   if (/frozen/.test(lower)) {
     return 'Frozen';
   }
-  
-  // Spices & Seasonings
-  if (/salt|pepper|oregano|basil|cumin|paprika|cinnamon|nutmeg|cayenne|chili powder|curry|turmeric|coriander|cardamom|clove|allspice|bay leaf|thyme|rosemary|sage|dill|tarragon/.test(lower)) {
-    return 'Spices & Seasonings';
-  }
-  
-  // Condiments & Sauces
-  if (/sauce|ketchup|mustard|mayo|mayonnaise|vinegar|oil|dressing|relish|salsa|hot sauce|soy sauce|fish sauce|oyster sauce|hoisin|teriyaki|worcestershire|sriracha/.test(lower)) {
-    return 'Condiments';
-  }
-  
+
   // Canned goods
   if (/canned|can of|tinned/.test(lower)) {
     return 'Canned Goods';
   }
-  
-  // Beverages
-  if (/water|juice|soda|coffee|tea|wine|beer|broth|stock/.test(lower)) {
-    return 'Beverages';
-  }
-  
+
   // Pasta & Grains
   if (/pasta|spaghetti|penne|rigatoni|fettuccine|linguine|rice|quinoa|couscous|orzo|noodle|macaroni/.test(lower)) {
     return 'Pasta & Grains';
   }
-  
+
   // Baking
   if (/flour|sugar|baking powder|baking soda|yeast|vanilla|chocolate|cocoa|honey|maple syrup|molasses/.test(lower)) {
     return 'Baking';
   }
-  
+
+  // Oils (separate from condiments for clearer categorization)
+  if (/oil/.test(lower)) {
+    return 'Condiments';
+  }
+
   // Default
   return 'Pantry';
 }

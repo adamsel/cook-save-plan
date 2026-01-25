@@ -57,7 +57,11 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'white flour': 'flour',
   'unbleached flour': 'flour',
   'bleached flour': 'flour',
-  
+  'self-raising flour': 'flour',
+  'self raising flour': 'flour',
+  'self-rising flour': 'flour',
+  'self rising flour': 'flour',
+
   'wholemeal flour': 'whole wheat flour',
   'wholewheat flour': 'whole wheat flour',
   
@@ -74,6 +78,9 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'natural yoghurt': 'plain yogurt',
   'plain yoghurt': 'plain yogurt',
   'greek yoghurt': 'greek yogurt',
+  'plain greek yogurt': 'greek yogurt',
+  'plain greek yoghurt': 'greek yogurt',
+  'full fat greek yogurt': 'greek yogurt',
   'low fat greek yogurt': 'greek yogurt',
   'fat free greek yogurt': 'greek yogurt',
   'nonfat greek yogurt': 'greek yogurt',
@@ -139,6 +146,10 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'rapeseed oil': 'neutral oil',
   'sunflower oil': 'neutral oil',
   'corn oil': 'neutral oil',
+  'cooking oil': 'neutral oil',
+  'oil for frying': 'neutral oil',
+  'frying oil': 'neutral oil',
+  'oil': 'neutral oil',
   
   // Vinegars
   'white wine vinegar': 'white wine vinegar',
