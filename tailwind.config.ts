@@ -69,6 +69,19 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Meal slot colors
+        meal: {
+          breakfast: "hsl(45, 93%, 60%)",
+          lunch: "hsl(150, 40%, 50%)",
+          dinner: "hsl(18, 65%, 50%)",
+          snack: "hsl(280, 50%, 60%)",
+        },
+      },
+      backgroundImage: {
+        'meal-breakfast': 'linear-gradient(135deg, hsl(45, 93%, 60%) 0%, hsl(35, 90%, 55%) 100%)',
+        'meal-lunch': 'linear-gradient(135deg, hsl(150, 40%, 50%) 0%, hsl(160, 35%, 45%) 100%)',
+        'meal-dinner': 'linear-gradient(135deg, hsl(18, 65%, 50%) 0%, hsl(8, 60%, 45%) 100%)',
+        'meal-snack': 'linear-gradient(135deg, hsl(280, 50%, 60%) 0%, hsl(270, 45%, 55%) 100%)',
       },
       borderRadius: {
         lg: "var(--radius)",

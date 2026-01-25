@@ -38,6 +38,7 @@ interface RecipeContextType {
   addToMealPlan: (recipeId: string, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack', weekStartDate?: string) => Promise<MealPlanItem | null>;
   removeFromMealPlan: (itemId: string) => Promise<void>;
   updateMealPlanItem: (itemId: string, updates: Partial<MealPlanItem>) => Promise<void>;
+  updateLeftoverPosition: (itemId: string, leftoverIndex: number, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
   
   // Settings Actions
   addCategory: (category: string) => void;
@@ -224,9 +225,37 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
     } else {
       setLocalMealPlans(prev => prev.map(mp => ({
         ...mp,
-        items: mp.items.map(item => 
+        items: mp.items.map(item =>
           item.id === itemId ? { ...item, ...updates } : item
         )
+      })));
+    }
+  };
+
+  const updateLeftoverPosition = async (
+    itemId: string,
+    leftoverIndex: number,
+    day: string,
+    mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  ) => {
+    if (user) {
+      await mealPlansData.updateLeftoverPosition(itemId, leftoverIndex, day, mealSlot);
+    } else {
+      // Local fallback - update leftoverPositions array on the item
+      setLocalMealPlans(prev => prev.map(mp => ({
+        ...mp,
+        items: mp.items.map(item => {
+          if (item.id !== itemId) return item;
+          const positions = [...(item.leftoverPositions || [])];
+          const existingIdx = positions.findIndex(p => p.index === leftoverIndex);
+          const newPos = { index: leftoverIndex, day, slot: mealSlot };
+          if (existingIdx >= 0) {
+            positions[existingIdx] = newPos;
+          } else {
+            positions.push(newPos);
+          }
+          return { ...item, leftoverPositions: positions };
+        })
       })));
     }
   };
@@ -280,6 +309,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       addToMealPlan,
       removeFromMealPlan,
       updateMealPlanItem,
+      updateLeftoverPosition,
       addCategory,
       addTag,
       updatePantryStaples,

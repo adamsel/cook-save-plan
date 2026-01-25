@@ -1,12 +1,12 @@
-import { useState, useMemo, useCallback } from 'react';
-import { 
-  DAYS_OF_WEEK, 
-  MEAL_SLOTS, 
-  DayOfWeek, 
-  MealSlot, 
-  Recipe, 
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import {
+  DAYS_OF_WEEK,
+  MEAL_SLOTS,
+  DayOfWeek,
+  MealSlot,
+  Recipe,
   MealPlanItem,
-  DisplayMealItem 
+  DisplayMealItem
 } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { format, startOfWeek, addDays, addWeeks, isSameWeek } from 'date-fns';
@@ -14,11 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Search, 
-  Clock, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Clock,
   Users,
   Plus,
   Heart,
@@ -27,8 +27,11 @@ import {
   History,
   BarChart3,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  LayoutGrid,
+  List
 } from 'lucide-react';
+import { DayListView } from '@/components/recipes/DayListView';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
@@ -36,23 +39,40 @@ import { WeeklySummary } from '@/components/recipes/WeeklySummary';
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { MealCard } from '@/components/recipes/MealCard';
 import { MealEditSheet } from '@/components/recipes/MealEditSheet';
+import { MealPlanEmptyState } from '@/components/recipes/MealPlanEmptyState';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 
 type FilterType = 'all' | 'favorites' | 'quick' | 'category';
+type ViewMode = 'grid' | 'list';
+
+// Hook to detect mobile screens
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
 
 export default function MealPlanPage() {
-  const { 
-    recipes, 
-    mealPlans, 
-    getCurrentMealPlan, 
-    addToMealPlan, 
-    removeFromMealPlan, 
-    updateMealPlanItem, 
-    categories, 
-    pantryStaples, 
-    toggleFavorite, 
-    toggleArchive, 
-    deleteRecipe 
+  const {
+    recipes,
+    mealPlans,
+    getCurrentMealPlan,
+    addToMealPlan,
+    removeFromMealPlan,
+    updateMealPlanItem,
+    updateLeftoverPosition,
+    categories,
+    pantryStaples,
+    toggleFavorite,
+    toggleArchive,
+    deleteRecipe
   } = useRecipes();
   const { toast } = useToast();
   const { householdSize } = useHouseholdSettings();
@@ -67,22 +87,47 @@ export default function MealPlanPage() {
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
-  
-  // Side panel editing state
-  const [editingItem, setEditingItem] = useState<{ item: MealPlanItem; recipe: Recipe } | null>(null);
-  
+
+  // View mode (auto-detect mobile)
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>('monday');
+
+  // Auto-switch to list view on mobile
+  useEffect(() => {
+    if (isMobile && viewMode === 'grid') {
+      setViewMode('list');
+    }
+  }, [isMobile]);
+
+  // Side panel editing state - store ID instead of copy for real-time updates
+  const [editingItemId, setEditingItemId] = useState<{ itemId: string; recipe: Recipe } | null>(null);
+
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
   const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
   const isCurrentWeek = selectedWeekOffset === 0;
   const isFutureWeek = selectedWeekOffset > 0;
   const canEdit = isCurrentWeek || isFutureWeek;
-  
+
   // Get meal plan for selected week
   const selectedWeekPlan = useMemo(() => {
     const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-    return mealPlans.find(mp => mp.weekStartDate === weekStartStr) || { id: '', weekStartDate: weekStartStr, items: [] };
+    return mealPlans.find(mp => mp.weekStartDate === weekStartStr) || {
+      id: '',
+      weekStartDate: weekStartStr,
+      items: [],
+      leftoverPositions: []
+    };
   }, [mealPlans, selectedWeekStart]);
+
+  // Derive current editing item from mealPlans state (ensures real-time updates)
+  const editingItem = editingItemId
+    ? {
+        item: selectedWeekPlan.items.find(i => i.id === editingItemId.itemId) || null,
+        recipe: editingItemId.recipe
+      }
+    : null;
 
   // Generate display items including virtual leftover cards
   const displayItemsMap = useMemo(() => {
@@ -113,23 +158,36 @@ export default function MealPlanPage() {
     // Generate virtual leftover cards
     selectedWeekPlan.items.forEach(item => {
       if (item.leftoverMeals <= 0) return;
-      
+
       const recipe = recipes.find(r => r.id === item.recipeId);
       if (!recipe) return;
-      
+
       const dayIndex = DAYS_OF_WEEK.indexOf(item.day as DayOfWeek);
-      
+
       // Create leftover cards for each leftover meal
       for (let i = 0; i < item.leftoverMeals; i++) {
-        // Try to place leftovers in lunch slots on subsequent days
-        const targetDayIndex = dayIndex + 1 + i;
-        if (targetDayIndex >= DAYS_OF_WEEK.length) continue; // Skip if beyond the week
-        
-        const targetDay = DAYS_OF_WEEK[targetDayIndex];
-        // Default leftovers to lunch
-        const targetSlot: MealSlot = 'lunch';
+        // Check for custom position (now stored on the item itself)
+        const customPos = item.leftoverPositions?.find(
+          lp => lp.index === i
+        );
+
+        let targetDay: DayOfWeek;
+        let targetSlot: MealSlot;
+
+        if (customPos) {
+          // Use custom position
+          targetDay = customPos.day as DayOfWeek;
+          targetSlot = customPos.slot;
+        } else {
+          // Default: next day's lunch
+          const targetDayIndex = dayIndex + 1 + i;
+          if (targetDayIndex >= DAYS_OF_WEEK.length) continue; // Skip if beyond the week
+          targetDay = DAYS_OF_WEEK[targetDayIndex];
+          targetSlot = 'lunch';
+        }
+
         const key = `${targetDay}-${targetSlot}`;
-        
+
         const leftoverItem: MealPlanItem = {
           id: `${item.id}-leftover-${i}`,
           recipeId: item.recipeId,
@@ -140,20 +198,21 @@ export default function MealPlanPage() {
           isLeftover: true,
           sourceItemId: item.id,
         };
-        
+
         const existing = map.get(key) || [];
         existing.push({
           item: leftoverItem,
           recipe,
           isLeftover: true,
           sourceItem: item,
+          leftoverIndex: i, // Track which leftover this is
         });
         map.set(key, existing);
       }
     });
-    
+
     return map;
-  }, [selectedWeekPlan.items, recipes]);
+  }, [selectedWeekPlan, recipes]);
 
   const filteredRecipes = useMemo(() => {
     let filtered = recipes.filter(r => !r.isArchived);
@@ -200,12 +259,36 @@ export default function MealPlanPage() {
       setDraggingItem(null);
       return;
     }
-    
+
     const recipeId = e.dataTransfer.getData('recipeId');
     const itemId = e.dataTransfer.getData('itemId');
-    
+    const isLeftover = e.dataTransfer.getData('isLeftover') === 'true';
+    const sourceItemId = e.dataTransfer.getData('sourceItemId');
+    const leftoverIndexStr = e.dataTransfer.getData('leftoverIndex');
+
+    // Moving a leftover to a new position
+    if (isLeftover && sourceItemId) {
+      const leftoverIndex = leftoverIndexStr ? parseInt(leftoverIndexStr, 10) : 0;
+      try {
+        await updateLeftoverPosition(sourceItemId, leftoverIndex, day, slot);
+        const recipe = recipes.find(r => r.id === recipeId);
+        if (recipe) {
+          toast({
+            title: "Leftover moved",
+            description: `${recipe.title} → ${day} ${slot}`,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to update leftover position:', err);
+        toast({
+          title: "Error moving leftover",
+          description: "Please try again",
+          variant: "destructive",
+        });
+      }
+    }
     // Moving an existing meal plan item
-    if (itemId && draggingItem) {
+    else if (itemId && draggingItem) {
       updateMealPlanItem(itemId, { day, mealSlot: slot });
       const recipe = recipes.find(r => r.id === draggingItem.recipeId);
       if (recipe) {
@@ -214,13 +297,13 @@ export default function MealPlanPage() {
           description: `${recipe.title} → ${day} ${slot}`,
         });
       }
-    } 
+    }
     // Adding a new recipe - auto-set servings to household size
     else if (recipeId) {
       const recipe = recipes.find(r => r.id === recipeId);
       const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
       const result = await addToMealPlan(recipeId, day, slot, weekStartStr);
-      
+
       // Auto-adjust to household size
       if (result && recipe) {
         const multiplier = householdSize / recipe.servings;
@@ -233,20 +316,39 @@ export default function MealPlanPage() {
         });
       }
     }
-    
+
     setDragOverSlot(null);
     setDraggingItem(null);
   };
 
-  const handleMealItemDragStart = (e: React.DragEvent, item: MealPlanItem, recipe: Recipe) => {
-    if (item.isLeftover) {
-      e.preventDefault();
-      return;
-    }
-    e.dataTransfer.setData('itemId', item.id);
+  const handleMealItemDragStart = (
+    e: React.DragEvent,
+    item: MealPlanItem,
+    recipe: Recipe,
+    displayItem?: DisplayMealItem
+  ) => {
+    // Always set recipe data for drop handling
     e.dataTransfer.setData('recipeId', recipe.id);
     e.dataTransfer.effectAllowed = 'move';
+
+    // Always set dragging state for visual feedback
     setDraggingItem({ itemId: item.id, recipeId: recipe.id });
+
+    // Handle leftover dragging - use displayItem for accurate source info
+    if (displayItem?.isLeftover) {
+      e.dataTransfer.setData('isLeftover', 'true');
+      // Get source item ID from displayItem.sourceItem or fall back to item.sourceItemId
+      const sourceId = displayItem.sourceItem?.id || item.sourceItemId;
+      if (sourceId) {
+        e.dataTransfer.setData('sourceItemId', sourceId);
+      }
+      // Set leftover index (default to 0 if not specified)
+      const leftoverIdx = displayItem.leftoverIndex ?? 0;
+      e.dataTransfer.setData('leftoverIndex', String(leftoverIdx));
+    } else {
+      // Dragging a regular meal item
+      e.dataTransfer.setData('itemId', item.id);
+    }
   };
 
   const handleMealItemDragEnd = () => {
@@ -267,9 +369,9 @@ export default function MealPlanPage() {
   const handleCardClick = (displayItem: DisplayMealItem) => {
     if (displayItem.isLeftover && displayItem.sourceItem) {
       // Click on leftover opens the source item for editing
-      setEditingItem({ item: displayItem.sourceItem, recipe: displayItem.recipe });
+      setEditingItemId({ itemId: displayItem.sourceItem.id, recipe: displayItem.recipe });
     } else {
-      setEditingItem({ item: displayItem.item, recipe: displayItem.recipe });
+      setEditingItemId({ itemId: displayItem.item.id, recipe: displayItem.recipe });
     }
   };
 
@@ -328,6 +430,26 @@ export default function MealPlanPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {/* View mode toggle */}
+              <div className="flex items-center rounded-lg border border-border/50 p-0.5">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="h-7 px-2"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="h-7 px-2"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+
               <Button
                 variant={showRecipePanel ? 'outline' : 'default'}
                 size="sm"
@@ -348,7 +470,7 @@ export default function MealPlanPage() {
                 className="gap-2"
               >
                 <BarChart3 className="h-4 w-4" />
-                Weekly Summary
+                <span className="hidden sm:inline">Weekly Summary</span>
               </Button>
             </div>
           </div>
@@ -406,15 +528,15 @@ export default function MealPlanPage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Recipe sidebar */}
+          {/* Recipe sidebar - Glass container */}
           {showRecipePanel && (
           <div className="lg:w-80 shrink-0">
-            <div className="sticky top-20 space-y-4 bg-card p-4 rounded-2xl border border-border/50 shadow-sm">
+            <div className="sticky top-20 space-y-4 glass rounded-2xl p-4 border border-white/30">
               <div className="flex items-center gap-2">
                 <Utensils className="h-5 w-5 text-primary" />
                 <h2 className="font-semibold">Recipes</h2>
               </div>
-              
+
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -422,10 +544,10 @@ export default function MealPlanPage() {
                   placeholder="Search recipes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-white/50"
                 />
               </div>
-              
+
               {/* Quick Filters */}
               <div className="flex flex-wrap gap-2">
                 {quickFilters.map(filter => (
@@ -444,7 +566,7 @@ export default function MealPlanPage() {
                   </Button>
                 ))}
               </div>
-              
+
               {/* Category Filter */}
               <div className="flex flex-wrap gap-1.5">
                 {categories.slice(0, 6).map(category => (
@@ -478,19 +600,19 @@ export default function MealPlanPage() {
                           e.dataTransfer.setData('recipeId', recipe.id);
                           e.dataTransfer.effectAllowed = 'copy';
                         }}
-                        className="group p-2 bg-secondary/30 rounded-xl border border-border/30 cursor-grab active:cursor-grabbing hover:shadow-md hover:bg-secondary/50 transition-all"
+                        className="group rounded-xl overflow-hidden bg-card/80 hover:bg-card shadow-sm card-hover cursor-grab active:cursor-grabbing"
                       >
-                        <div className="flex gap-3">
-                          <div className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-muted">
+                        <div className="flex gap-3 p-2">
+                          <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-muted">
                             {recipe.imageUrl ? (
                               <img
                                 src={recipe.imageUrl}
                                 alt=""
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Utensils className="h-5 w-5 text-muted-foreground" />
+                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                                <Utensils className="h-6 w-6 text-muted-foreground" />
                               </div>
                             )}
                             {recipe.isFavorite && (
@@ -498,10 +620,16 @@ export default function MealPlanPage() {
                                 <Heart className="h-3 w-3 fill-accent text-accent" />
                               </div>
                             )}
+                            {/* Drag hint overlay */}
+                            <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 text-[9px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded transition-opacity">
+                                Drag
+                              </span>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-medium text-sm truncate">{recipe.title}</h4>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <div className="min-w-0 flex-1 py-0.5">
+                            <h4 className="font-medium text-sm line-clamp-1">{recipe.title}</h4>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                               {recipe.totalTime && (
                                 <span className="flex items-center gap-0.5">
                                   <Clock className="h-3 w-3" />
@@ -537,109 +665,164 @@ export default function MealPlanPage() {
           </div>
           )}
 
-          {/* Calendar grid */}
+          {/* Calendar grid or List view */}
           <div className="flex-1 overflow-x-auto">
-            <div className="min-w-[700px]">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-2 mb-3">
-                {DAYS_OF_WEEK.map((day, index) => {
-                  const date = addDays(selectedWeekStart, index);
-                  const isToday = isSameWeek(date, today, { weekStartsOn: 1 }) && date.getDate() === today.getDate();
-                  const dailyNutrition = getDailyNutrition(day);
-                  
-                  return (
-                    <div 
-                      key={day} 
-                      className={cn(
-                        "text-center p-3 rounded-xl transition-colors",
-                        isToday && "bg-primary/10 border border-primary/20"
-                      )}
-                    >
-                      <div className={cn(
-                        "font-semibold text-sm",
-                        isToday && "text-primary"
-                      )}>
-                        {dayLabels[day]}
-                      </div>
-                      <div className={cn(
-                        "text-lg font-serif",
-                        isToday ? "text-primary" : "text-foreground"
-                      )}>
-                        {format(date, 'd')}
-                      </div>
-                      {dailyNutrition.calories > 0 && (
-                        <div className="text-[10px] text-muted-foreground mt-1 font-medium">
-                          {dailyNutrition.calories} cal
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {viewMode === 'grid' ? (
+              <div className="min-w-[700px]">
+                {/* Empty state when no meals planned */}
+                {selectedWeekPlan.items.length === 0 && (
+                  <MealPlanEmptyState
+                    onBrowseRecipes={() => setShowRecipePanel(true)}
+                  />
+                )}
 
-              {/* Meal Slots */}
-              {MEAL_SLOTS.map(slot => (
-                <div key={slot} className="mb-4">
-                  <div className="flex items-center gap-2 mb-2 pl-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {slot}
-                    </span>
-                    <div className="flex-1 h-px bg-border/50" />
-                  </div>
-                  
-                  <div className="grid grid-cols-7 gap-2">
-                    {DAYS_OF_WEEK.map(day => {
-                      const slotId = `${day}-${slot}`;
-                      const displayItems = getDisplayItemsForSlot(day, slot);
-                      const isOver = dragOverSlot === slotId;
-                      const hasItems = displayItems.length > 0;
+                {/* Day Headers - Hero treatment for today */}
+                <div className="grid grid-cols-7 gap-3 mb-4">
+                  {DAYS_OF_WEEK.map((day, index) => {
+                    const date = addDays(selectedWeekStart, index);
+                    const isToday = isSameWeek(date, today, { weekStartsOn: 1 }) && date.getDate() === today.getDate();
+                    const dailyNutrition = getDailyNutrition(day);
 
-                      return (
-                        <div
-                          key={slotId}
-                          onDrop={(e) => handleDrop(e, day, slot)}
-                          onDragOver={(e) => handleDragOver(e, slotId)}
-                          onDragLeave={handleDragLeave}
-                          className={cn(
-                            "min-h-[100px] rounded-xl border-2 border-dashed transition-all p-1.5",
-                            hasItems 
-                              ? "border-transparent bg-transparent" 
-                              : "border-border/40 bg-muted/20 hover:bg-muted/30",
-                            isOver && "border-primary bg-primary/5 scale-[1.02]",
-                            !canEdit && "opacity-80"
-                          )}
-                        >
-                          {hasItems ? (
-                            <div className="space-y-1.5">
-                              {displayItems.map((displayItem) => (
-                                <MealCard
-                                  key={displayItem.item.id}
-                                  recipe={displayItem.recipe}
-                                  item={displayItem.item}
-                                  isLeftover={displayItem.isLeftover}
-                                  householdSize={householdSize}
-                                  isDragging={draggingItem?.itemId === displayItem.item.id}
-                                  onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe)}
-                                  onDragEnd={handleMealItemDragEnd}
-                                  onClick={() => handleCardClick(displayItem)}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="h-full flex items-center justify-center">
-                              <span className="text-xs text-muted-foreground/60">
-                                {canEdit ? 'Drop recipe' : '—'}
-                              </span>
-                            </div>
-                          )}
+                    return (
+                      <div
+                        key={day}
+                        className={cn(
+                          "text-center p-4 rounded-2xl transition-all duration-300",
+                          isToday
+                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-primary/30"
+                            : "bg-card/50 hover:bg-card"
+                        )}
+                      >
+                        <div className={cn(
+                          "text-xs font-semibold uppercase tracking-wider mb-1",
+                          isToday ? "text-primary-foreground/80" : "text-muted-foreground"
+                        )}>
+                          {dayLabels[day]}
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className={cn(
+                          "text-3xl font-serif font-bold",
+                          isToday ? "text-primary-foreground" : "text-foreground"
+                        )}>
+                          {format(date, 'd')}
+                        </div>
+                        {/* Meal dots indicator */}
+                        <div className="flex justify-center gap-1.5 mt-2">
+                          {MEAL_SLOTS.map(slot => {
+                            const hasItems = getDisplayItemsForSlot(day, slot).length > 0;
+                            return (
+                              <div
+                                key={slot}
+                                className={cn(
+                                  "w-2 h-2 rounded-full transition-all",
+                                  hasItems
+                                    ? isToday ? "bg-primary-foreground" : "bg-primary"
+                                    : isToday ? "bg-primary-foreground/30" : "bg-muted-foreground/20"
+                                )}
+                              />
+                            );
+                          })}
+                        </div>
+                        {dailyNutrition.calories > 0 && (
+                          <div className={cn(
+                            "text-[10px] mt-1.5 font-medium",
+                            isToday ? "text-primary-foreground/70" : "text-muted-foreground"
+                          )}>
+                            {dailyNutrition.calories} cal
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-            
+
+                {/* Meal Slots */}
+                {MEAL_SLOTS.map(slot => (
+                  <div key={slot} className="mb-5">
+                    <div className="flex items-center gap-2 mb-3 pl-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {slot}
+                      </span>
+                      <div className="flex-1 h-px bg-border/30" />
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-3">
+                      {DAYS_OF_WEEK.map(day => {
+                        const slotId = `${day}-${slot}`;
+                        const displayItems = getDisplayItemsForSlot(day, slot);
+                        const isOver = dragOverSlot === slotId;
+                        const hasItems = displayItems.length > 0;
+
+                        return (
+                          <div
+                            key={slotId}
+                            onDrop={(e) => handleDrop(e, day, slot)}
+                            onDragOver={(e) => handleDragOver(e, slotId)}
+                            onDragLeave={handleDragLeave}
+                            className={cn(
+                              "min-h-[140px] rounded-2xl transition-all duration-300 p-2",
+                              hasItems
+                                ? "bg-transparent"
+                                : "glass-subtle border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40",
+                              isOver && "bg-primary/10 border-primary drop-target scale-[1.02] shadow-lg shadow-primary/10",
+                              !canEdit && "opacity-70 cursor-not-allowed"
+                            )}
+                          >
+                            {hasItems ? (
+                              <div className="space-y-2">
+                                {displayItems.map((displayItem) => (
+                                  <MealCard
+                                    key={displayItem.item.id}
+                                    recipe={displayItem.recipe}
+                                    item={displayItem.item}
+                                    isLeftover={displayItem.isLeftover}
+                                    leftoverSource={displayItem.sourceItem ? {
+                                      day: displayItem.sourceItem.day,
+                                      mealSlot: displayItem.sourceItem.mealSlot
+                                    } : undefined}
+                                    householdSize={householdSize}
+                                    isDragging={draggingItem?.itemId === displayItem.item.id}
+                                    onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe, displayItem)}
+                                    onDragEnd={handleMealItemDragEnd}
+                                    onClick={() => handleCardClick(displayItem)}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="h-full flex flex-col items-center justify-center py-6 group/slot">
+                                <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-2 group-hover/slot:bg-primary/10 transition-colors">
+                                  <Plus className="h-5 w-5 text-muted-foreground/40 group-hover/slot:text-primary transition-colors" />
+                                </div>
+                                <span className="text-xs text-muted-foreground/50 group-hover/slot:text-muted-foreground transition-colors">
+                                  {canEdit ? 'Drop recipe' : 'No meal'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <DayListView
+                selectedDay={selectedDay}
+                onDayChange={setSelectedDay}
+                weekStartDate={selectedWeekStart}
+                displayItemsMap={displayItemsMap}
+                householdSize={householdSize}
+                canEdit={canEdit}
+                draggingItem={draggingItem}
+                dragOverSlot={dragOverSlot}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDragStart={handleMealItemDragStart}
+                onDragEnd={handleMealItemDragEnd}
+                onCardClick={handleCardClick}
+              />
+            )}
+
             {/* Weekly Summary Panel */}
             {showSummary && (
               <div className="mt-6">
@@ -677,8 +860,8 @@ export default function MealPlanPage() {
 
         {/* Meal edit side panel */}
         <MealEditSheet
-          open={!!editingItem}
-          onOpenChange={(open) => !open && setEditingItem(null)}
+          open={!!editingItem?.item}
+          onOpenChange={(open) => !open && setEditingItemId(null)}
           recipe={editingItem?.recipe || null}
           item={editingItem?.item || null}
           householdSize={householdSize}
@@ -686,10 +869,10 @@ export default function MealPlanPage() {
           onUpdateLeftovers={updateLeftovers}
           onRemove={(itemId) => {
             removeFromMealPlan(itemId);
-            setEditingItem(null);
+            setEditingItemId(null);
           }}
           onViewRecipe={(recipe) => {
-            setEditingItem(null);
+            setEditingItemId(null);
             setSelectedRecipeForView(recipe);
           }}
         />

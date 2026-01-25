@@ -20,6 +20,7 @@ export type Database = {
           day: string
           id: string
           leftover_meals: number
+          leftover_positions: Json | null
           meal_plan_id: string
           meal_slot: string
           notes: string | null
@@ -31,6 +32,7 @@ export type Database = {
           day: string
           id?: string
           leftover_meals?: number
+          leftover_positions?: Json | null
           meal_plan_id: string
           meal_slot: string
           notes?: string | null
@@ -42,6 +44,7 @@ export type Database = {
           day?: string
           id?: string
           leftover_meals?: number
+          leftover_positions?: Json | null
           meal_plan_id?: string
           meal_slot?: string
           notes?: string | null

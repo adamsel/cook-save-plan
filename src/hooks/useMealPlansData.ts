@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { MealPlan, MealPlanItem } from '@/types/recipe';
+import { MealPlan, MealPlanItem, LeftoverPositionEntry } from '@/types/recipe';
 import { format, startOfWeek } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,6 +21,7 @@ interface DbMealPlanItem {
   meal_slot: string;
   servings_multiplier: number;
   leftover_meals: number;
+  leftover_positions: LeftoverPositionEntry[] | null; // JSON column
   notes: string | null;
   created_at: string;
 }
@@ -28,61 +29,68 @@ interface DbMealPlanItem {
 export function useMealPlansData() {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Convert DB meal plan item to app type
+  const dbToMealPlanItem = (item: DbMealPlanItem): MealPlanItem => ({
+    id: item.id,
+    recipeId: item.recipe_id,
+    day: item.day,
+    mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+    servingsMultiplier: Number(item.servings_multiplier),
+    leftoverMeals: Number(item.leftover_meals || 0),
+    leftoverPositions: item.leftover_positions || [],
+    notes: item.notes || undefined,
+  });
 
   // Convert DB meal plan to app type
   const dbToMealPlan = (dbPlan: DbMealPlan, items: DbMealPlanItem[]): MealPlan => ({
     id: dbPlan.id,
     weekStartDate: dbPlan.week_start_date,
-    items: items.map(item => ({
-      id: item.id,
-      recipeId: item.recipe_id,
-      day: item.day,
-      mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-      servingsMultiplier: Number(item.servings_multiplier),
-      leftoverMeals: Number(item.leftover_meals || 0),
-      notes: item.notes || undefined,
-    })),
+    items: items.map(dbToMealPlanItem),
   });
 
   // Fetch all meal plans
   const fetchMealPlans = useCallback(async () => {
     if (!user) return [];
-    
+
     const { data: plans, error: plansError } = await supabase
       .from('meal_plans')
       .select('*')
       .eq('user_id', user.id)
       .order('week_start_date', { ascending: false });
-    
+
     if (plansError) {
       console.error('Error fetching meal plans:', plansError);
       return [];
     }
-    
+
     if (!plans?.length) return [];
-    
-    // Fetch all items for these plans
+
+    // Fetch all items for these plans (includes leftover_positions JSON)
     const { data: items, error: itemsError } = await supabase
       .from('meal_plan_items')
       .select('*')
       .in('meal_plan_id', plans.map(p => p.id));
-    
+
     if (itemsError) {
       console.error('Error fetching meal plan items:', itemsError);
       return [];
     }
-    
+
     // Group items by plan
     const itemsByPlan = (items || []).reduce((acc, item) => {
       if (!acc[item.meal_plan_id]) acc[item.meal_plan_id] = [];
       acc[item.meal_plan_id].push(item as DbMealPlanItem);
       return acc;
     }, {} as Record<string, DbMealPlanItem[]>);
-    
-    return plans.map(plan => dbToMealPlan(plan as DbMealPlan, itemsByPlan[plan.id] || []));
+
+    return plans.map(plan => dbToMealPlan(
+      plan as DbMealPlan,
+      itemsByPlan[plan.id] || []
+    ));
   }, [user]);
 
   // Initial fetch
@@ -93,37 +101,40 @@ export function useMealPlansData() {
       setMealPlans(plans);
       setIsLoading(false);
     }
-    
+
     fetch();
   }, [fetchMealPlans]);
 
   // Get or create meal plan for a week
   const getMealPlan = useCallback(async (weekStartDate: string): Promise<MealPlan | null> => {
     if (!user) return null;
-    
+
     // Check if we already have it locally
     const existing = mealPlans.find(mp => mp.weekStartDate === weekStartDate);
     if (existing) return existing;
-    
+
     // Check database
-    const { data: existingPlan, error: checkError } = await supabase
+    const { data: existingPlan } = await supabase
       .from('meal_plans')
       .select('*')
       .eq('user_id', user.id)
       .eq('week_start_date', weekStartDate)
       .single();
-    
+
     if (existingPlan) {
       const { data: items } = await supabase
         .from('meal_plan_items')
         .select('*')
         .eq('meal_plan_id', existingPlan.id);
-      
-      const plan = dbToMealPlan(existingPlan as DbMealPlan, (items || []) as DbMealPlanItem[]);
+
+      const plan = dbToMealPlan(
+        existingPlan as DbMealPlan,
+        (items || []) as DbMealPlanItem[]
+      );
       setMealPlans(prev => [...prev, plan]);
       return plan;
     }
-    
+
     // Create new plan
     const { data: newPlan, error: createError } = await supabase
       .from('meal_plans')
@@ -133,12 +144,12 @@ export function useMealPlansData() {
       })
       .select()
       .single();
-    
+
     if (createError) {
       console.error('Error creating meal plan:', createError);
       return null;
     }
-    
+
     const plan = dbToMealPlan(newPlan as DbMealPlan, []);
     setMealPlans(prev => [...prev, plan]);
     return plan;
@@ -152,8 +163,8 @@ export function useMealPlansData() {
 
   // Add item to meal plan
   const addToMealPlan = async (
-    recipeId: string, 
-    day: string, 
+    recipeId: string,
+    day: string,
     mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack',
     weekStartDate?: string
   ) => {
@@ -165,12 +176,12 @@ export function useMealPlansData() {
       });
       return null;
     }
-    
+
     const targetDate = weekStartDate || format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const plan = await getMealPlan(targetDate);
-    
+
     if (!plan) return null;
-    
+
     const { data: item, error } = await supabase
       .from('meal_plan_items')
       .insert({
@@ -182,7 +193,7 @@ export function useMealPlansData() {
       })
       .select()
       .single();
-    
+
     if (error) {
       toast({
         title: 'Error adding to meal plan',
@@ -191,7 +202,7 @@ export function useMealPlansData() {
       });
       return null;
     }
-    
+
     const newItem: MealPlanItem = {
       id: item.id,
       recipeId: item.recipe_id,
@@ -199,14 +210,15 @@ export function useMealPlansData() {
       mealSlot: item.meal_slot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
       servingsMultiplier: Number(item.servings_multiplier),
       leftoverMeals: Number(item.leftover_meals || 0),
+      leftoverPositions: [],
     };
-    
-    setMealPlans(prev => prev.map(mp => 
-      mp.id === plan.id 
+
+    setMealPlans(prev => prev.map(mp =>
+      mp.id === plan.id
         ? { ...mp, items: [...mp.items, newItem] }
         : mp
     ));
-    
+
     return newItem;
   };
 
@@ -216,7 +228,7 @@ export function useMealPlansData() {
       .from('meal_plan_items')
       .delete()
       .eq('id', itemId);
-    
+
     if (error) {
       toast({
         title: 'Error removing from meal plan',
@@ -225,7 +237,7 @@ export function useMealPlansData() {
       });
       return;
     }
-    
+
     setMealPlans(prev => prev.map(mp => ({
       ...mp,
       items: mp.items.filter(item => item.id !== itemId),
@@ -240,12 +252,13 @@ export function useMealPlansData() {
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.day !== undefined) dbUpdates.day = updates.day;
     if (updates.mealSlot !== undefined) dbUpdates.meal_slot = updates.mealSlot;
-    
+    if (updates.leftoverPositions !== undefined) dbUpdates.leftover_positions = updates.leftoverPositions;
+
     const { error } = await supabase
       .from('meal_plan_items')
       .update(dbUpdates)
       .eq('id', itemId);
-    
+
     if (error) {
       toast({
         title: 'Error updating meal plan',
@@ -254,11 +267,114 @@ export function useMealPlansData() {
       });
       return;
     }
-    
+
+    // If reducing leftover count, also clean up positions array
+    if (updates.leftoverMeals !== undefined) {
+      const currentItem = mealPlans.flatMap(mp => mp.items).find(i => i.id === itemId);
+      if (currentItem && updates.leftoverMeals < currentItem.leftoverMeals) {
+        // Filter out positions for removed leftovers
+        const filteredPositions = (currentItem.leftoverPositions || []).filter(
+          p => p.index < updates.leftoverMeals!
+        );
+
+        // Update positions in DB if they changed
+        if (filteredPositions.length !== (currentItem.leftoverPositions || []).length) {
+          await supabase
+            .from('meal_plan_items')
+            .update({ leftover_positions: filteredPositions })
+            .eq('id', itemId);
+
+          updates.leftoverPositions = filteredPositions;
+        }
+      }
+    }
+
     setMealPlans(prev => prev.map(mp => ({
       ...mp,
-      items: mp.items.map(item => 
+      items: mp.items.map(item =>
         item.id === itemId ? { ...item, ...updates } : item
+      ),
+    })));
+  };
+
+  // Update leftover position (simplified - updates JSON column)
+  const updateLeftoverPosition = async (
+    itemId: string,
+    leftoverIndex: number,
+    day: string,
+    mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  ) => {
+    // Find the item
+    const item = mealPlans.flatMap(mp => mp.items).find(i => i.id === itemId);
+    if (!item) {
+      toast({
+        title: 'Error',
+        description: 'Item not found',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Build new positions array
+    const positions = [...(item.leftoverPositions || [])];
+    const existingIdx = positions.findIndex(p => p.index === leftoverIndex);
+
+    const newPosition: LeftoverPositionEntry = {
+      index: leftoverIndex,
+      day,
+      slot: mealSlot,
+    };
+
+    if (existingIdx >= 0) {
+      positions[existingIdx] = newPosition;
+    } else {
+      positions.push(newPosition);
+    }
+
+    // Update database
+    const { error } = await supabase
+      .from('meal_plan_items')
+      .update({ leftover_positions: positions })
+      .eq('id', itemId);
+
+    if (error) {
+      toast({
+        title: 'Error moving leftover',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Re-fetch to ensure UI updates with fresh data
+    const freshPlans = await fetchMealPlans();
+    setMealPlans(freshPlans);
+  };
+
+  // Delete leftover position (revert to default)
+  const deleteLeftoverPosition = async (itemId: string, leftoverIndex: number) => {
+    const item = mealPlans.flatMap(mp => mp.items).find(i => i.id === itemId);
+    if (!item) return;
+
+    // Remove position from array
+    const positions = (item.leftoverPositions || []).filter(
+      p => p.index !== leftoverIndex
+    );
+
+    const { error } = await supabase
+      .from('meal_plan_items')
+      .update({ leftover_positions: positions })
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Error deleting leftover position:', error);
+      return;
+    }
+
+    setMealPlans(prev => prev.map(mp => ({
+      ...mp,
+      items: mp.items.map(i =>
+        i.id === itemId ? { ...i, leftoverPositions: positions } : i
       ),
     })));
   };
@@ -271,6 +387,8 @@ export function useMealPlansData() {
     addToMealPlan,
     removeFromMealPlan,
     updateMealPlanItem,
+    updateLeftoverPosition,
+    deleteLeftoverPosition,
     refresh: fetchMealPlans,
   };
 }

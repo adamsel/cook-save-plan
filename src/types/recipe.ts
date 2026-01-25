@@ -60,6 +60,13 @@ export interface Recipe {
   nutrition?: RecipeNutrition;
 }
 
+// Entry for custom leftover position (stored as JSON in meal_plan_items)
+export interface LeftoverPositionEntry {
+  index: number; // Which leftover (0 = first, 1 = second, etc.)
+  day: string;   // Target day
+  slot: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // Target slot
+}
+
 export interface MealPlanItem {
   id: string;
   recipeId: string;
@@ -68,6 +75,7 @@ export interface MealPlanItem {
   servingsMultiplier: number;
   leftoverMeals: number; // Number of additional meals (leftovers) this provides
   notes?: string;
+  leftoverPositions?: LeftoverPositionEntry[]; // Custom positions for leftovers
   // Virtual field for display - not stored in DB
   isLeftover?: boolean;
   sourceItemId?: string; // Links leftover to its source meal
@@ -87,6 +95,7 @@ export interface DisplayMealItem {
   recipe: Recipe;
   isLeftover: boolean;
   sourceItem?: MealPlanItem; // The original item this leftover comes from
+  leftoverIndex?: number; // Which leftover this is (0, 1, 2...)
 }
 
 export interface MealPlan {

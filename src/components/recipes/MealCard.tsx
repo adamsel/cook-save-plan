@@ -1,11 +1,17 @@
 import { Recipe, MealPlanItem } from '@/types/recipe';
 import { cn } from '@/lib/utils';
-import { Utensils } from 'lucide-react';
+import { Utensils, Undo2 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface MealCardProps {
   recipe: Recipe;
   item: MealPlanItem;
   isLeftover?: boolean;
+  leftoverSource?: { day: string; mealSlot: string };
   householdSize: number;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
@@ -17,6 +23,7 @@ export function MealCard({
   recipe,
   item,
   isLeftover = false,
+  leftoverSource,
   householdSize,
   isDragging,
   onDragStart,
@@ -24,75 +31,82 @@ export function MealCard({
   onClick,
 }: MealCardProps) {
   const plannedServings = Math.round(recipe.servings * item.servingsMultiplier);
-  const totalMeals = 1 + (item.leftoverMeals || 0);
-  const isAdjusted = plannedServings !== householdSize;
+  const leftoverCount = item.leftoverMeals || 0;
+
+  // Format source info for tooltip
+  const formatDay = (day: string) => day.charAt(0).toUpperCase() + day.slice(1);
+  const formatSlot = (slot: string) => slot.charAt(0).toUpperCase() + slot.slice(1);
+  const sourceLabel = leftoverSource
+    ? `From ${formatDay(leftoverSource.day)}'s ${formatSlot(leftoverSource.mealSlot)}`
+    : 'Leftover';
 
   return (
     <div
-      draggable={!isLeftover}
+      draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        "group relative rounded-xl overflow-hidden transition-all cursor-pointer",
-        isLeftover 
-          ? "bg-muted/30 border-2 border-dashed border-muted-foreground/20" 
-          : "bg-card border border-border/50 shadow-sm hover:shadow-md hover:border-border",
-        isDragging && "opacity-50 ring-2 ring-primary scale-[1.02]"
+        "group relative rounded-xl overflow-hidden cursor-pointer",
+        "card-hover",
+        isLeftover
+          ? "ring-2 ring-dashed ring-amber-400/50 opacity-90"
+          : "shadow-md",
+        isDragging && "dragging"
       )}
     >
-      <div className="p-3">
-        <div className="flex gap-3">
-          {/* Recipe thumbnail */}
-          <div className={cn(
-            "relative w-12 h-12 rounded-lg overflow-hidden shrink-0",
-            isLeftover && "opacity-60"
-          )}>
-            {recipe.imageUrl ? (
-              <img
-                src={recipe.imageUrl}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-muted flex items-center justify-center">
-                <Utensils className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
+      {/* Recipe image with square aspect ratio for compact grid */}
+      <div className="aspect-square relative">
+        {recipe.imageUrl ? (
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/70">
+            <Utensils className="h-8 w-8 text-muted-foreground/60" />
           </div>
+        )}
 
-          {/* Content with clear hierarchy */}
-          <div className="flex-1 min-w-0 space-y-0.5">
-            {/* PRIMARY: Recipe title */}
-            <h4 className={cn(
-              "font-medium text-sm leading-tight line-clamp-1",
-              isLeftover && "text-muted-foreground"
-            )}>
-              {recipe.title}
-            </h4>
+        {/* Stronger gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
 
-            {/* SECONDARY: Feeds info or leftover label */}
-            {isLeftover ? (
-              <p className="text-xs text-muted-foreground/80 italic">
-                Leftover from previous day
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Feeds {totalMeals} meal{totalMeals > 1 ? 's' : ''}
-                {totalMeals > 1 && (
-                  <span className="text-muted-foreground/60">
-                    {' '}· {item.leftoverMeals} leftover{item.leftoverMeals > 1 ? 's' : ''}
-                  </span>
-                )}
-              </p>
-            )}
+        {/* Leftover indicator - top right corner badge */}
+        {isLeftover && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="absolute top-1.5 right-1.5 p-1 rounded-full bg-amber-500 shadow-md">
+                <Undo2 className="h-3 w-3 text-white" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">{sourceLabel}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
-            {/* TERTIARY: Adjusted serving note */}
-            {!isLeftover && isAdjusted && (
-              <p className="text-[10px] text-muted-foreground/60">
-                {plannedServings} servings · adjusted
-              </p>
-            )}
+        {/* Leftover count badge - top right (for source items) */}
+        {!isLeftover && leftoverCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-amber-500 shadow-md text-[10px] font-bold text-white">
+                +{leftoverCount}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Makes {leftoverCount} leftover meal{leftoverCount > 1 ? 's' : ''}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Content overlay - bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-2">
+          <h4 className="font-semibold text-white text-xs leading-tight line-clamp-2 drop-shadow-lg">
+            {recipe.title}
+          </h4>
+          <div className="text-[10px] text-white/80 mt-0.5 drop-shadow-md">
+            {plannedServings} srv
           </div>
         </div>
       </div>
