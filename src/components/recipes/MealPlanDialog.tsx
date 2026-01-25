@@ -1,5 +1,6 @@
 import { Recipe, DAYS_OF_WEEK, MEAL_SLOTS } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
+import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import {
   Dialog,
   DialogContent,
@@ -17,13 +18,23 @@ interface MealPlanDialogProps {
 }
 
 export function MealPlanDialog({ open, onOpenChange, recipe }: MealPlanDialogProps) {
-  const { addToMealPlan } = useRecipes();
+  const { addToMealPlan, updateMealPlanItem } = useRecipes();
   const { toast } = useToast();
+  const { householdSize } = useHouseholdSettings();
 
   if (!recipe) return null;
 
-  const handleAddToSlot = (day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
-    addToMealPlan(recipe.id, day, slot);
+  const handleAddToSlot = async (day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+    const result = await addToMealPlan(recipe.id, day, slot);
+
+    // Auto-adjust servings to household size
+    if (result && recipe.servings > 0) {
+      const multiplier = householdSize / recipe.servings;
+      if (multiplier !== 1) {
+        await updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+      }
+    }
+
     toast({
       title: "Added to meal plan",
       description: `${recipe.title} added to ${day} ${slot}.`,

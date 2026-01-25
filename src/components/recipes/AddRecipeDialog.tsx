@@ -718,108 +718,84 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setImportStep('edit');
   };
 
-  // Render based on import step
-  const renderContent = () => {
-    if (editingRecipe) {
-      return <EditForm />;
-    }
+  // Input step content - defined as JSX to avoid remounting on state changes
+  const inputStepContent = (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="url" className="gap-2">
+          <Link className="h-4 w-4" />
+          From URL
+        </TabsTrigger>
+        <TabsTrigger value="paste" className="gap-2">
+          <FileText className="h-4 w-4" />
+          Paste Text
+        </TabsTrigger>
+        <TabsTrigger value="manual" className="gap-2">
+          <PenLine className="h-4 w-4" />
+          Manual
+        </TabsTrigger>
+      </TabsList>
 
-    switch (importStep) {
-      case 'chat':
-        return (
-          <RecipeAIChat 
-            onRecipeReady={handleAIRecipeReady}
-            onCancel={() => onOpenChange(false)}
-          />
-        );
-      case 'input':
-        return <InputStep />;
-      case 'review':
-        return <ReviewStep />;
-      case 'edit':
-        return <EditForm />;
-    }
-  };
-
-  // Input step - URL or paste text
-  function InputStep() {
-    return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="url" className="gap-2">
-            <Link className="h-4 w-4" />
-            From URL
-          </TabsTrigger>
-          <TabsTrigger value="paste" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Paste Text
-          </TabsTrigger>
-          <TabsTrigger value="manual" className="gap-2">
-            <PenLine className="h-4 w-4" />
-            Manual
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="url" className="space-y-4 mt-4">
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Recipe URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://example.com/recipe"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleParseUrl()}
-                />
-                <Button type="button" onClick={handleParseUrl} disabled={!url || isLoading}>
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Import'}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                We'll extract ingredients, instructions, and more automatically.
-              </p>
-            </div>
-
-            {parseError && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                <p className="text-sm text-destructive">{parseError}</p>
-              </div>
-            )}
-
-            {showPasteFallback && (
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <Label>Paste recipe content</Label>
-                  <Button type="button" variant="ghost" size="sm" onClick={handlePasteFromClipboard}>
-                    <Clipboard className="h-4 w-4 mr-2" />
-                    Paste from clipboard
-                  </Button>
-                </div>
-                <Textarea
-                  placeholder="Copy the recipe from the website and paste it here. Include ingredients and instructions."
-                  value={pastedContent}
-                  onChange={(e) => setPastedContent(e.target.value)}
-                  rows={8}
-                />
-                <Button type="button" onClick={handleParseContent} disabled={!pastedContent.trim()}>
-                  Parse Content
-                </Button>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="paste" className="space-y-4 mt-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Paste recipe text</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={handlePasteFromClipboard}>
-                <Clipboard className="h-4 w-4 mr-2" />
-                Paste from clipboard
+      <TabsContent value="url" className="space-y-4 mt-4">
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label>Recipe URL</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="https://example.com/recipe"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleParseUrl()}
+              />
+              <Button type="button" onClick={handleParseUrl} disabled={!url || isLoading}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Import'}
               </Button>
             </div>
-            <Textarea
-              placeholder="Paste ingredients and instructions here. We'll parse them automatically.
+            <p className="text-sm text-muted-foreground">
+              We'll extract ingredients, instructions, and more automatically.
+            </p>
+          </div>
+
+          {parseError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive">{parseError}</p>
+            </div>
+          )}
+
+          {showPasteFallback && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <Label>Paste recipe content</Label>
+                <Button type="button" variant="ghost" size="sm" onClick={handlePasteFromClipboard}>
+                  <Clipboard className="h-4 w-4 mr-2" />
+                  Paste from clipboard
+                </Button>
+              </div>
+              <Textarea
+                placeholder="Copy the recipe from the website and paste it here. Include ingredients and instructions."
+                value={pastedContent}
+                onChange={(e) => setPastedContent(e.target.value)}
+                rows={8}
+              />
+              <Button type="button" onClick={handleParseContent} disabled={!pastedContent.trim()}>
+                Parse Content
+              </Button>
+            </div>
+          )}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="paste" className="space-y-4 mt-4">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>Paste recipe text</Label>
+            <Button type="button" variant="ghost" size="sm" onClick={handlePasteFromClipboard}>
+              <Clipboard className="h-4 w-4 mr-2" />
+              Paste from clipboard
+            </Button>
+          </div>
+          <Textarea
+            placeholder="Paste ingredients and instructions here. We'll parse them automatically.
 
 Example:
 Ingredients:
@@ -831,36 +807,32 @@ Instructions:
 1. Mix dry ingredients
 2. Add water and stir
 3. Knead until smooth"
-              value={pastedContent}
-              onChange={(e) => setPastedContent(e.target.value)}
-              rows={12}
-            />
-            <Button type="button" onClick={handleParseContent} disabled={!pastedContent.trim()}>
-              Parse Text
-            </Button>
-          </div>
-        </TabsContent>
+            value={pastedContent}
+            onChange={(e) => setPastedContent(e.target.value)}
+            rows={12}
+          />
+          <Button type="button" onClick={handleParseContent} disabled={!pastedContent.trim()}>
+            Parse Text
+          </Button>
+        </div>
+      </TabsContent>
 
-        <TabsContent value="manual" className="mt-4">
-          <div className="text-center py-8 space-y-4">
-            <p className="text-muted-foreground">
-              Start with a blank recipe form and enter everything manually.
-            </p>
-            <Button type="button" onClick={handleManualEntry}>
-              <PenLine className="h-4 w-4 mr-2" />
-              Start Manual Entry
-            </Button>
-          </div>
-        </TabsContent>
-      </Tabs>
-    );
-  }
+      <TabsContent value="manual" className="mt-4">
+        <div className="text-center py-8 space-y-4">
+          <p className="text-muted-foreground">
+            Start with a blank recipe form and enter everything manually.
+          </p>
+          <Button type="button" onClick={handleManualEntry}>
+            <PenLine className="h-4 w-4 mr-2" />
+            Start Manual Entry
+          </Button>
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
 
-  // Review step - show parsed data with edit options
-  function ReviewStep() {
-    if (!parsedRecipe) return null;
-
-    return (
+  // Review step content - defined as JSX to avoid remounting on state changes
+  const reviewStepContent = !parsedRecipe ? null : (
       <div className="space-y-6 mt-4">
         <div className="flex items-center justify-between">
           <Button type="button" variant="ghost" size="sm" onClick={() => setImportStep('input')}>
@@ -1053,77 +1025,75 @@ Instructions:
           </div>
         </div>
       </div>
-    );
-  }
+  );
 
-  // Full edit form
-  function EditForm() {
-    return (
-      <div className="space-y-6 mt-4">
-        {importStep === 'edit' && !editingRecipe && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => setImportStep('input')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        )}
+  // Full edit form content - defined as JSX to avoid remounting on state changes
+  const editFormContent = (
+    <div className="space-y-6 mt-4">
+      {importStep === 'edit' && !editingRecipe && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setImportStep('input')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+      )}
 
-        {/* Basic Info */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              placeholder="Recipe title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={cn(!title.trim() && "border-destructive")}
-            />
-          </div>
+      {/* Basic Info */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="title">Title *</Label>
+          <Input
+            id="title"
+            placeholder="Recipe title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className={cn(!title.trim() && "border-destructive")}
+          />
+        </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Brief description of the recipe"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            placeholder="Brief description of the recipe"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="imageUrl">Image URL</Label>
-            <Input
-              id="imageUrl"
-              placeholder="https://example.com/image.jpg"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="imageUrl">Image URL</Label>
+          <Input
+            id="imageUrl"
+            placeholder="https://example.com/image.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="sourceUrl">Source URL</Label>
-            <Input
-              id="sourceUrl"
-              placeholder="https://example.com/recipe"
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="sourceUrl">Source URL</Label>
+          <Input
+            id="sourceUrl"
+            placeholder="https://example.com/recipe"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label>Category *</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className={cn(!category && "border-destructive")}>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <Label>Category *</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className={cn(!category && "border-destructive")}>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
           <div className="space-y-2">
             <Label>Servings</Label>
@@ -1226,8 +1196,30 @@ Instructions:
           </Button>
         </div>
       </div>
-    );
-  }
+  );
+
+  // Render based on import step - returns JSX directly to avoid focus loss
+  const renderContent = () => {
+    if (editingRecipe) {
+      return editFormContent;
+    }
+
+    switch (importStep) {
+      case 'chat':
+        return (
+          <RecipeAIChat
+            onRecipeReady={handleAIRecipeReady}
+            onCancel={() => onOpenChange(false)}
+          />
+        );
+      case 'input':
+        return inputStepContent;
+      case 'review':
+        return reviewStepContent;
+      case 'edit':
+        return editFormContent;
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {

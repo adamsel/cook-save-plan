@@ -41,6 +41,7 @@ import { MealCard } from '@/components/recipes/MealCard';
 import { MealEditSheet } from '@/components/recipes/MealEditSheet';
 import { MealPlanEmptyState } from '@/components/recipes/MealPlanEmptyState';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 type FilterType = 'all' | 'favorites' | 'quick' | 'category';
 type ViewMode = 'grid' | 'list';
@@ -84,7 +85,7 @@ export default function MealPlanPage() {
   const [selectedRecipeForView, setSelectedRecipeForView] = useState<Recipe | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const [selectedWeekOffset, setSelectedWeekOffset] = useLocalStorage('mealPlanWeekOffset', 0);
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
 
@@ -666,7 +667,7 @@ export default function MealPlanPage() {
           )}
 
           {/* Calendar grid or List view */}
-          <div className="flex-1 overflow-x-auto">
+          <div className="flex-1 overflow-x-clip">
             {viewMode === 'grid' ? (
               <div className="min-w-[700px]">
                 {/* Empty state when no meals planned */}
@@ -677,7 +678,7 @@ export default function MealPlanPage() {
                 )}
 
                 {/* Day Headers - Hero treatment for today */}
-                <div className="grid grid-cols-7 gap-3 mb-4">
+                <div className="sticky top-16 z-20 bg-background pt-2 pb-4 -mx-2 px-2 grid grid-cols-7 gap-3">
                   {DAYS_OF_WEEK.map((day, index) => {
                     const date = addDays(selectedWeekStart, index);
                     const isToday = isSameWeek(date, today, { weekStartsOn: 1 }) && date.getDate() === today.getDate();
@@ -830,6 +831,7 @@ export default function MealPlanPage() {
                   recipes={recipes}
                   mealPlanItems={selectedWeekPlan.items}
                   pantryStaples={pantryStaples}
+                  householdSize={householdSize}
                 />
               </div>
             )}

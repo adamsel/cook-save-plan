@@ -90,7 +90,7 @@ export function MealCard({
         {!isLeftover && leftoverCount > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-amber-500 shadow-md text-[10px] font-bold text-white">
+              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 shadow-md text-[10px] font-bold text-white">
                 +{leftoverCount}
               </div>
             </TooltipTrigger>
