@@ -428,7 +428,8 @@ export default function MealPlanPage() {
         }
       });
     });
-    return { calories: Math.round(calories) };
+    // Divide by household size to show per-person calories
+    return { calories: Math.round(calories / householdSize) };
   };
 
   const quickFilters = [

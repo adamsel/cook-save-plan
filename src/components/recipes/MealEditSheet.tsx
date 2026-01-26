@@ -48,9 +48,31 @@ export function MealEditSheet({
   const totalMeals = 1 + (item.leftoverMeals || 0);
   const isAdjustedFromOriginal = recipe.servings !== plannedServings;
 
+  // Handle servings change and auto-calculate leftovers
   const handleServingsChange = (delta: number) => {
     const newMultiplier = Math.max(0.5, Math.min(6, item.servingsMultiplier + delta));
+    const newServings = Math.round(recipe.servings * newMultiplier);
     onUpdateServings(item.id, newMultiplier);
+
+    // Auto-calculate leftovers based on new servings and household size
+    const mealsFromServings = Math.floor(newServings / householdSize);
+    const newLeftovers = Math.max(0, mealsFromServings - 1);
+    if (newLeftovers !== item.leftoverMeals) {
+      onUpdateLeftovers(item.id, newLeftovers);
+    }
+  };
+
+  // Handle leftovers change and auto-calculate servings
+  const handleLeftoversChange = (newLeftovers: number) => {
+    onUpdateLeftovers(item.id, newLeftovers);
+
+    // Auto-calculate servings based on leftovers and household size
+    const mealsNeeded = newLeftovers + 1;
+    const servingsNeeded = mealsNeeded * householdSize;
+    const newMultiplier = servingsNeeded / recipe.servings;
+    if (Math.abs(newMultiplier - item.servingsMultiplier) > 0.01) {
+      onUpdateServings(item.id, Math.min(6, Math.max(0.5, newMultiplier)));
+    }
   };
 
   const dayLabels: Record<string, string> = {
@@ -186,7 +208,7 @@ export function MealEditSheet({
                     key={count}
                     variant={isActive ? "default" : "outline"}
                     className="h-12 flex-col gap-0.5"
-                    onClick={() => onUpdateLeftovers(item.id, count)}
+                    onClick={() => handleLeftoversChange(count)}
                   >
                     <span className="text-lg font-semibold">{count}</span>
                     <span className="text-[10px] opacity-70">

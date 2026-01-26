@@ -619,9 +619,10 @@ export default function ShoppingListPage() {
             size="sm"
             onClick={addCheckedToPantry}
             disabled={isPantryLoading || checkedCount === 0}
+            title={checkedCount === 0 ? "Check off items first to add them to pantry" : `Add ${checkedCount} item${checkedCount !== 1 ? 's' : ''} to pantry`}
           >
             <Package className="h-4 w-4 mr-1" />
-            Add to Pantry
+            Add to Pantry {checkedCount > 0 && `(${checkedCount})`}
           </Button>
           <Button variant="outline" size="sm" onClick={copyToClipboard}>
             <Copy className="h-4 w-4 mr-1" />
@@ -655,38 +656,38 @@ export default function ShoppingListPage() {
               key={category}
               open={expandedCategories[category] !== false}
               onOpenChange={() => toggleCategory(category)}
-              className="break-inside-avoid bg-card border border-border/50 rounded-lg p-2"
+              className="break-inside-avoid bg-card border border-border/50 rounded-xl p-3"
             >
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors">
+                <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   {expandedCategories[category] === false ? (
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
                   )}
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">{category}</span>
-                  <Badge variant="secondary" className="ml-auto">
+                  <span className="font-semibold">{category}</span>
+                  <Badge variant="secondary" className="ml-auto text-xs">
                     {items.filter(i => i.checked).length}/{items.length}
                   </Badge>
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="pl-8 space-y-1 mt-1">
+                <div className="space-y-0.5 mt-2">
                   {items.map(item => (
                     <div
                       key={item.id}
                       className={cn(
-                        "flex items-center gap-3 p-2 rounded-lg transition-colors",
-                        item.checked ? "opacity-50" : "hover:bg-muted/50"
+                        "flex items-center gap-3 py-2 px-3 rounded-md transition-colors",
+                        item.checked ? "opacity-40 bg-muted/30" : "hover:bg-muted/50"
                       )}
                     >
                       <Checkbox
                         checked={item.checked}
                         onCheckedChange={() => toggleItem(item.id)}
+                        className="h-5 w-5"
                       />
                       <span className={cn(
-                        "flex-1 flex items-center gap-1.5",
+                        "flex-1 flex items-center gap-2 min-w-0",
                         item.checked && "line-through text-muted-foreground"
                       )}>
                         {(() => {

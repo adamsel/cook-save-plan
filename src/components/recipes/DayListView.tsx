@@ -212,7 +212,10 @@ function ListMealCard({
 }: ListMealCardProps) {
   const { item, recipe, isLeftover, sourceItem } = displayItem;
   const leftoverCount = item.leftoverMeals || 0;
-  const plannedServings = Math.round(recipe.servings * item.servingsMultiplier);
+  // Calculate per-meal servings (total servings ÷ number of meals)
+  const totalServings = recipe.servings * item.servingsMultiplier;
+  const numberOfMeals = 1 + leftoverCount;
+  const plannedServings = Math.round(totalServings / numberOfMeals);
 
   const formatDay = (day: string) => day.charAt(0).toUpperCase() + day.slice(1);
   const formatSlot = (slot: string) => slot.charAt(0).toUpperCase() + slot.slice(1);

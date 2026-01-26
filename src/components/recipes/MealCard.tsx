@@ -30,8 +30,11 @@ export function MealCard({
   onDragEnd,
   onClick,
 }: MealCardProps) {
-  const plannedServings = Math.round(recipe.servings * item.servingsMultiplier);
   const leftoverCount = item.leftoverMeals || 0;
+  // Calculate per-meal servings (total servings ÷ number of meals)
+  const totalServings = recipe.servings * item.servingsMultiplier;
+  const numberOfMeals = 1 + leftoverCount;
+  const plannedServings = Math.round(totalServings / numberOfMeals);
 
   // Format source info for tooltip
   const formatDay = (day: string) => day.charAt(0).toUpperCase() + day.slice(1);
