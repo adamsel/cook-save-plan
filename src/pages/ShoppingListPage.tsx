@@ -52,6 +52,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useShoppingListState } from '@/hooks/useShoppingListState';
+import { usePantry } from '@/hooks/usePantry';
 import {
   Collapsible,
   CollapsibleContent,
@@ -65,6 +66,7 @@ export default function ShoppingListPage() {
   const { recipes, getMealPlanForWeek, mealPlans, pantryStaples, aisleCategories } = useRecipes();
   const { toast } = useToast();
   const { dietaryRestrictions, allergens } = useDietaryPreferences();
+  const { addFromShoppingList, isLoading: isPantryLoading } = usePantry();
 
   // Shopping list state - syncs with database for logged-in users
   const {
@@ -298,6 +300,31 @@ export default function ShoppingListPage() {
     window.print();
   };
 
+  // Add checked items to pantry
+  const addCheckedToPantry = async () => {
+    const checkedShoppingItems = shoppingList.filter(i => i.checked);
+    if (checkedShoppingItems.length === 0) {
+      toast({ title: "No items selected", description: "Check off items first to add them to your pantry." });
+      return;
+    }
+
+    // Convert shopping list items to pantry format
+    const pantryItems = checkedShoppingItems.map(item => ({
+      displayName: item.ingredient,
+      quantity: typeof item.quantity === 'number' ? item.quantity : undefined,
+      unit: item.unit || undefined,
+      category: item.category || 'Other',
+    }));
+
+    const addedCount = await addFromShoppingList(pantryItems);
+
+    // Toast is already shown by usePantry hook if items were added
+    // Clear checked items after adding to pantry
+    if (addedCount > 0 || checkedShoppingItems.length > 0) {
+      setCheckedItems({});
+    }
+  };
+
   const runAICleanup = async () => {
     if (!session?.access_token) {
       toast({
@@ -375,15 +402,31 @@ export default function ShoppingListPage() {
   function categorizeIngredient(ingredient: string): string {
     const lower = ingredient.toLowerCase();
 
-    // Simple categorization rules
-    if (/chicken|beef|pork|lamb|fish|salmon|shrimp|bacon|pancetta/.test(lower)) return 'Meat & Seafood';
-    if (/milk|cheese|cream|butter|yogurt|egg/.test(lower)) return 'Dairy';
-    if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot/.test(lower)) return 'Produce';
-    if (/bread|bagel|tortilla|roll/.test(lower)) return 'Bakery';
+    // Categorization rules - order matters (check specific patterns first)
+
+    // Meat & Seafood (comprehensive list including steak, turkey, etc.)
+    if (/chicken|beef|steak|pork|lamb|turkey|duck|veal|fish|salmon|tuna|cod|tilapia|halibut|shrimp|prawn|crab|lobster|scallop|bacon|pancetta|ham|sausage|mince|ground meat/.test(lower)) return 'Meat & Seafood';
+
+    // Dairy & Eggs
+    if (/milk|cheese|cream|butter|yogurt|egg|sour cream|cottage cheese|ricotta|mozzarella|parmesan|cheddar/.test(lower)) return 'Dairy';
+
+    // Produce (fruits and vegetables)
+    if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|mushroom|cabbage|kale|avocado|lemon|lime|orange|apple|banana|berry|grape/.test(lower)) return 'Produce';
+
+    // Bakery
+    if (/bread|bagel|tortilla|roll|bun|croissant|muffin|pita/.test(lower)) return 'Bakery';
+
+    // Frozen
     if (/frozen/.test(lower)) return 'Frozen';
-    if (/salt|pepper|oregano|basil|cumin|paprika|cinnamon/.test(lower)) return 'Spices & Seasonings';
-    if (/sauce|ketchup|mustard|mayo|vinegar|oil/.test(lower)) return 'Condiments';
-    if (/water|juice|soda|coffee|tea/.test(lower)) return 'Beverages';
+
+    // Spices & Seasonings
+    if (/salt|pepper|oregano|basil|cumin|paprika|cinnamon|thyme|rosemary|sage|nutmeg|ginger|turmeric|curry|chili powder|cayenne|bay leaf|dill|parsley|cilantro|mint|seasoning|spice/.test(lower)) return 'Spices & Seasonings';
+
+    // Condiments (check BEFORE beverages to avoid "juice" false matches)
+    if (/sauce|ketchup|mustard|mayo|mayonnaise|vinegar|oil|dressing|relish|salsa|soy sauce|hot sauce|worcestershire|sriracha|honey|syrup|jam|jelly/.test(lower)) return 'Condiments';
+
+    // Beverages (check last for liquid-like words)
+    if (/water|juice|soda|coffee|tea|broth|stock|wine|beer/.test(lower) && !/steak/.test(lower)) return 'Beverages';
 
     return 'Pantry';
   }
@@ -570,6 +613,15 @@ export default function ShoppingListPage() {
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addCheckedToPantry}
+            disabled={isPantryLoading || checkedCount === 0}
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Add to Pantry
+          </Button>
           <Button variant="outline" size="sm" onClick={copyToClipboard}>
             <Copy className="h-4 w-4 mr-1" />
             Copy
@@ -594,17 +646,18 @@ export default function ShoppingListPage() {
         </Button>
       </div>
 
-      {/* Shopping list */}
+      {/* Shopping list - responsive multi-column layout */}
       {totalCount > 0 ? (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Object.entries(groupedItems).map(([category, items]) => (
             <Collapsible
               key={category}
               open={expandedCategories[category] !== false}
               onOpenChange={() => toggleCategory(category)}
+              className="break-inside-avoid bg-card border border-border/50 rounded-lg p-2"
             >
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted transition-colors">
+                <button className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors">
                   {expandedCategories[category] === false ? (
                     <ChevronRight className="h-4 w-4" />
                   ) : (

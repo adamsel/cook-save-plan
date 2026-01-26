@@ -155,9 +155,18 @@ export function useHousehold() {
 
       if (householdError) {
         console.error('Error creating household:', householdError);
+        // Provide more specific error messages
+        let errorMessage = 'Failed to create household';
+        if (householdError.code === '42501') {
+          errorMessage = 'Permission denied. Please ensure you are logged in.';
+        } else if (householdError.code === '23505') {
+          errorMessage = 'A household with this name already exists.';
+        } else if (householdError.message) {
+          errorMessage = householdError.message;
+        }
         toast({
           title: 'Error',
-          description: 'Failed to create household',
+          description: errorMessage,
           variant: 'destructive',
         });
         return null;
@@ -176,9 +185,15 @@ export function useHousehold() {
         console.error('Error adding owner to household:', memberError);
         // Cleanup: delete the household
         await supabase.from('households').delete().eq('id', householdData.id);
+        let errorMessage = 'Failed to add you as owner';
+        if (memberError.code === '42501') {
+          errorMessage = 'Permission denied when adding membership.';
+        } else if (memberError.message) {
+          errorMessage = memberError.message;
+        }
         toast({
           title: 'Error',
-          description: 'Failed to create household',
+          description: errorMessage,
           variant: 'destructive',
         });
         return null;

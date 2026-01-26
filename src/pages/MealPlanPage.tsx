@@ -299,22 +299,40 @@ export default function MealPlanPage() {
         });
       }
     }
-    // Adding a new recipe - auto-set servings to household size
+    // Adding a new recipe - auto-set servings and leftovers based on household size
     else if (recipeId) {
       const recipe = recipes.find(r => r.id === recipeId);
       const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
       const result = await addToMealPlan(recipeId, day, slot, weekStartStr);
 
-      // Auto-adjust to household size
       if (result && recipe) {
-        const multiplier = householdSize / recipe.servings;
-        if (multiplier !== 1) {
-          updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+        // Calculate how many meals this recipe provides for the household
+        const mealsFromRecipe = recipe.servings / householdSize;
+
+        if (mealsFromRecipe <= 1) {
+          // Recipe doesn't make enough for one meal - scale up to household size
+          const multiplier = householdSize / recipe.servings;
+          if (multiplier !== 1) {
+            updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+          }
+          toast({
+            title: "Added",
+            description: `${recipe.title} scaled to ${householdSize} servings`,
+          });
+        } else {
+          // Recipe makes more than one meal - auto-suggest leftovers
+          const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
+          updateMealPlanItem(result.id, {
+            servingsMultiplier: 1, // Cook full recipe as written
+            leftoverMeals: suggestedLeftovers,
+          });
+          toast({
+            title: "Added",
+            description: suggestedLeftovers > 0
+              ? `${recipe.title} + ${suggestedLeftovers} leftover${suggestedLeftovers > 1 ? 's' : ''}`
+              : `${recipe.title} added`,
+          });
         }
-        toast({
-          title: "Added",
-          description: `${recipe.title} added for ${householdSize} servings`,
-        });
       }
     }
 
@@ -400,12 +418,13 @@ export default function MealPlanPage() {
       const displayItems = getDisplayItemsForSlot(day, slot);
       displayItems.forEach(({ recipe, item, isLeftover }) => {
         if (recipe.nutrition) {
-          // Don't double-count leftovers - they come from the same cooking
-          // Only count if it's the primary meal
-          if (!isLeftover) {
-            const totalMeals = 1 + (item.leftoverMeals || 0);
-            calories += recipe.nutrition.perServing.calories * item.servingsMultiplier;
-          }
+          // Calculate calories per eating occasion (spread across primary + leftovers)
+          const totalMeals = 1 + (item.leftoverMeals || 0);
+          // Total calories for this cooking session
+          const totalCalories = recipe.nutrition.perServing.calories * recipe.servings * item.servingsMultiplier;
+          // Calories per meal (spread evenly across all eating occasions)
+          const caloriesPerMeal = totalCalories / totalMeals;
+          calories += caloriesPerMeal;
         }
       });
     });

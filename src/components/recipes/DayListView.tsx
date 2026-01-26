@@ -263,8 +263,13 @@ function ListMealCard({
         </h3>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{plannedServings} srv</span>
-          {!isLeftover && recipe.nutrition && (
-            <span>{Math.round(recipe.nutrition.perServing.calories * item.servingsMultiplier)} cal</span>
+          {recipe.nutrition && (
+            <span>
+              {Math.round(
+                (recipe.nutrition.perServing.calories * recipe.servings * item.servingsMultiplier) /
+                (1 + (item.leftoverMeals || 0))
+              )} cal
+            </span>
           )}
           {isLeftover && (
             <Tooltip>
