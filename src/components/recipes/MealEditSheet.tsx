@@ -48,10 +48,12 @@ export function MealEditSheet({
   const totalMeals = 1 + (item.leftoverMeals || 0);
   const isAdjustedFromOriginal = recipe.servings !== plannedServings;
 
-  // Handle servings change and auto-calculate leftovers
+  // Handle servings change by +1/-1 serving and auto-calculate leftovers
   const handleServingsChange = (delta: number) => {
-    const newMultiplier = Math.max(0.5, Math.min(6, item.servingsMultiplier + delta));
-    const newServings = Math.round(recipe.servings * newMultiplier);
+    // delta is +1 or -1 serving
+    const currentServings = Math.round(recipe.servings * item.servingsMultiplier);
+    const newServings = Math.max(1, Math.min(recipe.servings * 6, currentServings + delta));
+    const newMultiplier = newServings / recipe.servings;
     onUpdateServings(item.id, newMultiplier);
 
     // Auto-calculate leftovers based on new servings and household size
@@ -146,8 +148,8 @@ export function MealEditSheet({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => handleServingsChange(-0.5)}
-                  disabled={item.servingsMultiplier <= 0.5}
+                  onClick={() => handleServingsChange(-1)}
+                  disabled={plannedServings <= 1}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
@@ -158,28 +160,43 @@ export function MealEditSheet({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => handleServingsChange(0.5)}
-                  disabled={item.servingsMultiplier >= 6}
+                  onClick={() => handleServingsChange(1)}
+                  disabled={plannedServings >= recipe.servings * 6}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            {/* Quick presets */}
+            {/* Quick presets - show household multiples and recipe original */}
             <div className="flex gap-2">
-              {[householdSize, householdSize * 2, householdSize * 3].map((preset) => {
-                const multiplier = preset / recipe.servings;
-                const isActive = Math.abs(item.servingsMultiplier - multiplier) < 0.01;
+              {[
+                { servings: householdSize, label: `${householdSize} (1 meal)` },
+                { servings: recipe.servings, label: `${recipe.servings} (recipe)` },
+                { servings: householdSize * 2, label: `${householdSize * 2} (2 meals)` },
+              ].filter((p, i, arr) =>
+                // Remove duplicates
+                arr.findIndex(x => x.servings === p.servings) === i
+              ).slice(0, 3).map(({ servings, label }) => {
+                const multiplier = servings / recipe.servings;
+                const isActive = plannedServings === servings;
                 return (
                   <Button
-                    key={preset}
+                    key={servings}
                     variant={isActive ? "default" : "outline"}
                     size="sm"
-                    className="flex-1"
-                    onClick={() => onUpdateServings(item.id, multiplier)}
+                    className="flex-1 text-xs"
+                    onClick={() => {
+                      onUpdateServings(item.id, multiplier);
+                      // Auto-calculate leftovers
+                      const mealsFromServings = Math.floor(servings / householdSize);
+                      const newLeftovers = Math.max(0, mealsFromServings - 1);
+                      if (newLeftovers !== item.leftoverMeals) {
+                        onUpdateLeftovers(item.id, newLeftovers);
+                      }
+                    }}
                   >
-                    {preset}
+                    {label}
                   </Button>
                 );
               })}
@@ -200,23 +217,52 @@ export function MealEditSheet({
               </p>
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
-              {[0, 1, 2, 3].map((count) => {
-                const isActive = item.leftoverMeals === count;
-                return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {item.leftoverMeals === 0 ? 'No leftovers' : `${item.leftoverMeals} leftover day${item.leftoverMeals > 1 ? 's' : ''}`}
+                </span>
+                <div className="flex items-center gap-2 bg-secondary rounded-lg p-1">
                   <Button
-                    key={count}
-                    variant={isActive ? "default" : "outline"}
-                    className="h-12 flex-col gap-0.5"
-                    onClick={() => handleLeftoversChange(count)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleLeftoversChange(Math.max(0, item.leftoverMeals - 1))}
+                    disabled={item.leftoverMeals <= 0}
                   >
-                    <span className="text-lg font-semibold">{count}</span>
-                    <span className="text-[10px] opacity-70">
-                      {count === 0 ? 'None' : count === 1 ? 'meal' : 'meals'}
-                    </span>
+                    <Minus className="h-4 w-4" />
                   </Button>
-                );
-              })}
+                  <span className="text-lg font-semibold w-8 text-center tabular-nums">
+                    {item.leftoverMeals}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleLeftoversChange(item.leftoverMeals + 1)}
+                    disabled={item.leftoverMeals >= 6}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {/* Quick presets for common leftover counts */}
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map((count) => {
+                  const isActive = item.leftoverMeals === count;
+                  return (
+                    <Button
+                      key={count}
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      className="h-9"
+                      onClick={() => handleLeftoversChange(count)}
+                    >
+                      {count === 0 ? 'None' : `+${count}`}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

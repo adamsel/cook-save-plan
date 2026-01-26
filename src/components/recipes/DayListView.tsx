@@ -211,7 +211,10 @@ function ListMealCard({
   onClick,
 }: ListMealCardProps) {
   const { item, recipe, isLeftover, sourceItem } = displayItem;
-  const leftoverCount = item.leftoverMeals || 0;
+  // For leftover cards, use source item's leftoverMeals count for correct calculation
+  const leftoverCount = isLeftover && sourceItem
+    ? sourceItem.leftoverMeals
+    : (item.leftoverMeals || 0);
   // Calculate per-meal servings (total servings ÷ number of meals)
   const totalServings = recipe.servings * item.servingsMultiplier;
   const numberOfMeals = 1 + leftoverCount;
@@ -270,7 +273,7 @@ function ListMealCard({
             <span>
               {Math.round(
                 (recipe.nutrition.perServing.calories * recipe.servings * item.servingsMultiplier) /
-                (1 + (item.leftoverMeals || 0))
+                numberOfMeals
               )} cal
             </span>
           )}

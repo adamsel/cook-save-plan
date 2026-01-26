@@ -6,7 +6,6 @@ import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
 import { checkDietaryFlags } from '@/lib/dietaryFlags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import {
   ShoppingCart,
@@ -25,7 +24,6 @@ import {
   Loader2,
   Check,
   X,
-  Pencil,
   AlertTriangle
 } from 'lucide-react';
 import {
@@ -42,6 +40,7 @@ import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -87,9 +86,6 @@ export default function ShoppingListPage() {
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-
-  // Category editing state
-  const [editingCategoryFor, setEditingCategoryFor] = useState<string | null>(null);
 
   // AI cleanup state
   const [isCleaningUp, setIsCleaningUp] = useState(false);
@@ -362,26 +358,16 @@ export default function ShoppingListPage() {
         return;
       }
 
-      const CLEANUP_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shopping-list-cleanup`;
-
-      const response = await fetch(CLEANUP_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ items: itemsForCleanup }),
+      // Use Supabase client's functions.invoke() which handles auth automatically
+      const { data: result, error } = await supabase.functions.invoke('shopping-list-cleanup', {
+        body: { items: itemsForCleanup },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed: ${response.status}`);
+      if (error) {
+        throw new Error(error.message || 'Request failed');
       }
 
-      const result = await response.json();
-
-      if (result.error) {
+      if (result?.error) {
         throw new Error(result.error);
       }
 
@@ -648,66 +634,81 @@ export default function ShoppingListPage() {
         </Button>
       </div>
 
-      {/* Shopping list - responsive 2-column layout */}
+      {/* Shopping list - single column for easy scanning */}
       {totalCount > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="space-y-4">
           {Object.entries(groupedItems).map(([category, items]) => (
             <Collapsible
               key={category}
               open={expandedCategories[category] !== false}
               onOpenChange={() => toggleCategory(category)}
-              className="break-inside-avoid bg-card border border-border/50 rounded-xl p-3"
+              className="bg-card border border-border/50 rounded-xl overflow-hidden"
             >
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <button className="flex items-center gap-3 w-full py-4 px-5 hover:bg-muted/30 transition-colors">
                   {expandedCategories[category] === false ? (
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="font-semibold">{category}</span>
-                  <Badge variant="secondary" className="ml-auto text-xs">
+                  <span className="font-semibold text-base">{category}</span>
+                  <span className="ml-auto text-sm text-muted-foreground">
                     {items.filter(i => i.checked).length}/{items.length}
-                  </Badge>
+                  </span>
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="space-y-0.5 mt-2">
-                  {items.map(item => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "flex items-center gap-3 py-2 px-3 rounded-md transition-colors",
-                        item.checked ? "opacity-40 bg-muted/30" : "hover:bg-muted/50"
-                      )}
-                    >
-                      <Checkbox
-                        checked={item.checked}
-                        onCheckedChange={() => toggleItem(item.id)}
-                        className="h-5 w-5"
-                      />
-                      <span className={cn(
-                        "flex-1 flex items-center gap-2 min-w-0",
-                        item.checked && "line-through text-muted-foreground"
-                      )}>
-                        {(() => {
-                          const extItem = item as ShoppingListItem & {
-                            _totalDisplay?: string;
-                            _alternatives?: string[];
-                            _alternativeNote?: string;
-                          };
-                          const qty = extItem._totalDisplay || (item.quantity ? `${item.quantity} ${item.unit}` : '');
-                          return qty && <span className="font-medium">{qty} </span>;
-                        })()}
-                        {item.ingredient}
-                        {/* Dietary/allergen warning */}
-                        {(() => {
-                          const flags = checkDietaryFlags(item.ingredient, dietaryRestrictions, allergens);
-                          if (flags.length === 0) return null;
-                          return (
+                <div className="divide-y divide-border/40">
+                  {items.map(item => {
+                    const extItem = item as ShoppingListItem & {
+                      _totalDisplay?: string;
+                      _alternatives?: string[];
+                      _alternativeNote?: string;
+                      _sources?: Array<{ recipeId: string; amount: string }>;
+                    };
+                    const qty = extItem._totalDisplay || (item.quantity ? `${item.quantity} ${item.unit}` : '');
+                    const flags = checkDietaryFlags(item.ingredient, dietaryRestrictions, allergens);
+                    const alts = extItem._alternatives || [];
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleItem(item.id)}
+                        className={cn(
+                          "flex items-center gap-4 min-h-[52px] py-3 px-5 cursor-pointer transition-colors select-none",
+                          item.checked
+                            ? "bg-muted/20"
+                            : "hover:bg-muted/30 active:bg-muted/50"
+                        )}
+                      >
+                        {/* Custom checkbox visual - larger touch target */}
+                        <div className={cn(
+                          "h-6 w-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all",
+                          item.checked
+                            ? "bg-primary border-primary"
+                            : "border-muted-foreground/40"
+                        )}>
+                          {item.checked && <Check className="h-4 w-4 text-primary-foreground" />}
+                        </div>
+
+                        {/* Item content */}
+                        <div className={cn(
+                          "flex-1 min-w-0 flex items-center gap-2",
+                          item.checked && "opacity-50"
+                        )}>
+                          <span className={cn(
+                            "text-base",
+                            item.checked && "line-through"
+                          )}>
+                            {qty && <span className="font-semibold text-primary">{qty} </span>}
+                            {item.ingredient}
+                          </span>
+
+                          {/* Dietary warning - inline */}
+                          {flags.length > 0 && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 hover:text-amber-600 cursor-help" />
+                                <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[220px]">
                                 <p className="text-xs font-medium text-amber-600 mb-1">Dietary Warning</p>
@@ -718,60 +719,48 @@ export default function ShoppingListPage() {
                                 ))}
                               </TooltipContent>
                             </Tooltip>
-                          );
-                        })()}
-                        {/* Alternatives tooltip */}
-                        {(() => {
-                          const extItem = item as ShoppingListItem & {
-                            _alternatives?: string[];
-                            _alternativeNote?: string;
-                          };
-                          const alts = extItem._alternatives || [];
-                          const altNote = extItem._alternativeNote;
-                          if (alts.length === 0) return null;
-                          return (
+                          )}
+
+                          {/* Alternatives tooltip */}
+                          {alts.length > 0 && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-help" />
+                                <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[200px]">
                                 <p className="text-xs">
                                   <span className="font-medium">Also works: </span>
                                   {alts.join(', ')}
                                 </p>
-                                {altNote && (
+                                {extItem._alternativeNote && (
                                   <p className="text-xs text-muted-foreground mt-1">
-                                    ({altNote})
+                                    ({extItem._alternativeNote})
                                   </p>
                                 )}
                               </TooltipContent>
                             </Tooltip>
-                          );
-                        })()}
-                      </span>
-                      {item.recipeIds.length > 0 ? (
-                        <Popover>
-                          <PopoverTrigger>
-                            <Badge
-                              variant="outline"
-                              className="text-xs cursor-pointer hover:bg-muted transition-colors"
-                            >
-                              {item.recipeIds.length} recipe{item.recipeIds.length > 1 ? 's' : ''}
-                            </Badge>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-72 p-2" align="end">
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-muted-foreground px-2 py-1">
-                                Used in:
-                              </p>
-                              {(() => {
-                                const extItem = item as ShoppingListItem & {
-                                  _sources?: Array<{ recipeId: string; amount: string }>;
-                                };
-                                const sources = extItem._sources || [];
-                                return item.recipeIds.map(recipeId => {
+                          )}
+                        </div>
+
+                        {/* Recipe badge - subtle pill */}
+                        {item.recipeIds.length > 0 && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-muted-foreground bg-muted/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors flex-shrink-0"
+                              >
+                                {item.recipeIds.length} {item.recipeIds.length === 1 ? 'recipe' : 'recipes'}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-2" align="end">
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                  Used in:
+                                </p>
+                                {item.recipeIds.map(recipeId => {
                                   const recipe = recipes.find(r => r.id === recipeId);
-                                  // Get all amounts for this recipe (could be multiple if same recipe has multiple uses)
+                                  const sources = extItem._sources || [];
                                   const recipeSources = sources.filter(s => s.recipeId === recipeId);
                                   const amount = recipeSources.map(s => s.amount).filter(Boolean).join(' + ') || '';
                                   if (!recipe) {
@@ -798,68 +787,60 @@ export default function ShoppingListPage() {
                                       )}
                                     </button>
                                   );
-                                });
-                              })()}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      ) : null}
-                      {/* Category edit popover */}
-                      {!item.isCustom && (
-                        <Popover
-                          open={editingCategoryFor === item.id}
-                          onOpenChange={(open) => setEditingCategoryFor(open ? item.id : null)}
-                        >
-                          <PopoverTrigger asChild>
-                            <button
-                              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors"
-                              title="Change category"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-2" align="end">
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-muted-foreground px-2 py-1">
-                                Move to:
-                              </p>
-                              {aisleCategories.map(cat => (
-                                <button
-                                  key={cat}
-                                  onClick={() => {
-                                    setCategoryOverride(item.id, cat);
-                                    setEditingCategoryFor(null);
-                                    toast({
-                                      title: "Category updated",
-                                      description: `${item.ingredient} moved to ${cat}`,
-                                    });
-                                  }}
-                                  className={cn(
-                                    "flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left text-sm",
-                                    item.category === cat && "bg-muted font-medium"
-                                  )}
-                                >
-                                  <Package className="h-3 w-3 text-muted-foreground" />
-                                  {cat}
-                                  {item.category === cat && (
-                                    <Check className="h-3 w-3 ml-auto text-primary" />
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                      {item.isCustom && (
-                        <button
-                          onClick={() => removeCustomItem(item.id)}
-                          className="text-muted-foreground hover:text-destructive text-xs"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                                })}
+                                {/* Category edit moved to popover */}
+                                {!item.isCustom && (
+                                  <>
+                                    <div className="border-t border-border/50 my-2" />
+                                    <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                      Move to category:
+                                    </p>
+                                    <div className="max-h-32 overflow-y-auto">
+                                      {aisleCategories.map(cat => (
+                                        <button
+                                          key={cat}
+                                          onClick={() => {
+                                            setCategoryOverride(item.id, cat);
+                                            toast({
+                                              title: "Category updated",
+                                              description: `${item.ingredient} moved to ${cat}`,
+                                            });
+                                          }}
+                                          className={cn(
+                                            "flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left text-sm",
+                                            item.category === cat && "bg-muted font-medium"
+                                          )}
+                                        >
+                                          <Package className="h-3 w-3 text-muted-foreground" />
+                                          {cat}
+                                          {item.category === cat && (
+                                            <Check className="h-3 w-3 ml-auto text-primary" />
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+
+                        {/* Custom item remove button */}
+                        {item.isCustom && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCustomItem(item.id);
+                            }}
+                            className="text-muted-foreground hover:text-destructive text-xs flex-shrink-0"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </CollapsibleContent>
             </Collapsible>

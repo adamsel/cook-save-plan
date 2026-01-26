@@ -12,6 +12,7 @@ interface MealCardProps {
   item: MealPlanItem;
   isLeftover?: boolean;
   leftoverSource?: { day: string; mealSlot: string };
+  sourceLeftoverMeals?: number; // Number of leftover meals from the source item
   householdSize: number;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
@@ -24,13 +25,17 @@ export function MealCard({
   item,
   isLeftover = false,
   leftoverSource,
+  sourceLeftoverMeals,
   householdSize,
   isDragging,
   onDragStart,
   onDragEnd,
   onClick,
 }: MealCardProps) {
-  const leftoverCount = item.leftoverMeals || 0;
+  // For leftover cards, use source item's leftoverMeals count for correct calculation
+  const leftoverCount = isLeftover && sourceLeftoverMeals !== undefined
+    ? sourceLeftoverMeals
+    : (item.leftoverMeals || 0);
   // Calculate per-meal servings (total servings ÷ number of meals)
   const totalServings = recipe.servings * item.servingsMultiplier;
   const numberOfMeals = 1 + leftoverCount;

@@ -393,7 +393,8 @@ function categorizeIngredient(ingredient: string): string {
   }
 
   // Beverages & Broths (check BEFORE "beef"/"chicken" matches Meat)
-  if (/broth|stock|water|juice|soda|coffee|tea|wine|beer/.test(lower)) {
+  // Use word boundary for "tea" to avoid matching "steak"
+  if (/broth|stock|water|juice|soda|coffee|\btea\b|wine|beer/.test(lower)) {
     return 'Beverages';
   }
 
@@ -405,7 +406,7 @@ function categorizeIngredient(ingredient: string): string {
   // === NOW CHECK GENERIC PATTERNS ===
 
   // Proteins (safe now that sauces/broths are filtered)
-  if (/chicken|beef|pork|lamb|turkey|duck|salmon|tuna|shrimp|prawn|crab|lobster|bacon|ham|sausage|ground meat|mince|fish fillet|cod|tilapia|halibut/.test(lower)) {
+  if (/chicken|beef|steak|pork|lamb|turkey|duck|veal|salmon|tuna|shrimp|prawn|crab|lobster|bacon|ham|sausage|ground meat|mince|fish fillet|cod|tilapia|halibut/.test(lower)) {
     return 'Meat & Seafood';
   }
 

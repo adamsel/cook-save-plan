@@ -416,10 +416,14 @@ export default function MealPlanPage() {
     let calories = 0;
     MEAL_SLOTS.forEach(slot => {
       const displayItems = getDisplayItemsForSlot(day, slot);
-      displayItems.forEach(({ recipe, item, isLeftover }) => {
+      displayItems.forEach(({ recipe, item, isLeftover, sourceItem }) => {
         if (recipe.nutrition) {
+          // For leftover items, use source item's leftoverMeals count for correct calculation
+          const leftoverCount = isLeftover && sourceItem
+            ? sourceItem.leftoverMeals
+            : (item.leftoverMeals || 0);
           // Calculate calories per eating occasion (spread across primary + leftovers)
-          const totalMeals = 1 + (item.leftoverMeals || 0);
+          const totalMeals = 1 + leftoverCount;
           // Total calories for this cooking session
           const totalCalories = recipe.nutrition.perServing.calories * recipe.servings * item.servingsMultiplier;
           // Calories per meal (spread evenly across all eating occasions)
@@ -800,6 +804,7 @@ export default function MealPlanPage() {
                                       day: displayItem.sourceItem.day,
                                       mealSlot: displayItem.sourceItem.mealSlot
                                     } : undefined}
+                                    sourceLeftoverMeals={displayItem.sourceItem?.leftoverMeals}
                                     householdSize={householdSize}
                                     isDragging={draggingItem?.itemId === displayItem.item.id}
                                     onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe, displayItem)}
