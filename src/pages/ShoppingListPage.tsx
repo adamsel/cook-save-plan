@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
 import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan } from '@/types/recipe';
 import { mergeIngredients, type RawIngredientInput } from '@/lib/ingredientNormalizer/index';
+import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
+import { checkDietaryFlags } from '@/lib/dietaryFlags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +24,9 @@ import {
   Sparkles,
   Loader2,
   Check,
-  X
+  X,
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Popover,
@@ -47,6 +51,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useShoppingListState } from '@/hooks/useShoppingListState';
 import {
   Collapsible,
   CollapsibleContent,
@@ -59,9 +64,19 @@ import { format, startOfWeek, addWeeks, endOfWeek } from 'date-fns';
 export default function ShoppingListPage() {
   const { recipes, getMealPlanForWeek, mealPlans, pantryStaples, aisleCategories } = useRecipes();
   const { toast } = useToast();
-  
-  const [checkedItems, setCheckedItems] = useLocalStorage<Record<string, boolean>>('shoppingListChecked', {});
-  const [customItems, setCustomItems] = useLocalStorage<ShoppingListItem[]>('customShoppingItems', []);
+  const { dietaryRestrictions, allergens } = useDietaryPreferences();
+
+  // Shopping list state - syncs with database for logged-in users
+  const {
+    checkedItems,
+    setCheckedItems,
+    customItems,
+    setCustomItems,
+    categoryOverrides,
+    setCategoryOverride,
+    isLoading: isStateLoading,
+    isSyncing
+  } = useShoppingListState();
   const [selectedDays, setSelectedDays] = useLocalStorage<DayOfWeek[]>('shoppingListDays', [...DAYS_OF_WEEK]);
   const [newItemText, setNewItemText] = useState('');
   const [groupByAisle, setGroupByAisle] = useState(true);
@@ -70,6 +85,9 @@ export default function ShoppingListPage() {
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+
+  // Category editing state
+  const [editingCategoryFor, setEditingCategoryFor] = useState<string | null>(null);
 
   // AI cleanup state
   const [isCleaningUp, setIsCleaningUp] = useState(false);
@@ -146,6 +164,9 @@ export default function ShoppingListPage() {
         // Extract the primary quantity for display
         const primaryQty = item.quantities[0];
 
+        // Apply category override if exists
+        const effectiveCategory = categoryOverrides[item.key] || item.category;
+
         return {
           id: item.key,
           ingredient: item.displayName,
@@ -153,31 +174,36 @@ export default function ShoppingListPage() {
           unit: primaryQty?.unit ?? '',
           recipeIds: item.recipeIds,
           checked: checkedItems[item.key] || false,
-          category: item.category,
+          category: effectiveCategory,
           isCustom: false,
           // Store the formatted total for display
           _totalDisplay: item.totalDisplay,
           _originalNames: item.originalNames,
           _alternatives: item.alternatives,
           _alternativeNote: item.alternativeNote,
+          _sources: item.sources,
+          _hasOverride: !!categoryOverrides[item.key],
         } as ShoppingListItem & {
           _totalDisplay?: string;
           _originalNames?: string[];
           _alternatives?: string[];
           _alternativeNote?: string;
+          _sources?: Array<{ recipeId: string; amount: string }>;
+          _hasOverride?: boolean;
         };
       });
 
-    // Add custom items
+    // Add custom items (add recipeIds: [] since custom items aren't from recipes)
     customItems.forEach(item => {
       items.push({
         ...item,
+        recipeIds: [],
         checked: checkedItems[item.id] || false,
       });
     });
 
     return items;
-  }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays]);
+  }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays, categoryOverrides]);
 
   const toggleDay = (day: DayOfWeek) => {
     setSelectedDays(prev => {
@@ -348,7 +374,7 @@ export default function ShoppingListPage() {
 
   function categorizeIngredient(ingredient: string): string {
     const lower = ingredient.toLowerCase();
-    
+
     // Simple categorization rules
     if (/chicken|beef|pork|lamb|fish|salmon|shrimp|bacon|pancetta/.test(lower)) return 'Meat & Seafood';
     if (/milk|cheese|cream|butter|yogurt|egg/.test(lower)) return 'Dairy';
@@ -358,9 +384,50 @@ export default function ShoppingListPage() {
     if (/salt|pepper|oregano|basil|cumin|paprika|cinnamon/.test(lower)) return 'Spices & Seasonings';
     if (/sauce|ketchup|mustard|mayo|vinegar|oil/.test(lower)) return 'Condiments';
     if (/water|juice|soda|coffee|tea/.test(lower)) return 'Beverages';
-    
+
     return 'Pantry';
   }
+
+  // Apply AI cleanup results to the shopping list
+  const applyCleanupResults = () => {
+    if (!cleanupResult) return;
+
+    // Mark all current recipe-based items as checked (they're being replaced by consolidated items)
+    const newCheckedItems: Record<string, boolean> = { ...checkedItems };
+    shoppingList.forEach(item => {
+      if (!item.isCustom) {
+        newCheckedItems[item.id] = true;
+      }
+    });
+
+    // Create new custom items from the AI cleanup result
+    const newCustomItems: ShoppingListItem[] = cleanupResult.items.map(item => ({
+      id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      ingredient: item.ingredient,
+      quantity: null, // Quantity is in the display string
+      unit: item.quantity, // Store the full quantity string (e.g., "150g") in unit field for display
+      recipeIds: [],
+      checked: false,
+      category: item.category,
+      isCustom: true,
+    }));
+
+    // Update state
+    setCheckedItems(newCheckedItems);
+    setCustomItems(prev => {
+      // Keep existing custom items that weren't part of the cleanup
+      const existingCustom = prev.filter(item => checkedItems[item.id]);
+      return [...existingCustom, ...newCustomItems];
+    });
+
+    // Close dialog and show success
+    setCleanupDialogOpen(false);
+    setCleanupResult(null);
+    toast({
+      title: "Cleanup applied!",
+      description: `Your shopping list has been consolidated to ${cleanupResult.items.length} items.`,
+    });
+  };
 
   const checkedCount = shoppingList.filter(i => i.checked).length;
   const totalCount = shoppingList.length;
@@ -368,11 +435,18 @@ export default function ShoppingListPage() {
   return (
     <div className="container py-6 animate-fade-in max-w-2xl">
       <div className="mb-6">
-        <h1 className="font-serif text-3xl font-bold mb-2">Shopping List</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-serif text-3xl font-bold mb-2">Shopping List</h1>
+          {isSyncing && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
         <p className="text-muted-foreground">
-          {totalCount > 0 
-            ? `${checkedCount} of ${totalCount} items checked`
-            : 'No items in your shopping list'}
+          {isStateLoading
+            ? 'Loading your shopping list...'
+            : totalCount > 0
+              ? `${checkedCount} of ${totalCount} items checked`
+              : 'No items in your shopping list'}
         </p>
       </div>
 
@@ -479,7 +553,6 @@ export default function ShoppingListPage() {
         <div className="flex-1" />
 
         <div className="flex gap-2">
-          {/* AI Cleanup button hidden until Edge Function is deployed
           <Button
             variant="outline"
             size="sm"
@@ -493,7 +566,6 @@ export default function ShoppingListPage() {
             )}
             Smart Cleanup
           </Button>
-          */}
           <Button variant="outline" size="sm" onClick={clearChecked}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset
@@ -573,6 +645,27 @@ export default function ShoppingListPage() {
                           return qty && <span className="font-medium">{qty} </span>;
                         })()}
                         {item.ingredient}
+                        {/* Dietary/allergen warning */}
+                        {(() => {
+                          const flags = checkDietaryFlags(item.ingredient, dietaryRestrictions, allergens);
+                          if (flags.length === 0) return null;
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 hover:text-amber-600 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[220px]">
+                                <p className="text-xs font-medium text-amber-600 mb-1">Dietary Warning</p>
+                                {flags.map((flag, idx) => (
+                                  <p key={idx} className="text-xs">
+                                    {flag.type === 'allergen' ? 'Contains' : 'Not'} {flag.label.toLowerCase()}
+                                  </p>
+                                ))}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
+                        {/* Alternatives tooltip */}
                         {(() => {
                           const extItem = item as ShoppingListItem & {
                             _alternatives?: string[];
@@ -604,8 +697,8 @@ export default function ShoppingListPage() {
                       {item.recipeIds.length > 0 ? (
                         <Popover>
                           <PopoverTrigger>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className="text-xs cursor-pointer hover:bg-muted transition-colors"
                             >
                               {item.recipeIds.length} recipe{item.recipeIds.length > 1 ? 's' : ''}
@@ -613,21 +706,19 @@ export default function ShoppingListPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-72 p-2" align="end">
                             <div className="space-y-1">
-                              {/* DEBUG LINE - Remove after testing */}
-                              <p className="text-[10px] font-mono bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-1 rounded break-all">
-                                Ingredient: {item.ingredient}, recipeIds: {item.recipeIds.join(', ')}, recipesFound: {item.recipeIds.filter(id => recipes.find(r => r.id === id)).length}
-                              </p>
-                              
                               <p className="text-xs font-medium text-muted-foreground px-2 py-1">
                                 Used in:
                               </p>
-                              {item.recipeIds.length === 0 ? (
-                                <p className="text-sm text-muted-foreground px-2 py-2">
-                                  No recipes use this ingredient
-                                </p>
-                              ) : (
-                                item.recipeIds.map(recipeId => {
+                              {(() => {
+                                const extItem = item as ShoppingListItem & {
+                                  _sources?: Array<{ recipeId: string; amount: string }>;
+                                };
+                                const sources = extItem._sources || [];
+                                return item.recipeIds.map(recipeId => {
                                   const recipe = recipes.find(r => r.id === recipeId);
+                                  // Get all amounts for this recipe (could be multiple if same recipe has multiple uses)
+                                  const recipeSources = sources.filter(s => s.recipeId === recipeId);
+                                  const amount = recipeSources.map(s => s.amount).filter(Boolean).join(' + ') || '';
                                   if (!recipe) {
                                     return (
                                       <div key={recipeId} className="text-xs text-muted-foreground px-2 py-1">
@@ -639,18 +730,71 @@ export default function ShoppingListPage() {
                                     <button
                                       key={recipeId}
                                       onClick={() => setSelectedRecipe(recipe)}
-                                      className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left"
+                                      className="flex items-center justify-between gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left"
                                     >
-                                      <UtensilsCrossed className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                      <span className="text-sm truncate">{recipe.title}</span>
+                                      <span className="flex items-center gap-2 min-w-0">
+                                        <UtensilsCrossed className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                        <span className="text-sm truncate">{recipe.title}</span>
+                                      </span>
+                                      {amount && (
+                                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                                          {amount}
+                                        </span>
+                                      )}
                                     </button>
                                   );
-                                })
-                              )}
+                                });
+                              })()}
                             </div>
                           </PopoverContent>
                         </Popover>
                       ) : null}
+                      {/* Category edit popover */}
+                      {!item.isCustom && (
+                        <Popover
+                          open={editingCategoryFor === item.id}
+                          onOpenChange={(open) => setEditingCategoryFor(open ? item.id : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors"
+                              title="Change category"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2" align="end">
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                Move to:
+                              </p>
+                              {aisleCategories.map(cat => (
+                                <button
+                                  key={cat}
+                                  onClick={() => {
+                                    setCategoryOverride(item.id, cat);
+                                    setEditingCategoryFor(null);
+                                    toast({
+                                      title: "Category updated",
+                                      description: `${item.ingredient} moved to ${cat}`,
+                                    });
+                                  }}
+                                  className={cn(
+                                    "flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left text-sm",
+                                    item.category === cat && "bg-muted font-medium"
+                                  )}
+                                >
+                                  <Package className="h-3 w-3 text-muted-foreground" />
+                                  {cat}
+                                  {item.category === cat && (
+                                    <Check className="h-3 w-3 ml-auto text-primary" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                       {item.isCustom && (
                         <button
                           onClick={() => removeCustomItem(item.id)}
@@ -743,11 +887,26 @@ export default function ShoppingListPage() {
                 </div>
               </div>
 
-              {/* Note about the feature */}
-              <p className="text-xs text-muted-foreground">
-                This is a preview of AI suggestions. In a future update, you'll be able to apply
-                these changes directly to your shopping list.
-              </p>
+              {/* Action buttons */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCleanupDialogOpen(false);
+                    setCleanupResult(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={applyCleanupResults}
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Apply Changes
+                </Button>
+              </div>
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useHousehold } from '@/hooks/useHousehold';
 import { MealPlan, MealPlanItem, LeftoverPositionEntry } from '@/types/recipe';
 import { format, startOfWeek } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 interface DbMealPlan {
   id: string;
   user_id: string;
+  household_id: string | null;
   week_start_date: string;
   created_at: string;
   updated_at: string;
@@ -29,6 +31,7 @@ interface DbMealPlanItem {
 export function useMealPlansData() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { household, hasHousehold } = useHousehold();
 
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,15 +55,25 @@ export function useMealPlansData() {
     items: items.map(dbToMealPlanItem),
   });
 
-  // Fetch all meal plans
+  // Fetch all meal plans (including household plans if applicable)
   const fetchMealPlans = useCallback(async () => {
     if (!user) return [];
 
-    const { data: plans, error: plansError } = await supabase
+    // Build query - get user's own plans
+    let query = supabase
       .from('meal_plans')
       .select('*')
-      .eq('user_id', user.id)
       .order('week_start_date', { ascending: false });
+
+    // If user has a household, fetch household plans too
+    // RLS will handle permissions, but we use .or() to get both conditions
+    if (hasHousehold && household?.id) {
+      query = query.or(`user_id.eq.${user.id},household_id.eq.${household.id}`);
+    } else {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data: plans, error: plansError } = await query;
 
     if (plansError) {
       console.error('Error fetching meal plans:', plansError);
@@ -91,7 +104,7 @@ export function useMealPlansData() {
       plan as DbMealPlan,
       itemsByPlan[plan.id] || []
     ));
-  }, [user]);
+  }, [user, hasHousehold, household?.id]);
 
   // Initial fetch
   useEffect(() => {
@@ -113,13 +126,20 @@ export function useMealPlansData() {
     const existing = mealPlans.find(mp => mp.weekStartDate === weekStartDate);
     if (existing) return existing;
 
-    // Check database
-    const { data: existingPlan } = await supabase
+    // Check database - look for user's own plan or household plan
+    let query = supabase
       .from('meal_plans')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('week_start_date', weekStartDate)
-      .single();
+      .eq('week_start_date', weekStartDate);
+
+    if (hasHousehold && household?.id) {
+      query = query.or(`user_id.eq.${user.id},household_id.eq.${household.id}`);
+    } else {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data: existingPlans } = await query;
+    const existingPlan = existingPlans?.[0];
 
     if (existingPlan) {
       const { data: items } = await supabase
@@ -135,13 +155,19 @@ export function useMealPlansData() {
       return plan;
     }
 
-    // Create new plan
+    // Create new plan - include household_id if user has a household
+    const insertData: { user_id: string; week_start_date: string; household_id?: string } = {
+      user_id: user.id,
+      week_start_date: weekStartDate,
+    };
+
+    if (hasHousehold && household?.id) {
+      insertData.household_id = household.id;
+    }
+
     const { data: newPlan, error: createError } = await supabase
       .from('meal_plans')
-      .insert({
-        user_id: user.id,
-        week_start_date: weekStartDate,
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -153,7 +179,7 @@ export function useMealPlansData() {
     const plan = dbToMealPlan(newPlan as DbMealPlan, []);
     setMealPlans(prev => [...prev, plan]);
     return plan;
-  }, [user, mealPlans]);
+  }, [user, mealPlans, hasHousehold, household?.id]);
 
   // Get current week's meal plan
   const getCurrentMealPlan = useCallback(async (): Promise<MealPlan | null> => {

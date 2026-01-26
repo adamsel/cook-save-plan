@@ -6,6 +6,24 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/context/AuthContext';
 import { startOfWeek, format } from 'date-fns';
 
+interface RecipeShare {
+  id: string;
+  shared_with_user_id: string;
+  can_edit: boolean;
+  created_at: string;
+  profiles: {
+    display_name: string | null;
+    email: string | null;
+  } | null;
+}
+
+interface PendingShare {
+  id: string;
+  invited_email: string;
+  can_edit: boolean;
+  created_at: string;
+}
+
 interface RecipeContextType {
   // Recipes
   recipes: Recipe[];
@@ -13,16 +31,16 @@ interface RecipeContextType {
   sharedRecipes: Recipe[];
   allRecipes: Recipe[];
   isLoading: boolean;
-  
+
   // Meal Plans
   mealPlans: MealPlan[];
-  
+
   // Categories & Tags
   categories: string[];
   tags: string[];
   pantryStaples: string[];
   aisleCategories: string[];
-  
+
   // Recipe Actions
   addRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Recipe | null>;
   updateRecipe: (recipe: Recipe) => Promise<void>;
@@ -31,6 +49,12 @@ interface RecipeContextType {
   toggleArchive: (id: string) => Promise<void>;
   makeRecipePublic: (id: string, isPublic: boolean) => Promise<boolean>;
   copyToPersonal: (recipeId: string) => Promise<Recipe | null>;
+
+  // Sharing Actions
+  shareRecipe: (recipeId: string, email: string, canEdit?: boolean) => Promise<{ error: string | null; shared: boolean; pending: boolean }>;
+  getRecipeShares: (recipeId: string) => Promise<{ shares: RecipeShare[]; pendingShares: PendingShare[] }>;
+  revokeShare: (shareId: string) => Promise<boolean>;
+  revokePendingShare: (pendingShareId: string) => Promise<boolean>;
   
   // Meal Plan Actions
   getCurrentMealPlan: () => MealPlan;
@@ -285,6 +309,27 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const mealPlans = user ? mealPlansData.mealPlans : localMealPlans;
   const isLoading = user ? (recipesData.isLoading || mealPlansData.isLoading) : false;
 
+  // Sharing functions - only available when authenticated
+  const shareRecipe = async (recipeId: string, email: string, canEdit: boolean = false) => {
+    if (!user) return { error: 'Not authenticated', shared: false, pending: false };
+    return await recipesData.shareRecipe(recipeId, email, canEdit);
+  };
+
+  const getRecipeShares = async (recipeId: string) => {
+    if (!user) return { shares: [], pendingShares: [] };
+    return await recipesData.getRecipeShares(recipeId);
+  };
+
+  const revokeShare = async (shareId: string) => {
+    if (!user) return false;
+    return await recipesData.revokeShare(shareId);
+  };
+
+  const revokePendingShare = async (pendingShareId: string) => {
+    if (!user) return false;
+    return await recipesData.revokePendingShare(pendingShareId);
+  };
+
   return (
     <RecipeContext.Provider value={{
       recipes,
@@ -304,6 +349,10 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       toggleArchive,
       makeRecipePublic,
       copyToPersonal,
+      shareRecipe,
+      getRecipeShares,
+      revokeShare,
+      revokePendingShare,
       getCurrentMealPlan,
       getMealPlanForWeek,
       addToMealPlan,

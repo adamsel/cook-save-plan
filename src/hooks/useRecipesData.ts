@@ -351,24 +351,170 @@ export function useRecipesData() {
     return true;
   };
 
-  // Share recipe with user
-  const shareRecipe = async (recipeId: string, email: string) => {
-    if (!user) return { error: 'Not authenticated' };
-    
-    // Find user by email (we'd need a lookup - for now just use the email as user_id lookup)
-    // In a real app, you'd have a user search or invitation system
-    const { data: profiles, error: profileError } = await supabase
+  // Share recipe with user by email
+  const shareRecipe = async (recipeId: string, email: string, canEdit: boolean = false) => {
+    if (!user) return { error: 'Not authenticated', shared: false, pending: false };
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if trying to share with self
+    if (normalizedEmail === user.email?.toLowerCase()) {
+      return { error: 'Cannot share with yourself', shared: false, pending: false };
+    }
+
+    // Look up user by email in profiles
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('user_id')
-      .ilike('display_name', email);
-    
-    // This is a simplified approach - in production you'd have proper user lookup
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error looking up user:', profileError);
+      return { error: 'Failed to look up user', shared: false, pending: false };
+    }
+
+    if (profile) {
+      // User exists - create direct share
+      const { error: shareError } = await supabase
+        .from('recipe_shares')
+        .insert({
+          recipe_id: recipeId,
+          shared_by_user_id: user.id,
+          shared_with_user_id: profile.user_id,
+          can_edit: canEdit,
+        });
+
+      if (shareError) {
+        if (shareError.code === '23505') { // Unique violation
+          return { error: 'Recipe already shared with this user', shared: false, pending: false };
+        }
+        console.error('Error sharing recipe:', shareError);
+        return { error: 'Failed to share recipe', shared: false, pending: false };
+      }
+
+      toast({
+        title: 'Recipe shared!',
+        description: `${normalizedEmail} can now view this recipe.`,
+      });
+      return { error: null, shared: true, pending: false };
+    } else {
+      // User doesn't exist - create pending share
+      const { error: pendingError } = await supabase
+        .from('pending_shares')
+        .insert({
+          recipe_id: recipeId,
+          shared_by_user_id: user.id,
+          invited_email: normalizedEmail,
+          can_edit: canEdit,
+        });
+
+      if (pendingError) {
+        if (pendingError.code === '23505') { // Unique violation
+          return { error: 'Invitation already sent to this email', shared: false, pending: false };
+        }
+        console.error('Error creating pending share:', pendingError);
+        return { error: 'Failed to send invitation', shared: false, pending: false };
+      }
+
+      toast({
+        title: 'Invitation sent!',
+        description: `When ${normalizedEmail} signs up, they'll have access to this recipe.`,
+      });
+      return { error: null, shared: false, pending: true };
+    }
+  };
+
+  // Get existing shares for a recipe
+  const getRecipeShares = async (recipeId: string) => {
+    if (!user) return { shares: [], pendingShares: [] };
+
+    // Get active shares
+    const { data: shares, error: sharesError } = await supabase
+      .from('recipe_shares')
+      .select(`
+        id,
+        shared_with_user_id,
+        can_edit,
+        created_at,
+        profiles!recipe_shares_shared_with_user_id_fkey(display_name, email)
+      `)
+      .eq('recipe_id', recipeId)
+      .eq('shared_by_user_id', user.id);
+
+    if (sharesError) {
+      console.error('Error fetching shares:', sharesError);
+    }
+
+    // Get pending shares
+    const { data: pendingShares, error: pendingError } = await supabase
+      .from('pending_shares')
+      .select('id, invited_email, can_edit, created_at')
+      .eq('recipe_id', recipeId)
+      .eq('shared_by_user_id', user.id);
+
+    if (pendingError) {
+      console.error('Error fetching pending shares:', pendingError);
+    }
+
+    return {
+      shares: shares || [],
+      pendingShares: pendingShares || [],
+    };
+  };
+
+  // Revoke a share
+  const revokeShare = async (shareId: string) => {
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('recipe_shares')
+      .delete()
+      .eq('id', shareId)
+      .eq('shared_by_user_id', user.id);
+
+    if (error) {
+      console.error('Error revoking share:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to revoke share',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
     toast({
-      title: 'Share feature',
-      description: 'Sharing by email will be available soon. For now, make your recipe public to share.',
+      title: 'Share revoked',
+      description: 'User no longer has access to this recipe.',
     });
-    
-    return { error: null };
+    return true;
+  };
+
+  // Revoke a pending share
+  const revokePendingShare = async (pendingShareId: string) => {
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('pending_shares')
+      .delete()
+      .eq('id', pendingShareId)
+      .eq('shared_by_user_id', user.id);
+
+    if (error) {
+      console.error('Error revoking pending share:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to revoke invitation',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    toast({
+      title: 'Invitation revoked',
+      description: 'The invitation has been cancelled.',
+    });
+    return true;
   };
 
   // Copy library recipe to personal collection
@@ -470,6 +616,9 @@ export function useRecipesData() {
     toggleArchive,
     makeRecipePublic,
     shareRecipe,
+    getRecipeShares,
+    revokeShare,
+    revokePendingShare,
     copyToPersonal,
     // Refresh functions
     refreshPersonal: fetchPersonalRecipes,

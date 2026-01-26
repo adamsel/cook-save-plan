@@ -121,6 +121,12 @@ export function getDisplayName(normalizedKey: string, originalNames: string[]): 
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+// Source tracking for recipe attribution
+export interface IngredientSource {
+  recipeId: string;
+  amount: string; // e.g., "2 cups", "100g"
+}
+
 // Types for merged shopping list items
 export interface MergedIngredient {
   key: string;
@@ -129,6 +135,7 @@ export interface MergedIngredient {
   quantities: MergedQuantity[];
   totalDisplay: string;
   recipeIds: string[];
+  sources: IngredientSource[]; // Track amount from each recipe
   category: string;
   alternatives: string[];  // e.g., ["almond butter"] for "peanut butter or almond butter"
   alternativeNote?: string; // e.g., "butter already on list" for "coconut oil or butter"
@@ -175,6 +182,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     originalNames: Set<string>;
     quantities: Map<string, NormalizedQuantity & { count: number }>;
     recipeIds: Set<string>;
+    sources: IngredientSource[];
     alternatives: Set<string>;
   }>();
 
@@ -196,6 +204,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
         originalNames: new Set(),
         quantities: new Map(),
         recipeIds: new Set(),
+        sources: [],
         alternatives: new Set(),
       });
     }
@@ -203,6 +212,13 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     const group = groups.get(key)!;
     group.originalNames.add(primary); // Store primary name, not the full "X or Y" string
     group.recipeIds.add(input.recipeId);
+
+    // Track source with amount for attribution
+    const adjustedQty = input.quantity !== null ? input.quantity * multiplier : null;
+    const amountStr = adjustedQty !== null
+      ? `${formatQuantityString(adjustedQty, input.unit)}`
+      : '';
+    group.sources.push({ recipeId: input.recipeId, amount: amountStr });
 
     // Track alternatives
     for (const alt of alternatives) {
@@ -352,6 +368,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
       quantities,
       totalDisplay,
       recipeIds: Array.from(group.recipeIds),
+      sources: group.sources,
       category: categorizeIngredient(key),
       alternatives,
       alternativeNote,

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library } from 'lucide-react';
+import { UtensilsCrossed, Calendar, ShoppingCart, Package, Settings, Plus, User, LogOut, LogIn, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -26,6 +26,7 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
     { to: '/recipes', label: 'My Recipes', icon: UtensilsCrossed },
     { to: '/meal-plan', label: 'Meal Plan', icon: Calendar },
     { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
+    { to: '/pantry', label: 'Pantry', icon: Package },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
 

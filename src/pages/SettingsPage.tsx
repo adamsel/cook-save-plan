@@ -1,28 +1,50 @@
 import { useState } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
+import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
+import { HouseholdManagement } from '@/components/settings/HouseholdManagement';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Settings, 
-  Tags, 
-  Package, 
-  Plus, 
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Settings,
+  Tags,
+  Package,
+  Plus,
   X,
   Save,
   Users,
-  Minus
+  Home,
+  Minus,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  getAllDietaryRestrictions,
+  getAllAllergens,
+  type DietaryRestriction,
+  type Allergen,
+} from '@/lib/dietaryFlags';
 
 export default function SettingsPage() {
   const { categories, tags, pantryStaples, addCategory, addTag, updatePantryStaples } = useRecipes();
-  const { householdSize, suggestLeftoversForLunch, updateSettings } = useHouseholdSettings();
+  const { householdSize, suggestLeftoversForLunch, updateSettings, hasHousehold, canEditSettings } = useHouseholdSettings();
+  const {
+    dietaryRestrictions,
+    allergens,
+    toggleRestriction,
+    toggleAllergen,
+    canEdit: canEditDietary,
+    hasHousehold: hasDietaryHousehold,
+  } = useDietaryPreferences();
   const { toast } = useToast();
+
+  const allRestrictions = getAllDietaryRestrictions();
+  const allAllergens = getAllAllergens();
 
   const [newCategory, setNewCategory] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -71,16 +93,37 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-8">
+        {/* Household Management */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Home className="h-5 w-5 text-primary" />
+            <h2 className="font-serif text-xl font-semibold">Household</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Create a household to share meal plans and shopping lists with family members.
+          </p>
+          <HouseholdManagement />
+        </section>
+
+        <Separator />
+
         {/* Household Settings */}
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Household</h2>
+            <h2 className="font-serif text-xl font-semibold">Meal Planning</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Set your household size to get smart serving suggestions when meal planning.
+            {hasHousehold
+              ? 'These settings apply to all household members.'
+              : 'Set your household size to get smart serving suggestions when meal planning.'}
           </p>
-          
+          {hasHousehold && !canEditSettings && (
+            <p className="text-xs text-amber-600">
+              Only household admins and owners can change these settings.
+            </p>
+          )}
+
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
               <div>
@@ -95,7 +138,7 @@ export default function SettingsPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => updateSettings({ householdSize: Math.max(1, householdSize - 1) })}
-                  disabled={householdSize <= 1}
+                  disabled={householdSize <= 1 || !canEditSettings}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
@@ -105,7 +148,7 @@ export default function SettingsPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => updateSettings({ householdSize: Math.min(10, householdSize + 1) })}
-                  disabled={householdSize >= 10}
+                  disabled={householdSize >= 10 || !canEditSettings}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -122,7 +165,75 @@ export default function SettingsPage() {
               <Switch
                 checked={suggestLeftoversForLunch}
                 onCheckedChange={(checked) => updateSettings({ suggestLeftoversForLunch: checked })}
+                disabled={!canEditSettings}
               />
+            </div>
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* Dietary Preferences */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-primary" />
+            <h2 className="font-serif text-xl font-semibold">Dietary Preferences</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Set dietary restrictions and allergens to see warnings in your shopping list.
+            {hasDietaryHousehold && ' These settings apply to all household members.'}
+          </p>
+          {hasDietaryHousehold && !canEditDietary && (
+            <p className="text-xs text-amber-600">
+              Only household admins and owners can change these settings.
+            </p>
+          )}
+
+          <div className="space-y-4">
+            {/* Dietary Restrictions */}
+            <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Label className="font-medium mb-3 block">Dietary Restrictions</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {allRestrictions.map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`restriction-${value}`}
+                      checked={dietaryRestrictions.includes(value)}
+                      onCheckedChange={() => toggleRestriction(value)}
+                      disabled={!canEditDietary}
+                    />
+                    <label
+                      htmlFor={`restriction-${value}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Allergens */}
+            <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Label className="font-medium mb-3 block">Allergens to Avoid</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {allAllergens.map(({ value, label }) => (
+                  <div key={value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`allergen-${value}`}
+                      checked={allergens.includes(value)}
+                      onCheckedChange={() => toggleAllergen(value)}
+                      disabled={!canEditDietary}
+                    />
+                    <label
+                      htmlFor={`allergen-${value}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
