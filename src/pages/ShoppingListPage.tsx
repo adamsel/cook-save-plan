@@ -369,6 +369,7 @@ export default function ShoppingListPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ items: itemsForCleanup }),
       });
@@ -646,9 +647,9 @@ export default function ShoppingListPage() {
         </Button>
       </div>
 
-      {/* Shopping list - responsive multi-column layout */}
+      {/* Shopping list - responsive 2-column layout */}
       {totalCount > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {Object.entries(groupedItems).map(([category, items]) => (
             <Collapsible
               key={category}
