@@ -1,4 +1,4 @@
-import { Recipe, MealPlanItem, DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot } from '@/types/recipe';
+import { Recipe, MealPlanItem, EventType, DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot } from '@/types/recipe';
 import {
   Sheet,
   SheetContent,
@@ -8,16 +8,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Minus, 
-  Plus, 
-  Trash2, 
-  Users, 
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Minus,
+  Plus,
+  Trash2,
+  Users,
   Utensils,
   ChefHat,
-  CalendarPlus
+  CalendarPlus,
+  PartyPopper,
+  ShoppingBag,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const eventTypes: { value: EventType; label: string; icon: typeof PartyPopper }[] = [
+  { value: 'potluck', label: 'Potluck', icon: PartyPopper },
+  { value: 'guests', label: 'Guests', icon: Users },
+  { value: 'takeaway', label: 'Takeaway', icon: ShoppingBag },
+];
 
 interface MealEditSheetProps {
   open: boolean;
@@ -27,6 +38,7 @@ interface MealEditSheetProps {
   householdSize: number;
   onUpdateServings: (itemId: string, multiplier: number) => void;
   onUpdateLeftovers: (itemId: string, leftovers: number) => void;
+  onUpdateEvent: (itemId: string, eventType: EventType | null, guestCount: number | null, eventNote: string | null) => void;
   onRemove: (itemId: string) => void;
   onViewRecipe: (recipe: Recipe) => void;
 }
@@ -39,6 +51,7 @@ export function MealEditSheet({
   householdSize,
   onUpdateServings,
   onUpdateLeftovers,
+  onUpdateEvent,
   onRemove,
   onViewRecipe,
 }: MealEditSheetProps) {
@@ -264,6 +277,98 @@ export function MealEditSheet({
                 })}
               </div>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Event settings */}
+          <div className="space-y-3">
+            <div>
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                <PartyPopper className="h-4 w-4 text-muted-foreground" />
+                Event
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                For potlucks, hosting guests, or takeaway
+              </p>
+            </div>
+
+            {/* Event type buttons */}
+            <div className="flex gap-2">
+              {eventTypes.map(({ value, label, icon: Icon }) => {
+                const isActive = item.eventType === value;
+                return (
+                  <Button
+                    key={value}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 gap-1.5"
+                    onClick={() => {
+                      if (isActive) {
+                        // Clear event
+                        onUpdateEvent(item.id, null, null, null);
+                      } else {
+                        // Set event type with default guest count
+                        onUpdateEvent(item.id, value, item.guestCount || 6, item.eventNote || null);
+                      }
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {/* Guest count and note - only show when event is set */}
+            {item.eventType && (
+              <div className="space-y-3 p-3 bg-secondary/50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Number of people</Label>
+                  <div className="flex items-center gap-2 bg-background rounded-lg p-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onUpdateEvent(item.id, item.eventType!, Math.max(2, (item.guestCount || 6) - 1), item.eventNote || null)}
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-sm font-semibold w-8 text-center tabular-nums">
+                      {item.guestCount || 6}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onUpdateEvent(item.id, item.eventType!, Math.min(50, (item.guestCount || 6) + 1), item.eventNote || null)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Note (optional)</Label>
+                  <Input
+                    placeholder="e.g., Desert BBQ"
+                    value={item.eventNote || ''}
+                    onChange={(e) => onUpdateEvent(item.id, item.eventType!, item.guestCount || 6, e.target.value || null)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground hover:text-destructive"
+                  onClick={() => onUpdateEvent(item.id, null, null, null)}
+                >
+                  <X className="h-3.5 w-3.5 mr-1.5" />
+                  Clear event
+                </Button>
+              </div>
+            )}
           </div>
 
           <Separator />

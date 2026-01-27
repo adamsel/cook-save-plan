@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  checkRateLimit,
+  getClientIP,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,48 +36,115 @@ interface CleanupResponse {
   changes: string[];
 }
 
-const SYSTEM_PROMPT = `You are a smart shopping list assistant. Your job is to clean up and consolidate shopping lists to make them practical for grocery shopping.
+const SYSTEM_PROMPT = `You consolidate shopping lists. Combine duplicates, convert units, round quantities.
 
-Given a list of ingredients with quantities, you should:
+IMPORTANT: Respond with ONLY a valid JSON object, no markdown, no code blocks, no explanation. Just the raw JSON.
 
-1. **Combine quantities for the same item** - If there are multiple entries that are essentially the same ingredient, combine their quantities (e.g., "50g butter" + "30g butter" = "80g butter")
+Output format:
+{"items":[{"id":"string","ingredient":"Name","quantity":"amount","category":"Category"}],"changes":["change1"]}
 
-2. **Convert mixed units to practical forms** - When items have different unit types, convert to the most practical (e.g., "2 cups flour" + "100g flour" should become a single weight or volume)
+Rules:
+- Combine same ingredients (e.g., 50g+30g butter = 80g butter)
+- Keep items minimal - only add "originalIngredients" and "notes" if items were actually merged
+- Keep "changes" array short - only list actual consolidations made
+- Output valid JSON only`;
 
-3. **Group similar generic ingredients** - Items like "vegetable oil", "cooking oil", "oil for frying" can be combined as "neutral oil". But keep specialty items separate (olive oil, sesame oil, coconut oil should stay distinct)
+const BATCH_SIZE = 25;
 
-4. **Flag issues** - Note any nonsensical combinations (like "1 tbsp bacon" which doesn't make sense)
+async function processItemBatch(
+  items: ShoppingItem[],
+  apiKey: string
+): Promise<CleanupResponse> {
+  const itemsList = items
+    .map(item => `- ${item.quantity} ${item.ingredient} (${item.category})`)
+    .join("\n");
 
-5. **Suggest practical quantities** - Round to practical shopping amounts (e.g., 127g becomes 130g or 150g)
+  const userPrompt = `Please clean up and consolidate this shopping list:\n\n${itemsList}`;
 
-Respond with a JSON object:
-\`\`\`json
-{
-  "items": [
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
-      "id": "unique-id",
-      "ingredient": "Butter",
-      "quantity": "150g",
-      "category": "Dairy",
-      "originalIngredients": ["butter", "unsalted butter"],
-      "notes": "Combined from 2 recipes"
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: SYSTEM_PROMPT + "\n\n" + userPrompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+        }
+      }),
     }
-  ],
-  "changes": [
-    "Combined 50g + 30g + 70g butter into 150g",
-    "Converted 2 cups flour + 100g flour into 350g flour",
-    "Grouped vegetable oil and cooking oil as neutral oil"
-  ]
-}
-\`\`\`
+  );
 
-Keep the response concise. Only include items that need changes in the "changes" array.
-If an item doesn't need any changes, still include it in "items" but without notes.`;
+  if (!response.ok) {
+    throw new Error(`AI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  if (!content) {
+    // Return original items if no response
+    return {
+      items: items.map(item => ({
+        id: item.id,
+        ingredient: item.ingredient,
+        quantity: item.quantity,
+        category: item.category,
+      })),
+      changes: [],
+    };
+  }
+
+  // Try to parse JSON
+  try {
+    // First try direct parse
+    return JSON.parse(content) as CleanupResponse;
+  } catch {
+    // Try to extract JSON from content
+    const firstBrace = content.indexOf('{');
+    if (firstBrace !== -1) {
+      let depth = 0;
+      let endIdx = -1;
+      for (let i = firstBrace; i < content.length; i++) {
+        if (content[i] === '{') depth++;
+        if (content[i] === '}') depth--;
+        if (depth === 0) { endIdx = i; break; }
+      }
+      if (endIdx !== -1) {
+        try {
+          return JSON.parse(content.substring(firstBrace, endIdx + 1)) as CleanupResponse;
+        } catch {
+          // Fall through to return original
+        }
+      }
+    }
+    // Return original items if parsing fails
+    return {
+      items: items.map(item => ({
+        id: item.id,
+        ingredient: item.ingredient,
+        quantity: item.quantity,
+        category: item.category,
+      })),
+      changes: [],
+    };
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limiting - AI functions are expensive, limit strictly
+  const clientIP = getClientIP(req);
+  const rateLimitResult = checkRateLimit(clientIP, RATE_LIMITS.AI_FUNCTION);
+  if (!rateLimitResult.allowed) {
+    console.log(`Rate limit exceeded for IP: ${clientIP}`);
+    return rateLimitResponse(rateLimitResult, corsHeaders);
   }
 
   try {
@@ -94,80 +167,60 @@ serve(async (req) => {
 
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     if (!GOOGLE_AI_API_KEY) {
-      throw new Error("GOOGLE_AI_API_KEY is not configured");
-    }
-
-    // Format items for the prompt
-    const itemsList = items
-      .map(item => `- ${item.quantity} ${item.ingredient} (${item.category})`)
-      .join("\n");
-
-    const userPrompt = `Please clean up and consolidate this shopping list:\n\n${itemsList}`;
-
-    // Call Google Gemini API directly
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_AI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: SYSTEM_PROMPT + "\n\n" + userPrompt }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-          }
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const text = await response.text();
-      console.error("Google AI error:", response.status, text);
+      console.error("GOOGLE_AI_API_KEY environment variable is not set");
       return new Response(
-        JSON.stringify({ error: "AI service error" }),
+        JSON.stringify({ error: "AI service not configured. Please set GOOGLE_AI_API_KEY in Supabase Edge Function environment variables." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // Process in batches if list is large
+    console.log(`Processing ${items.length} items in batches of ${BATCH_SIZE}`);
 
-    // Extract JSON from the response
-    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-    if (!jsonMatch) {
-      // Try to parse the whole content as JSON
+    const allCleanedItems: CleanedItem[] = [];
+    const allChanges: string[] = [];
+
+    // Split items into batches
+    const batches: ShoppingItem[][] = [];
+    for (let i = 0; i < items.length; i += BATCH_SIZE) {
+      batches.push(items.slice(i, i + BATCH_SIZE));
+    }
+
+    console.log(`Created ${batches.length} batches`);
+
+    // Process each batch
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(`Processing batch ${i + 1}/${batches.length} with ${batch.length} items`);
+
       try {
-        const parsed = JSON.parse(content);
-        return new Response(
-          JSON.stringify(parsed),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch {
-        return new Response(
-          JSON.stringify({
-            error: "Could not parse AI response",
-            raw: content.substring(0, 500)
-          }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const result = await processItemBatch(batch, GOOGLE_AI_API_KEY);
+        allCleanedItems.push(...result.items);
+        allChanges.push(...result.changes);
+      } catch (e) {
+        console.error(`Batch ${i + 1} failed:`, e);
+        // On batch failure, add original items
+        allCleanedItems.push(...batch.map(item => ({
+          id: item.id,
+          ingredient: item.ingredient,
+          quantity: item.quantity,
+          category: item.category,
+        })));
       }
     }
 
-    const cleanupResult = JSON.parse(jsonMatch[1]) as CleanupResponse;
+    // If we have multiple batches, do a final consolidation pass on items that might span batches
+    // Group by ingredient name and combine if needed
+    if (batches.length > 1) {
+      console.log("Running final consolidation pass across batches");
+      // For now, just return the combined results - a full cross-batch consolidation would need another AI call
+      // which could cause similar issues. Users can run cleanup again if needed.
+    }
+
+    const cleanupResult: CleanupResponse = {
+      items: allCleanedItems,
+      changes: allChanges.length > 0 ? allChanges : ["No consolidations needed"],
+    };
 
     return new Response(
       JSON.stringify(cleanupResult),

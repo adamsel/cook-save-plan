@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useShoppingListState } from '@/hooks/useShoppingListState';
 import { usePantry } from '@/hooks/usePantry';
@@ -245,7 +246,54 @@ export default function ShoppingListPage() {
   }, [shoppingList, groupByAisle, aisleCategories]);
 
   const toggleItem = (id: string) => {
+    const wasChecked = checkedItems[id];
     setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+
+    // If item is being checked (not unchecked), show one-tap pantry prompt
+    if (!wasChecked) {
+      const item = shoppingList.find(i => i.id === id);
+      if (item) {
+        toast({
+          title: `"${item.ingredient}" checked off`,
+          description: "Add it to your pantry?",
+          action: (
+            <ToastAction
+              altText="Add to pantry"
+              onClick={async () => {
+                try {
+                  const pantryItem = {
+                    displayName: item.ingredient,
+                    quantity: typeof item.quantity === 'number' ? item.quantity : undefined,
+                    unit: item.unit || undefined,
+                    category: item.category || 'Other',
+                  };
+                  const added = await addFromShoppingList([pantryItem]);
+                  // usePantry hook shows its own success toast, but if item already existed
+                  // (added === 0), it means quantity was updated silently
+                  if (added === 0) {
+                    toast({
+                      title: "Pantry updated",
+                      description: `Updated quantity for "${item.ingredient}"`,
+                    });
+                  }
+                } catch (error) {
+                  console.error('Failed to add to pantry:', error);
+                  toast({
+                    title: "Failed to add to pantry",
+                    description: "Please try again",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              <Package className="h-3.5 w-3.5 mr-1.5" />
+              Add to Pantry
+            </ToastAction>
+          ),
+          duration: 4000,
+        });
+      }
+    }
   };
 
   const toggleCategory = (category: string) => {
@@ -358,16 +406,38 @@ export default function ShoppingListPage() {
         return;
       }
 
-      // Use Supabase client's functions.invoke() which handles auth automatically
-      const { data: result, error } = await supabase.functions.invoke('shopping-list-cleanup', {
-        body: { items: itemsForCleanup },
+      // Debug: Log session and URL info
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shopping-list-cleanup`;
+      console.log('🔍 Debug - Function URL:', functionUrl);
+      console.log('🔍 Debug - Items to cleanup:', itemsForCleanup.length);
+      console.log('🔍 Debug - Request body:', JSON.stringify({ items: itemsForCleanup }).substring(0, 500));
+
+      // Use direct fetch for better error visibility
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: itemsForCleanup }),
       });
 
-      if (error) {
-        throw new Error(error.message || 'Request failed');
+      console.log('🔍 Debug - Response status:', response.status);
+      const responseText = await response.text();
+      console.log('🔍 Debug - Response body:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`Function error (${response.status}): ${responseText}`);
+      }
+
+      const result = JSON.parse(responseText);
+
+      if (result?.error) {
+        console.error('Function returned error:', result);
+        throw new Error(result.error);
       }
 
       if (result?.error) {
+        console.error('Function returned error:', result);
         throw new Error(result.error);
       }
 

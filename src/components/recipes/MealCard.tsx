@@ -1,11 +1,17 @@
-import { Recipe, MealPlanItem } from '@/types/recipe';
+import { Recipe, MealPlanItem, EventType } from '@/types/recipe';
 import { cn } from '@/lib/utils';
-import { Utensils, Undo2 } from 'lucide-react';
+import { Utensils, Undo2, PartyPopper, Users, ShoppingBag } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+
+const eventConfig: Record<EventType, { icon: typeof PartyPopper; label: string; color: string }> = {
+  potluck: { icon: PartyPopper, label: 'Potluck', color: 'bg-purple-500' },
+  guests: { icon: Users, label: 'Guests', color: 'bg-blue-500' },
+  takeaway: { icon: ShoppingBag, label: 'Takeaway', color: 'bg-orange-500' },
+};
 
 interface MealCardProps {
   recipe: Recipe;
@@ -104,6 +110,31 @@ export function MealCard({
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">Makes {leftoverCount} leftover meal{leftoverCount > 1 ? 's' : ''}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Event badge - top left */}
+        {!isLeftover && item.eventType && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={cn(
+                "absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] font-medium text-white flex items-center gap-1",
+                eventConfig[item.eventType].color
+              )}>
+                {(() => {
+                  const EventIcon = eventConfig[item.eventType!].icon;
+                  return <EventIcon className="h-3 w-3" />;
+                })()}
+                {item.guestCount && <span>{item.guestCount}</span>}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">
+                {eventConfig[item.eventType].label}
+                {item.guestCount && ` for ${item.guestCount}`}
+                {item.eventNote && ` - ${item.eventNote}`}
+              </p>
             </TooltipContent>
           </Tooltip>
         )}

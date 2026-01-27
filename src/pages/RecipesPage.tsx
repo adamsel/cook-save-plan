@@ -26,15 +26,20 @@ import { useToast } from '@/hooks/use-toast';
 type RecipeTab = 'personal' | 'discover';
 
 export default function RecipesPage() {
-  const { 
-    recipes, 
-    categories, 
-    tags, 
-    toggleFavorite, 
-    toggleArchive, 
-    deleteRecipe, 
+  const {
+    recipes,
+    categories,
+    tags,
+    toggleFavorite,
+    toggleArchive,
+    deleteRecipe,
     updateRecipe,
     addRecipe,
+    makeRecipePublic,
+    shareRecipe,
+    getRecipeShares,
+    revokeShare,
+    revokePendingShare,
   } = useRecipes();
   const { toast } = useToast();
   
@@ -535,6 +540,11 @@ export default function RecipesPage() {
           handleAddToMealPlan(recipe);
         }}
         isLibraryRecipe={false}
+        onTogglePublic={makeRecipePublic}
+        onShareByEmail={shareRecipe}
+        onGetShares={getRecipeShares}
+        onRevokeShare={revokeShare}
+        onRevokePendingShare={revokePendingShare}
       />
 
       {/* Spoonacular Recipe Detail Dialog */}

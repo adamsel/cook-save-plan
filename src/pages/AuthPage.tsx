@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -193,6 +193,17 @@ export default function AuthPage() {
             </form>
           </TabsContent>
         </Tabs>
+
+        <div className="px-6 pb-4 text-center text-xs text-muted-foreground">
+          By continuing, you agree to our{' '}
+          <Link to="/terms" className="underline hover:text-foreground">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" className="underline hover:text-foreground">
+            Privacy Policy
+          </Link>
+        </div>
       </Card>
     </div>
   );

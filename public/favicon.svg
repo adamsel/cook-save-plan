@@ -1,12 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="8" fill="#16a34a"/>
-  <g transform="translate(6, 6)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <!-- Fork -->
-    <path d="M3 2v6a2 2 0 0 0 2 2v10"/>
-    <path d="M3 2L3 8"/>
-    <path d="M1 2v3"/>
-    <path d="M5 2v3"/>
-    <!-- Knife -->
-    <path d="M17 2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2v10"/>
+  <g transform="translate(6, 6)" stroke="#fff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Fork going diagonal (top-left to bottom-right) -->
+    <path d="M2 2l16 16"/>
+    <path d="M2 2v4l2 2"/>
+    <path d="M4 2v2"/>
+    <path d="M6 2v4l-2 2"/>
+    <!-- Knife going diagonal (top-right to bottom-left) -->
+    <path d="M18 2L2 18"/>
+    <path d="M18 2c0 0 0 4-2 6l-4 4"/>
   </g>
 </svg>

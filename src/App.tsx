@@ -16,6 +16,8 @@ import ShoppingListPage from "@/pages/ShoppingListPage";
 import PantryPage from "@/pages/PantryPage";
 import SettingsPage from "@/pages/SettingsPage";
 import AuthPage from "@/pages/AuthPage";
+import TermsPage from "@/pages/TermsPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +36,8 @@ const App = () => {
               <div className="min-h-screen bg-background">
                 <Routes>
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="*" element={
                     <ProtectedRoute>
                       <Navigation onAddRecipe={() => setShowAddRecipe(true)} />

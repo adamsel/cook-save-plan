@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Recipe Stash
 
-## Project info
+A meal planning app for couples and families who batch cook and have lives.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Recipe Management** - Save, organize, and import recipes from any website
+- **Meal Planning** - Plan your week with drag-and-drop simplicity
+- **Household Collaboration** - Plan meals together with your partner
+- **Smart Shopping Lists** - Auto-generated, organized by aisle, with ingredient merging
+- **Leftover Tracking** - Batch cook once, eat multiple meals
+- **Event Planning** - Track potlucks, guest dinners, and takeaway nights
+- **AI Recipe Assistant** - Parse recipes from text or URLs automatically
+- **Pantry Management** - Track what you have, avoid buying duplicates
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Edge Functions)
+- **AI**: Google Gemini for recipe parsing and smart cleanup
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Development
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+# Install dependencies
+npm install
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
+
+# Build for production
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+## Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create a `.env.local` file:
 
-**Use GitHub Codespaces**
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key
+VITE_SENTRY_DSN=your_sentry_dsn (optional)
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Supabase Setup
 
-## What technologies are used for this project?
+1. Create a Supabase project
+2. Run migrations from `supabase/migrations/`
+3. Set edge function secrets:
+   ```bash
+   supabase secrets set GOOGLE_AI_API_KEY=your_key
+   supabase secrets set SPOONACULAR_API_KEY=your_key
+   ```
+4. Deploy edge functions:
+   ```bash
+   supabase functions deploy
+   ```
 
-This project is built with:
+## License
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+MIT

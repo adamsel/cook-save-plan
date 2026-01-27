@@ -6,7 +6,8 @@ import {
   MealSlot,
   Recipe,
   MealPlanItem,
-  DisplayMealItem
+  DisplayMealItem,
+  EventType
 } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { format, startOfWeek, addDays, addWeeks, isSameWeek } from 'date-fns';
@@ -400,6 +401,10 @@ export default function MealPlanPage() {
 
   const updateLeftovers = (itemId: string, leftoverMeals: number) => {
     updateMealPlanItem(itemId, { leftoverMeals });
+  };
+
+  const updateEvent = (itemId: string, eventType: EventType | null, guestCount: number | null, eventNote: string | null) => {
+    updateMealPlanItem(itemId, { eventType, guestCount, eventNote });
   };
 
   const dayLabels: Record<string, string> = {
@@ -894,6 +899,7 @@ export default function MealPlanPage() {
           householdSize={householdSize}
           onUpdateServings={updateServings}
           onUpdateLeftovers={updateLeftovers}
+          onUpdateEvent={updateEvent}
           onRemove={(itemId) => {
             removeFromMealPlan(itemId);
             setEditingItemId(null);

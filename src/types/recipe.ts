@@ -47,6 +47,7 @@ export interface Recipe {
   instructions: string[];
   isFavorite: boolean;
   isArchived: boolean;
+  isPublic?: boolean; // Whether recipe is publicly viewable
   createdAt: string;
   updatedAt: string;
   // Import tracking
@@ -60,12 +61,33 @@ export interface Recipe {
   nutrition?: RecipeNutrition;
 }
 
+// Recipe sharing types
+export interface RecipeShare {
+  id: string;
+  shared_with_user_id: string;
+  can_edit: boolean;
+  created_at: string;
+  profiles: {
+    display_name: string | null;
+    email: string | null;
+  } | null;
+}
+
+export interface PendingShare {
+  id: string;
+  invited_email: string;
+  can_edit: boolean;
+  created_at: string;
+}
+
 // Entry for custom leftover position (stored as JSON in meal_plan_items)
 export interface LeftoverPositionEntry {
   index: number; // Which leftover (0 = first, 1 = second, etc.)
   day: string;   // Target day
   slot: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // Target slot
 }
+
+export type EventType = 'potluck' | 'guests' | 'takeaway';
 
 export interface MealPlanItem {
   id: string;
@@ -76,6 +98,10 @@ export interface MealPlanItem {
   leftoverMeals: number; // Number of additional meals (leftovers) this provides
   notes?: string;
   leftoverPositions?: LeftoverPositionEntry[]; // Custom positions for leftovers
+  // Event fields for potlucks, guests, etc.
+  eventType?: EventType | null;
+  guestCount?: number | null; // Overrides household size for ingredient scaling
+  eventNote?: string | null; // e.g., "Desert BBQ"
   // Virtual field for display - not stored in DB
   isLeftover?: boolean;
   sourceItemId?: string; // Links leftover to its source meal

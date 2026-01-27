@@ -1,5 +1,6 @@
-import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library } from 'lucide-react';
+import { useState } from 'react';
+import { Recipe, RecipeShare, PendingShare } from '@/types/recipe';
+import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { ShareRecipeDialog } from './ShareRecipeDialog';
 
 interface RecipeDetailDialogProps {
   recipe: Recipe | null;
@@ -22,6 +24,12 @@ interface RecipeDetailDialogProps {
   onAddToMealPlan: (recipe: Recipe) => void;
   isLibraryRecipe?: boolean;
   onCopyToPersonal?: (recipe: Recipe) => void;
+  // Sharing props
+  onTogglePublic?: (recipeId: string, isPublic: boolean) => Promise<boolean>;
+  onShareByEmail?: (recipeId: string, email: string, canEdit?: boolean) => Promise<{ error: string | null; shared: boolean; pending: boolean }>;
+  onGetShares?: (recipeId: string) => Promise<{ shares: RecipeShare[]; pendingShares: PendingShare[] }>;
+  onRevokeShare?: (shareId: string) => Promise<boolean>;
+  onRevokePendingShare?: (pendingShareId: string) => Promise<boolean>;
 }
 
 export function RecipeDetailDialog({
@@ -35,7 +43,14 @@ export function RecipeDetailDialog({
   onAddToMealPlan,
   isLibraryRecipe = false,
   onCopyToPersonal,
+  onTogglePublic,
+  onShareByEmail,
+  onGetShares,
+  onRevokeShare,
+  onRevokePendingShare,
 }: RecipeDetailDialogProps) {
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
   if (!recipe) return null;
 
   const nutrition = recipe.nutrition?.perServing;
@@ -246,31 +261,39 @@ export function RecipeDetailDialog({
                 <Calendar className="h-4 w-4 mr-2" />
                 Add to Meal Plan
               </Button>
-              
+
+              {/* Share button - only for personal recipes with sharing enabled */}
+              {!isLibraryRecipe && onTogglePublic && (
+                <Button variant="outline" onClick={() => setShareDialogOpen(true)}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </Button>
+              )}
+
               {isLibraryRecipe && onCopyToPersonal && (
                 <Button variant="outline" onClick={() => onCopyToPersonal(recipe)}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy to My Recipes
                 </Button>
               )}
-              
+
               {!isLibraryRecipe && onEdit && (
                 <Button variant="outline" onClick={() => onEdit(recipe)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
                 </Button>
               )}
-              
+
               {!isLibraryRecipe && (
                 <Button variant="outline" onClick={() => onToggleArchive(recipe.id)}>
                   <Archive className="h-4 w-4 mr-2" />
                   {recipe.isArchived ? 'Unarchive' : 'Archive'}
                 </Button>
               )}
-              
+
               {!isLibraryRecipe && onDelete && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="text-destructive hover:text-destructive"
                   onClick={() => {
                     onDelete(recipe.id);
@@ -285,6 +308,26 @@ export function RecipeDetailDialog({
           </div>
         </ScrollArea>
       </DialogContent>
+
+      {/* Share Recipe Dialog */}
+      {!isLibraryRecipe && onTogglePublic && (
+        <ShareRecipeDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          recipe={recipe}
+          isPublic={recipe.isPublic || false}
+          onTogglePublic={async (isPublic) => {
+            if (onTogglePublic) {
+              return await onTogglePublic(recipe.id, isPublic);
+            }
+            return false;
+          }}
+          onShareByEmail={onShareByEmail}
+          onGetShares={onGetShares}
+          onRevokeShare={onRevokeShare}
+          onRevokePendingShare={onRevokePendingShare}
+        />
+      )}
     </Dialog>
   );
 }

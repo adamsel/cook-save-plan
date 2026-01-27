@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { setUserContext, clearUserContext } from '@/lib/sentry';
 
 interface Profile {
   id: string;
@@ -37,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Set Sentry user context for error tracking
+          setUserContext(session.user.id, session.user.email);
+
           // Fetch profile with setTimeout to avoid race conditions
           setTimeout(async () => {
             const { data } = await supabase
@@ -47,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfile(data);
           }, 0);
         } else {
+          // Clear Sentry user context on logout
+          clearUserContext();
           setProfile(null);
         }
         

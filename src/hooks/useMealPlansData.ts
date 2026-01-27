@@ -25,6 +25,9 @@ interface DbMealPlanItem {
   leftover_meals: number;
   leftover_positions: LeftoverPositionEntry[] | null; // JSON column
   notes: string | null;
+  event_type: string | null;
+  guest_count: number | null;
+  event_note: string | null;
   created_at: string;
 }
 
@@ -46,6 +49,9 @@ export function useMealPlansData() {
     leftoverMeals: Number(item.leftover_meals || 0),
     leftoverPositions: item.leftover_positions || [],
     notes: item.notes || undefined,
+    eventType: item.event_type as MealPlanItem['eventType'] || undefined,
+    guestCount: item.guest_count || undefined,
+    eventNote: item.event_note || undefined,
   });
 
   // Convert DB meal plan to app type
@@ -279,6 +285,9 @@ export function useMealPlansData() {
     if (updates.day !== undefined) dbUpdates.day = updates.day;
     if (updates.mealSlot !== undefined) dbUpdates.meal_slot = updates.mealSlot;
     if (updates.leftoverPositions !== undefined) dbUpdates.leftover_positions = updates.leftoverPositions;
+    if (updates.eventType !== undefined) dbUpdates.event_type = updates.eventType;
+    if (updates.guestCount !== undefined) dbUpdates.guest_count = updates.guestCount;
+    if (updates.eventNote !== undefined) dbUpdates.event_note = updates.eventNote;
 
     const { error } = await supabase
       .from('meal_plan_items')
