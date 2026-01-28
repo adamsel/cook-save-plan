@@ -48,7 +48,14 @@ VITE_SENTRY_DSN=your_sentry_dsn (optional)
 2. Run migrations from `supabase/migrations/`
 3. Set edge function secrets:
    ```bash
+   # Required for AI features (recipe parsing, shopping list cleanup)
    supabase secrets set GOOGLE_AI_API_KEY=your_key
+
+   # Optional: URL scraping for recipe import (get key at firecrawl.dev)
+   # Without this, users can still paste recipe text manually
+   supabase secrets set FIRECRAWL_API_KEY=your_key
+
+   # Optional: Recipe discovery feature
    supabase secrets set SPOONACULAR_API_KEY=your_key
    ```
 4. Deploy edge functions:

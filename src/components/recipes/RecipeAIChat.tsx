@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Send, Loader2, Bot, User, Link as LinkIcon, 
-  ChefHat, Clock, Users, Check, Edit2, X,
+import {
+  Send, Loader2, Bot, User, Link as LinkIcon,
+  ChefHat, Clock, Users, Check, Edit2,
   Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -376,9 +376,7 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
           <Sparkles className="h-5 w-5 text-primary" />
           <h2 className="font-semibold">AI Recipe Assistant</h2>
         </div>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          <X className="h-4 w-4" />
-        </Button>
+        {/* Close button is provided by DialogContent, no need for duplicate */}
       </div>
 
       <ScrollArea ref={scrollRef} className="flex-1 py-4">
