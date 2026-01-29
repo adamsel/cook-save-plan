@@ -79,15 +79,18 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
         const carbsPerMeal = sessionCarbs / totalMeals;
         const fatPerMeal = sessionFat / totalMeals;
 
-        // Add primary meal nutrition to its day
+        // Use guestCount for events, householdSize for regular meals
+        const eaters = item.eventType && item.guestCount ? item.guestCount : householdSize;
+
+        // Add primary meal nutrition to its day (per-person)
         if (dailyNutrition[item.day]) {
-          dailyNutrition[item.day].calories += caloriesPerMeal;
-          dailyNutrition[item.day].protein += proteinPerMeal;
-          dailyNutrition[item.day].carbs += carbsPerMeal;
-          dailyNutrition[item.day].fat += fatPerMeal;
+          dailyNutrition[item.day].calories += caloriesPerMeal / eaters;
+          dailyNutrition[item.day].protein += proteinPerMeal / eaters;
+          dailyNutrition[item.day].carbs += carbsPerMeal / eaters;
+          dailyNutrition[item.day].fat += fatPerMeal / eaters;
         }
 
-        // Add leftover meals nutrition to their respective days
+        // Add leftover meals nutrition to their respective days (leftovers use householdSize)
         const dayIndex = DAYS_OF_WEEK.indexOf(item.day as typeof DAYS_OF_WEEK[number]);
         for (let i = 0; i < leftoverCount; i++) {
           const customPos = item.leftoverPositions?.find(lp => lp.index === i);
@@ -104,10 +107,11 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
           }
 
           if (dailyNutrition[targetDay]) {
-            dailyNutrition[targetDay].calories += caloriesPerMeal;
-            dailyNutrition[targetDay].protein += proteinPerMeal;
-            dailyNutrition[targetDay].carbs += carbsPerMeal;
-            dailyNutrition[targetDay].fat += fatPerMeal;
+            // Leftovers are eaten by household, not event guests
+            dailyNutrition[targetDay].calories += caloriesPerMeal / householdSize;
+            dailyNutrition[targetDay].protein += proteinPerMeal / householdSize;
+            dailyNutrition[targetDay].carbs += carbsPerMeal / householdSize;
+            dailyNutrition[targetDay].fat += fatPerMeal / householdSize;
           }
         }
       }
@@ -202,11 +206,11 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
       return parts.join(', ');
     };
 
-    // Calculate per-person values by dividing by household size
-    const perPersonCalories = Math.round(totalCalories / householdSize);
-    const perPersonProtein = Math.round(totalProtein / householdSize);
-    const perPersonCarbs = Math.round(totalCarbs / householdSize);
-    const perPersonFat = Math.round(totalFat / householdSize);
+    // Already calculated per-person values above (divided per-item by eaters)
+    const perPersonCalories = Math.round(totalCalories);
+    const perPersonProtein = Math.round(totalProtein);
+    const perPersonCarbs = Math.round(totalCarbs);
+    const perPersonFat = Math.round(totalFat);
 
     // Daily average based on days that have meals (more accurate than dividing by 7)
     const avgDivisor = daysWithMeals > 0 ? daysWithMeals : 7;

@@ -343,7 +343,10 @@ export function useRecipesData() {
       });
       return false;
     }
-    
+
+    // Update local recipes state so UI reflects the change immediately
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, isPublic } : r));
+
     // Refresh library recipes
     const library = await fetchLibraryRecipes();
     setLibraryRecipes(library);
@@ -416,6 +419,22 @@ export function useRecipesData() {
         console.error('Error creating pending share:', pendingError);
         return { error: 'Failed to send invitation', shared: false, pending: false };
       }
+
+      // Send invitation email (fire and forget - don't block on email success)
+      const recipe = recipes.find(r => r.id === recipeId);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .single();
+
+      supabase.functions.invoke('send-share-invitation', {
+        body: {
+          email: normalizedEmail,
+          recipeTitle: recipe?.title || 'a recipe',
+          sharerName: profile?.display_name || 'Someone',
+        },
+      }).catch(err => console.error('Failed to send invitation email:', err));
 
       toast({
         title: 'Invitation sent!',

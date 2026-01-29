@@ -37,11 +37,21 @@ export interface HouseholdSettings {
   updated_at: string;
 }
 
+export interface PendingHouseholdInvite {
+  id: string;
+  household_id: string;
+  email: string;
+  role: HouseholdRole;
+  invited_by: string;
+  invited_at: string;
+}
+
 export function useHousehold() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingHouseholdInvite[]>([]);
   const [settings, setSettings] = useState<HouseholdSettings | null>(null);
   const [userRole, setUserRole] = useState<HouseholdRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +61,7 @@ export function useHousehold() {
     if (!user) {
       setHousehold(null);
       setMembers([]);
+      setPendingInvites([]);
       setSettings(null);
       setUserRole(null);
       setIsLoading(false);
@@ -86,6 +97,7 @@ export function useHousehold() {
         // User doesn't have a household
         setHousehold(null);
         setMembers([]);
+        setPendingInvites([]);
         setSettings(null);
         setUserRole(null);
         setIsLoading(false);
@@ -116,6 +128,19 @@ export function useHousehold() {
         console.error('Error fetching household members:', membersError);
       } else {
         setMembers(membersData as unknown as HouseholdMember[]);
+      }
+
+      // Fetch pending invites
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('pending_household_invites')
+        .select('*')
+        .eq('household_id', householdData.id)
+        .order('invited_at', { ascending: false });
+
+      if (pendingError) {
+        console.error('Error fetching pending invites:', pendingError);
+      } else {
+        setPendingInvites(pendingData as PendingHouseholdInvite[]);
       }
 
       // Fetch settings
@@ -239,12 +264,72 @@ export function useHousehold() {
     }
 
     if (!profile) {
+      // User doesn't have an account - create pending invite
+      // Check if already invited
+      const existingInvite = pendingInvites.find(
+        inv => inv.email.toLowerCase() === normalizedEmail
+      );
+      if (existingInvite) {
+        toast({
+          title: 'Already invited',
+          description: 'An invitation has already been sent to this email.',
+          variant: 'destructive',
+        });
+        return { error: 'Already invited' };
+      }
+
+      // Create pending invite
+      const { error: pendingError } = await supabase
+        .from('pending_household_invites')
+        .insert({
+          household_id: household.id,
+          email: normalizedEmail,
+          role: role === 'owner' ? 'member' : role, // Can't invite as owner
+          invited_by: user.id,
+        });
+
+      if (pendingError) {
+        console.error('Error creating pending invite:', pendingError);
+        if (pendingError.code === '23505') {
+          toast({
+            title: 'Already invited',
+            description: 'An invitation has already been sent to this email.',
+            variant: 'destructive',
+          });
+          return { error: 'Already invited' };
+        }
+        toast({
+          title: 'Error',
+          description: 'Failed to create invitation',
+          variant: 'destructive',
+        });
+        return { error: 'Failed to create invitation' };
+      }
+
+      // Get inviter's name for the email
+      const { data: inviterProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .single();
+
+      // Send invitation email (fire and forget)
+      supabase.functions.invoke('send-household-invitation', {
+        body: {
+          email: normalizedEmail,
+          householdName: household.name,
+          inviterName: inviterProfile?.display_name || 'Someone',
+          role: role === 'owner' ? 'member' : role,
+        },
+      }).catch(err => console.error('Failed to send household invitation email:', err));
+
       toast({
-        title: 'User not found',
-        description: 'No user exists with that email address.',
-        variant: 'destructive',
+        title: 'Invitation sent!',
+        description: `An email has been sent to ${normalizedEmail}. They'll be added when they create an account.`,
       });
-      return { error: 'User not found' };
+
+      await fetchHousehold();
+      return { error: null };
     }
 
     // Check if already a member
@@ -448,14 +533,108 @@ export function useHousehold() {
 
     setHousehold(null);
     setMembers([]);
+    setPendingInvites([]);
     setSettings(null);
     setUserRole(null);
     return true;
   };
 
+  // Cancel a pending invite
+  const cancelPendingInvite = async (inviteId: string) => {
+    if (!user || !household) return false;
+    if (userRole !== 'owner' && userRole !== 'admin') {
+      toast({
+        title: 'Permission denied',
+        description: 'Only owners and admins can cancel invitations.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    const { error } = await supabase
+      .from('pending_household_invites')
+      .delete()
+      .eq('id', inviteId);
+
+    if (error) {
+      console.error('Error canceling pending invite:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to cancel invitation',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    toast({
+      title: 'Invitation canceled',
+      description: 'The invitation has been canceled.',
+    });
+
+    setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+    return true;
+  };
+
+  // Resend a pending invite email
+  const resendInvite = async (inviteId: string) => {
+    if (!user || !household) return false;
+    if (userRole !== 'owner' && userRole !== 'admin') {
+      toast({
+        title: 'Permission denied',
+        description: 'Only owners and admins can resend invitations.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    const invite = pendingInvites.find(inv => inv.id === inviteId);
+    if (!invite) {
+      toast({
+        title: 'Invitation not found',
+        description: 'This invitation no longer exists.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // Get inviter's name for the email
+    const { data: inviterProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('user_id', user.id)
+      .single();
+
+    try {
+      await supabase.functions.invoke('send-household-invitation', {
+        body: {
+          email: invite.email,
+          householdName: household.name,
+          inviterName: inviterProfile?.display_name || 'Someone',
+          role: invite.role,
+        },
+      });
+
+      toast({
+        title: 'Invitation resent',
+        description: `A new invitation email has been sent to ${invite.email}.`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to resend invitation email',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
   return {
     household,
     members,
+    pendingInvites,
     settings,
     userRole,
     isLoading,
@@ -468,6 +647,8 @@ export function useHousehold() {
     updateSettings,
     leaveHousehold,
     deleteHousehold,
+    cancelPendingInvite,
+    resendInvite,
     refresh: fetchHousehold,
   };
 }

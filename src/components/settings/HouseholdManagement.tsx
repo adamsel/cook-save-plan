@@ -31,9 +31,14 @@ import {
   User,
   Trash2,
   LogOut,
-  Loader2
+  Loader2,
+  Clock,
+  RefreshCw,
+  X,
+  Mail
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
 
 export function HouseholdManagement() {
   const { user } = useAuth();
@@ -41,6 +46,7 @@ export function HouseholdManagement() {
   const {
     household,
     members,
+    pendingInvites,
     userRole,
     isLoading,
     hasHousehold,
@@ -51,6 +57,8 @@ export function HouseholdManagement() {
     removeMember,
     leaveHousehold,
     deleteHousehold,
+    cancelPendingInvite,
+    resendInvite,
   } = useHousehold();
 
   const [householdName, setHouseholdName] = useState('');
@@ -232,6 +240,52 @@ export function HouseholdManagement() {
         </div>
       </div>
 
+      {/* Pending Invites - only visible to admins/owners */}
+      {isAdmin && pendingInvites.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Pending Invites</Label>
+          <div className="space-y-2">
+            {pendingInvites.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-dashed"
+              >
+                <div className="flex items-center gap-3">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">{invite.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Invited {formatDistanceToNow(new Date(invite.invited_at))} ago
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="capitalize">{invite.role}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => resendInvite(invite.id)}
+                    title="Resend invitation"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => cancelPendingInvite(invite.id)}
+                    title="Cancel invitation"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Invite Member - only for admins/owners */}
       {isAdmin && (
         <div className="space-y-2">
@@ -266,7 +320,7 @@ export function HouseholdManagement() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            The user must have an account with this email address.
+            If the user doesn't have an account, they'll receive an email invitation and be added automatically when they sign up.
           </p>
         </div>
       )}

@@ -94,7 +94,7 @@ export function MealCard({
                 <Undo2 className="h-3 w-3 text-white" />
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top">
+            <TooltipContent side="bottom" avoidCollisions>
               <p className="text-xs">{sourceLabel}</p>
             </TooltipContent>
           </Tooltip>
@@ -108,7 +108,7 @@ export function MealCard({
                 +{leftoverCount}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top">
+            <TooltipContent side="bottom" avoidCollisions>
               <p className="text-xs">Makes {leftoverCount} leftover meal{leftoverCount > 1 ? 's' : ''}</p>
             </TooltipContent>
           </Tooltip>
@@ -129,7 +129,7 @@ export function MealCard({
                 {item.guestCount && <span>{item.guestCount}</span>}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top">
+            <TooltipContent side="bottom" align="start" avoidCollisions>
               <p className="text-xs">
                 {eventConfig[item.eventType].label}
                 {item.guestCount && ` for ${item.guestCount}`}

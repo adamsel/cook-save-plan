@@ -433,12 +433,14 @@ export default function MealPlanPage() {
           const totalCalories = recipe.nutrition.perServing.calories * recipe.servings * item.servingsMultiplier;
           // Calories per meal (spread evenly across all eating occasions)
           const caloriesPerMeal = totalCalories / totalMeals;
-          calories += caloriesPerMeal;
+          // Use guestCount for events, householdSize for regular meals
+          const eaters = item.eventType && item.guestCount ? item.guestCount : householdSize;
+          calories += caloriesPerMeal / eaters;
         }
       });
     });
-    // Divide by household size to show per-person calories
-    return { calories: Math.round(calories / householdSize) };
+    // Already divided per-item above, so just return the sum
+    return { calories: Math.round(calories) };
   };
 
   const quickFilters = [

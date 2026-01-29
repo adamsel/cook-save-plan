@@ -80,8 +80,14 @@ export default function RecipesPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [mealPlanRecipe, setMealPlanRecipe] = useState<Recipe | null>(null);
   const [showMealPlanDialog, setShowMealPlanDialog] = useState(false);
-  const [viewingRecipe, setViewingRecipe] = useState<Recipe | null>(null);
+  const [viewingRecipeId, setViewingRecipeId] = useState<string | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+
+  // Derive viewingRecipe from recipes array so it updates when recipes change
+  const viewingRecipe = useMemo(() => {
+    if (!viewingRecipeId) return null;
+    return recipes.find(r => r.id === viewingRecipeId) || null;
+  }, [viewingRecipeId, recipes]);
   
   // Spoonacular detail dialog state
   const [showSpoonacularDetailDialog, setShowSpoonacularDetailDialog] = useState(false);
@@ -488,7 +494,7 @@ export default function RecipesPage() {
                     onDelete={deleteRecipe}
                     onAddToMealPlan={handleAddToMealPlan}
                     onViewDetails={(recipe) => {
-                      setViewingRecipe(recipe);
+                      setViewingRecipeId(recipe.id);
                       setShowDetailDialog(true);
                     }}
                     isLibraryRecipe={false}

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Recipe, MealPlanItem, EventType, DAYS_OF_WEEK, MEAL_SLOTS, DayOfWeek, MealSlot } from '@/types/recipe';
 import {
   Sheet,
@@ -55,6 +56,14 @@ export function MealEditSheet({
   onRemove,
   onViewRecipe,
 }: MealEditSheetProps) {
+  // Local state for event note to prevent input lag
+  const [localEventNote, setLocalEventNote] = useState(item?.eventNote || '');
+
+  // Sync local state when item changes (e.g., switching between meals)
+  useEffect(() => {
+    setLocalEventNote(item?.eventNote || '');
+  }, [item?.eventNote, item?.id]);
+
   if (!recipe || !item) return null;
 
   const plannedServings = Math.round(recipe.servings * item.servingsMultiplier);
@@ -69,6 +78,9 @@ export function MealEditSheet({
     const newMultiplier = newServings / recipe.servings;
     onUpdateServings(item.id, newMultiplier);
 
+    // Skip auto-calculation for event meals - leftovers stay at 0
+    if (item.eventType) return;
+
     // Auto-calculate leftovers based on new servings and household size
     const mealsFromServings = Math.floor(newServings / householdSize);
     const newLeftovers = Math.max(0, mealsFromServings - 1);
@@ -80,6 +92,9 @@ export function MealEditSheet({
   // Handle leftovers change and auto-calculate servings
   const handleLeftoversChange = (newLeftovers: number) => {
     onUpdateLeftovers(item.id, newLeftovers);
+
+    // Skip auto-calculation for event meals - user controls servings independently
+    if (item.eventType) return;
 
     // Auto-calculate servings based on leftovers and household size
     const mealsNeeded = newLeftovers + 1;
@@ -201,6 +216,8 @@ export function MealEditSheet({
                     className="flex-1 text-xs"
                     onClick={() => {
                       onUpdateServings(item.id, multiplier);
+                      // Skip auto-calculation for event meals
+                      if (item.eventType) return;
                       // Auto-calculate leftovers
                       const mealsFromServings = Math.floor(servings / householdSize);
                       const newLeftovers = Math.max(0, mealsFromServings - 1);
@@ -219,14 +236,17 @@ export function MealEditSheet({
           <Separator />
 
           {/* Leftovers control */}
-          <div className="space-y-3">
+          <div className={cn("space-y-3", item.eventType && "opacity-50")}>
             <div>
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <CalendarPlus className="h-4 w-4 text-muted-foreground" />
                 Leftover meals
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Extra meals from this cooking session
+                {item.eventType
+                  ? "Disabled for events - food is consumed at the event"
+                  : "Extra meals from this cooking session"
+                }
               </p>
             </div>
 
@@ -241,7 +261,7 @@ export function MealEditSheet({
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => handleLeftoversChange(Math.max(0, item.leftoverMeals - 1))}
-                    disabled={item.leftoverMeals <= 0}
+                    disabled={item.leftoverMeals <= 0 || !!item.eventType}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -253,7 +273,7 @@ export function MealEditSheet({
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => handleLeftoversChange(item.leftoverMeals + 1)}
-                    disabled={item.leftoverMeals >= 6}
+                    disabled={item.leftoverMeals >= 6 || !!item.eventType}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -270,6 +290,7 @@ export function MealEditSheet({
                       size="sm"
                       className="h-9"
                       onClick={() => handleLeftoversChange(count)}
+                      disabled={!!item.eventType}
                     >
                       {count === 0 ? 'None' : `+${count}`}
                     </Button>
@@ -310,6 +331,10 @@ export function MealEditSheet({
                       } else {
                         // Set event type with default guest count
                         onUpdateEvent(item.id, value, item.guestCount || 6, item.eventNote || null);
+                        // Events don't have leftovers - food is consumed at the event
+                        if (item.leftoverMeals > 0) {
+                          onUpdateLeftovers(item.id, 0);
+                        }
                       }
                     }}
                   >
@@ -352,8 +377,14 @@ export function MealEditSheet({
                   <Label className="text-sm">Note (optional)</Label>
                   <Input
                     placeholder="e.g., Desert BBQ"
-                    value={item.eventNote || ''}
-                    onChange={(e) => onUpdateEvent(item.id, item.eventType!, item.guestCount || 6, e.target.value || null)}
+                    value={localEventNote}
+                    onChange={(e) => setLocalEventNote(e.target.value)}
+                    onBlur={() => {
+                      // Only update if the value has actually changed
+                      if (localEventNote !== (item.eventNote || '')) {
+                        onUpdateEvent(item.id, item.eventType!, item.guestCount || 6, localEventNote || null);
+                      }
+                    }}
                     className="h-8 text-sm"
                   />
                 </div>
