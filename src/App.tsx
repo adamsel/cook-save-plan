@@ -9,6 +9,7 @@ import { RecipeProvider } from "@/context/RecipeContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Navigation } from "@/components/layout/Navigation";
 import { AddRecipeDialog } from "@/components/recipes/AddRecipeDialog";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import Dashboard from "@/pages/Dashboard";
 import RecipesPage from "@/pages/RecipesPage";
 import MealPlanPage from "@/pages/MealPlanPage";
@@ -18,6 +19,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import AuthPage from "@/pages/AuthPage";
 import TermsPage from "@/pages/TermsPage";
 import PrivacyPage from "@/pages/PrivacyPage";
+import LandingPage from "@/pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,14 +37,18 @@ const App = () => {
             <BrowserRouter>
               <div className="min-h-screen bg-background">
                 <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<LandingPage />} />
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
-                  <Route path="*" element={
+
+                  {/* Protected routes */}
+                  <Route path="/*" element={
                     <ProtectedRoute>
                       <Navigation onAddRecipe={() => setShowAddRecipe(true)} />
                       <Routes>
-                        <Route path="/" element={<Dashboard onAddRecipe={() => setShowAddRecipe(true)} />} />
+                        <Route path="/dashboard" element={<Dashboard onAddRecipe={() => setShowAddRecipe(true)} />} />
                         <Route path="/recipes" element={<RecipesPage />} />
                         <Route path="/meal-plan" element={<MealPlanPage />} />
                         <Route path="/shopping-list" element={<ShoppingListPage />} />
@@ -54,10 +60,11 @@ const App = () => {
                   } />
                 </Routes>
               </div>
-              <AddRecipeDialog 
-                open={showAddRecipe} 
-                onOpenChange={setShowAddRecipe} 
+              <AddRecipeDialog
+                open={showAddRecipe}
+                onOpenChange={setShowAddRecipe}
               />
+              <OfflineIndicator />
             </BrowserRouter>
           </TooltipProvider>
         </RecipeProvider>

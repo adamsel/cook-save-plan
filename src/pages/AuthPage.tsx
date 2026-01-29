@@ -22,7 +22,7 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   if (user && !isLoading) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -42,7 +42,7 @@ export default function AuthPage() {
         title: 'Welcome back!',
         description: 'You have been logged in successfully.',
       });
-      navigate('/');
+      navigate('/dashboard');
     }
     
     setIsSubmitting(false);
@@ -65,7 +65,7 @@ export default function AuthPage() {
         title: 'Account created!',
         description: 'Welcome to Recipe Stash. Start adding your recipes!',
       });
-      navigate('/');
+      navigate('/dashboard');
     }
     
     setIsSubmitting(false);
