@@ -142,12 +142,20 @@ export function RecipeDetailDialog({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-primary hover:underline"
+                  title="Recipe from original creator • Always linked back"
                 >
                   <ExternalLink className="h-4 w-4" />
                   View source
                 </a>
               )}
             </div>
+
+            {/* Source attribution */}
+            {recipe.sourceUrl && (
+              <p className="text-xs text-muted-foreground mb-4 -mt-2">
+                Recipe from original creator • Always linked back
+              </p>
+            )}
 
             {/* Meal type and tags */}
             <div className="flex flex-wrap gap-2 mb-6">

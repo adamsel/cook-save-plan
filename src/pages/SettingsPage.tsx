@@ -18,11 +18,13 @@ import {
   X,
   Save,
   Users,
-  Home,
+  Heart,
   Minus,
   AlertTriangle,
   Target,
+  ChevronDown,
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,7 @@ export default function SettingsPage() {
   const [newTag, setNewTag] = useState('');
   const [newStaple, setNewStaple] = useState('');
   const [localStaples, setLocalStaples] = useState<string[]>(pantryStaples);
+  const [nutritionOpen, setNutritionOpen] = useState(false);
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -100,11 +103,11 @@ export default function SettingsPage() {
         {/* Household Management */}
         <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Home className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            <h2 className="font-serif text-lg md:text-xl font-semibold">Household</h2>
+            <Heart className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Share the load</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Create a household to share meal plans and shopping lists with family members.
+            Planning alone works great. If you want help, invite someone to plan with you.
           </p>
           <HouseholdManagement />
         </section>
@@ -134,9 +137,9 @@ export default function SettingsPage() {
               isMobile ? "p-3 space-y-3" : "p-4 flex items-center justify-between"
             )}>
               <div>
-                <Label className="font-medium">Household size</Label>
+                <Label className="font-medium">Default servings</Label>
                 <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                  Dinner servings will default to this number
+                  How many people usually eat dinner?
                 </p>
               </div>
               <div className="flex items-center gap-2 bg-background rounded-lg p-1 border w-fit">
@@ -178,126 +181,6 @@ export default function SettingsPage() {
                 disabled={!canEditSettings}
               />
             </div>
-          </div>
-        </section>
-
-        <Separator />
-
-        {/* Nutrition Goals */}
-        <section className="space-y-3 md:space-y-4">
-          <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            <h2 className="font-serif text-lg md:text-xl font-semibold">Nutrition Goals</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Set your nutrition goals to track progress in the Weekly Summary.
-          </p>
-
-          <div className="space-y-3 md:space-y-4">
-            {/* Primary Goal */}
-            <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
-              <Label className="font-medium mb-2 md:mb-3 block">What's your primary goal?</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: 'none', label: 'No specific goal', desc: 'General balanced eating' },
-                  { value: 'weight_loss', label: 'Weight loss', desc: 'Calorie-conscious meals' },
-                  { value: 'muscle_gain', label: 'Muscle gain', desc: 'High protein focus' },
-                  { value: 'balanced', label: 'Balanced macros', desc: 'Even macro distribution' },
-                ].map(({ value, label, desc }) => (
-                  <button
-                    key={value}
-                    onClick={() => updateSettings({
-                      nutritionGoals: { ...nutritionGoals, primaryGoal: value as NutritionGoal }
-                    })}
-                    className={cn(
-                      "rounded-lg border text-left transition-colors",
-                      isMobile ? "p-2" : "p-3",
-                      nutritionGoals?.primaryGoal === value
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-muted/50 border-border/50'
-                    )}
-                  >
-                    <span className={cn("font-medium block", isMobile ? "text-xs" : "text-sm")}>{label}</span>
-                    <span className={cn(
-                      isMobile ? "text-[10px]" : "text-xs",
-                      nutritionGoals?.primaryGoal === value ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                    )}>{desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Target Values - only show when a goal is selected */}
-            {nutritionGoals?.primaryGoal && nutritionGoals.primaryGoal !== 'none' && (
-              <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
-                <Label className="font-medium mb-2 md:mb-3 block">Daily targets (optional)</Label>
-                <p className="text-xs text-muted-foreground mb-2 md:mb-3">
-                  Leave blank to let AI suggest targets based on your goal.
-                </p>
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Calories</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 2000"
-                      value={nutritionGoals?.targetCalories || ''}
-                      onChange={(e) => updateSettings({
-                        nutritionGoals: {
-                          ...nutritionGoals,
-                          targetCalories: e.target.value ? parseInt(e.target.value) : undefined
-                        }
-                      })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Protein (g)</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 100"
-                      value={nutritionGoals?.targetProtein || ''}
-                      onChange={(e) => updateSettings({
-                        nutritionGoals: {
-                          ...nutritionGoals,
-                          targetProtein: e.target.value ? parseInt(e.target.value) : undefined
-                        }
-                      })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Carbs (g)</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 250"
-                      value={nutritionGoals?.targetCarbs || ''}
-                      onChange={(e) => updateSettings({
-                        nutritionGoals: {
-                          ...nutritionGoals,
-                          targetCarbs: e.target.value ? parseInt(e.target.value) : undefined
-                        }
-                      })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Fat (g)</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 65"
-                      value={nutritionGoals?.targetFat || ''}
-                      onChange={(e) => updateSettings({
-                        nutritionGoals: {
-                          ...nutritionGoals,
-                          targetFat: e.target.value ? parseInt(e.target.value) : undefined
-                        }
-                      })}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -488,6 +371,132 @@ export default function SettingsPage() {
             </p>
           </div>
         </section>
+
+        <Separator />
+
+        {/* Nutrition Goals - Collapsed by default */}
+        <Collapsible open={nutritionOpen} onOpenChange={setNutritionOpen}>
+          <section className="space-y-3 md:space-y-4">
+            <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+              <Target className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+              <h2 className="font-serif text-lg md:text-xl font-semibold text-muted-foreground">Advanced: Nutrition tracking</h2>
+              <ChevronDown className={cn(
+                "h-4 w-4 ml-auto text-muted-foreground transition-transform",
+                nutritionOpen && "rotate-180"
+              )} />
+            </CollapsibleTrigger>
+            <p className="text-sm text-muted-foreground">
+              Most people skip this. Your meal plan works great without it.
+            </p>
+
+            <CollapsibleContent className="space-y-3 md:space-y-4">
+              {/* Primary Goal */}
+              <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+                <Label className="font-medium mb-2 md:mb-3 block">What's your primary goal?</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'none', label: 'No specific goal', desc: 'General balanced eating' },
+                    { value: 'weight_loss', label: 'Weight loss', desc: 'Calorie-conscious meals' },
+                    { value: 'muscle_gain', label: 'Muscle gain', desc: 'High protein focus' },
+                    { value: 'balanced', label: 'Balanced macros', desc: 'Even macro distribution' },
+                  ].map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      onClick={() => updateSettings({
+                        nutritionGoals: { ...nutritionGoals, primaryGoal: value as NutritionGoal }
+                      })}
+                      className={cn(
+                        "rounded-lg border text-left transition-colors",
+                        isMobile ? "p-2" : "p-3",
+                        nutritionGoals?.primaryGoal === value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted/50 border-border/50'
+                      )}
+                    >
+                      <span className={cn("font-medium block", isMobile ? "text-xs" : "text-sm")}>{label}</span>
+                      <span className={cn(
+                        isMobile ? "text-[10px]" : "text-xs",
+                        nutritionGoals?.primaryGoal === value ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                      )}>{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Target Values - only show when a goal is selected */}
+              {nutritionGoals?.primaryGoal && nutritionGoals.primaryGoal !== 'none' && (
+                <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+                  <Label className="font-medium mb-2 md:mb-3 block">Daily targets (optional)</Label>
+                  <p className="text-xs text-muted-foreground mb-2 md:mb-3">
+                    Leave blank to let AI suggest targets based on your goal.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Calories</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 2000"
+                        value={nutritionGoals?.targetCalories || ''}
+                        onChange={(e) => updateSettings({
+                          nutritionGoals: {
+                            ...nutritionGoals,
+                            targetCalories: e.target.value ? parseInt(e.target.value) : undefined
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Protein (g)</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 100"
+                        value={nutritionGoals?.targetProtein || ''}
+                        onChange={(e) => updateSettings({
+                          nutritionGoals: {
+                            ...nutritionGoals,
+                            targetProtein: e.target.value ? parseInt(e.target.value) : undefined
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Carbs (g)</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 250"
+                        value={nutritionGoals?.targetCarbs || ''}
+                        onChange={(e) => updateSettings({
+                          nutritionGoals: {
+                            ...nutritionGoals,
+                            targetCarbs: e.target.value ? parseInt(e.target.value) : undefined
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Fat (g)</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 65"
+                        value={nutritionGoals?.targetFat || ''}
+                        onChange={(e) => updateSettings({
+                          nutritionGoals: {
+                            ...nutritionGoals,
+                            targetFat: e.target.value ? parseInt(e.target.value) : undefined
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CollapsibleContent>
+          </section>
+        </Collapsible>
       </div>
     </div>
   );

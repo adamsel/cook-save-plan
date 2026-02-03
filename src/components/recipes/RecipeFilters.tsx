@@ -138,7 +138,7 @@ export function RecipeFilters({
             className="gap-2 shrink-0"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            Filters
+            Filter
             {activeFilterCount > 0 && (
               <Badge variant="default" className="h-5 px-1.5 text-xs">
                 {activeFilterCount}

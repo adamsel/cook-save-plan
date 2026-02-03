@@ -16,28 +16,28 @@ export function MealPlanEmptyState() {
       </div>
 
       <h2 className="font-serif text-2xl md:text-3xl font-bold mb-3 animate-fade-up" style={{ animationDelay: '0.1s' }}>
-        Plan Your Perfect Week
+        Let's fill your week.
       </h2>
 
       <p className="text-muted-foreground max-w-md mb-8 text-base md:text-lg animate-fade-up" style={{ animationDelay: '0.2s' }}>
-        Drag recipes from the sidebar to start planning. We'll track nutrition and help you stay organized.
+        Tap any empty slot to add a meal. Start with dinners—we'll handle the rest.
       </p>
 
       {/* Feature highlights */}
       <div className="flex flex-wrap justify-center gap-4 md:gap-6 mb-10 animate-fade-up" style={{ animationDelay: '0.3s' }}>
         <FeatureHighlight
-          icon={Clock}
-          label="Track cooking time"
+          icon={ChefHat}
+          label="Leftovers handled"
           color="text-meal-breakfast"
         />
         <FeatureHighlight
           icon={ShoppingCart}
-          label="Auto shopping list"
+          label="Shopping list ready"
           color="text-meal-lunch"
         />
         <FeatureHighlight
-          icon={ChefHat}
-          label="Leftover planning"
+          icon={Clock}
+          label="Less thinking"
           color="text-meal-dinner"
         />
       </div>

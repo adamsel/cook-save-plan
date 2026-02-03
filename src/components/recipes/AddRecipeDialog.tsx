@@ -743,7 +743,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              We'll extract ingredients, instructions, and more automatically.
+              We'll extract the recipe automatically. Your recipes stay with you—we just help organize them.
             </p>
           </div>
 

@@ -137,11 +137,11 @@ export function HouseholdManagement() {
       <div className="space-y-3 md:space-y-4">
         <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
           <p className="text-sm text-muted-foreground mb-3 md:mb-4">
-            Create a household to share meal plans and recipes with family members.
+            You're planning solo right now. Want to share the load with someone?
           </p>
           <div className="flex gap-2">
             <Input
-              placeholder={isMobile ? "Household name..." : "Household name (e.g., 'The Smiths')"}
+              placeholder={isMobile ? "Name your space..." : "A name for your shared space (e.g., 'Home')"}
               value={householdName}
               onChange={(e) => setHouseholdName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateHousehold()}
@@ -153,7 +153,7 @@ export function HouseholdManagement() {
               {isCreating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                'Create'
+                'Set up sharing'
               )}
             </Button>
           </div>
@@ -181,7 +181,7 @@ export function HouseholdManagement() {
 
       {/* Members List */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Members</Label>
+        <Label className="text-sm font-medium">Planning together</Label>
         <div className="space-y-2">
           {members.map((member) => (
             <div
@@ -255,7 +255,7 @@ export function HouseholdManagement() {
       {/* Pending Invites - only visible to admins/owners */}
       {isAdmin && pendingInvites.length > 0 && (
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Pending Invites</Label>
+          <Label className="text-sm font-medium">Waiting to hear back</Label>
           <div className="space-y-2">
             {pendingInvites.map((invite) => (
               <div
@@ -307,13 +307,13 @@ export function HouseholdManagement() {
       {/* Invite Member - only for admins/owners */}
       {isAdmin && (
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Invite Member</Label>
+          <Label className="text-sm font-medium">Share with someone</Label>
           <div className={cn(
             "gap-2",
             isMobile ? "space-y-2" : "flex"
           )}>
             <Input
-              placeholder="Email address"
+              placeholder="Their email"
               type="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
@@ -326,8 +326,8 @@ export function HouseholdManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="member">Can view</SelectItem>
+                  <SelectItem value="admin">Can edit</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -343,7 +343,7 @@ export function HouseholdManagement() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            If the user doesn't have an account, they'll receive an email invitation and be added automatically when they sign up.
+            They'll get an email to join. No pressure—they can ignore it.
           </p>
         </div>
       )}
@@ -355,14 +355,14 @@ export function HouseholdManagement() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="w-full gap-2 text-destructive border-destructive/50 hover:bg-destructive/10">
                 <LogOut className="h-4 w-4" />
-                Leave Household
+                Stop sharing
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Leave household?</AlertDialogTitle>
+                <AlertDialogTitle>Stop sharing?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You will no longer have access to shared meal plans and recipes. You can be invited back later.
+                  You'll go back to planning solo. Your recipes stay with you.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -371,7 +371,7 @@ export function HouseholdManagement() {
                   onClick={leaveHousehold}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Leave
+                  Stop sharing
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -383,14 +383,14 @@ export function HouseholdManagement() {
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="w-full gap-2">
                 <Trash2 className="h-4 w-4" />
-                Delete Household
+                Remove shared space
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete household?</AlertDialogTitle>
+                <AlertDialogTitle>Remove shared space?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. All members will be removed and any shared data will be lost.
+                  This can't be undone. Everyone will go back to planning solo.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -399,7 +399,7 @@ export function HouseholdManagement() {
                   onClick={deleteHousehold}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Delete
+                  Remove
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
