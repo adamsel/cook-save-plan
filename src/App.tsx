@@ -14,7 +14,6 @@ import Dashboard from "@/pages/Dashboard";
 import RecipesPage from "@/pages/RecipesPage";
 import MealPlanPage from "@/pages/MealPlanPage";
 import ShoppingListPage from "@/pages/ShoppingListPage";
-import PantryPage from "@/pages/PantryPage";
 import SettingsPage from "@/pages/SettingsPage";
 import AuthPage from "@/pages/AuthPage";
 import TermsPage from "@/pages/TermsPage";
@@ -52,7 +51,6 @@ const App = () => {
                         <Route path="/recipes" element={<RecipesPage />} />
                         <Route path="/meal-plan" element={<MealPlanPage />} />
                         <Route path="/shopping-list" element={<ShoppingListPage />} />
-                        <Route path="/pantry" element={<PantryPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>

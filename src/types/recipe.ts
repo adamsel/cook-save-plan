@@ -157,15 +157,14 @@ export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner'] as const;
 export type MealSlot = typeof MEAL_SLOTS[number];
 
 export const DEFAULT_CATEGORIES = [
-  'Main Course',
+  'Dinner',
+  'Lunch',
   'Side Dish',
   'Appetizer',
   'Salad',
   'Soup',
-  'Breakfast',
   'Dessert',
   'Beverage',
-  'Snack',
   'Other'
 ];
 

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Calendar, ShoppingCart, Package, Settings, Plus, User, LogOut, LogIn, Library } from 'lucide-react';
+import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +13,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface NavigationProps {
   onAddRecipe: () => void;
@@ -21,12 +29,12 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
     { to: '/recipes', label: 'My Recipes', icon: UtensilsCrossed },
     { to: '/meal-plan', label: 'Meal Plan', icon: Calendar },
     { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
-    { to: '/pantry', label: 'Pantry', icon: Package },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -48,12 +56,52 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <NavLink to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
-            <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="font-serif text-xl font-semibold tracking-tight">Recipe Stash</span>
-        </NavLink>
+        <div className="flex items-center gap-2">
+          {/* Mobile hamburger menu */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon" className="mr-1">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary">
+                    <UtensilsCrossed className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  Recipe Stash
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 mt-6">
+                {navItems.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {label}
+                  </NavLink>
+                ))}
+              </nav>
+            </SheetContent>
+          </Sheet>
+
+          <NavLink to="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
+              <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <span className="font-serif text-xl font-semibold tracking-tight hidden sm:inline">Recipe Stash</span>
+          </NavLink>
+        </div>
 
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map(({ to, label, icon: Icon }) => (
@@ -126,25 +174,6 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
           )}
         </div>
       </div>
-
-      {/* Mobile navigation */}
-      <nav className="md:hidden flex items-center justify-around border-t border-border/50 py-2 px-2">
-        {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => cn(
-              "flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-              isActive 
-                ? "text-primary" 
-                : "text-muted-foreground"
-            )}
-          >
-            <Icon className="h-5 w-5" />
-            {label.split(' ')[0]}
-          </NavLink>
-        ))}
-      </nav>
     </header>
   );
 }

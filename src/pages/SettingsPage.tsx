@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
-import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
+import { useHouseholdSettings, type NutritionGoal } from '@/hooks/useHouseholdSettings';
 import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
 import { HouseholdManagement } from '@/components/settings/HouseholdManagement';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,11 @@ import {
   Home,
   Minus,
   AlertTriangle,
+  Target,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import {
   getAllDietaryRestrictions,
   getAllAllergens,
@@ -32,7 +35,7 @@ import {
 
 export default function SettingsPage() {
   const { categories, tags, pantryStaples, addCategory, addTag, updatePantryStaples } = useRecipes();
-  const { householdSize, suggestLeftoversForLunch, updateSettings, hasHousehold, canEditSettings } = useHouseholdSettings();
+  const { householdSize, suggestLeftoversForLunch, nutritionGoals, updateSettings, hasHousehold, canEditSettings } = useHouseholdSettings();
   const {
     dietaryRestrictions,
     allergens,
@@ -42,6 +45,7 @@ export default function SettingsPage() {
     hasHousehold: hasDietaryHousehold,
   } = useDietaryPreferences();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const allRestrictions = getAllDietaryRestrictions();
   const allAllergens = getAllAllergens();
@@ -55,7 +59,6 @@ export default function SettingsPage() {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
       addCategory(newCategory.trim());
       setNewCategory('');
-      toast({ title: "Category added" });
     }
   };
 
@@ -63,7 +66,6 @@ export default function SettingsPage() {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       addTag(newTag.trim());
       setNewTag('');
-      toast({ title: "Tag added" });
     }
   };
 
@@ -80,24 +82,26 @@ export default function SettingsPage() {
 
   const handleSaveStaples = () => {
     updatePantryStaples(localStaples);
-    toast({ title: "Pantry staples updated" });
   };
 
   return (
     <div className="container py-6 animate-fade-in max-w-2xl">
-      <div className="mb-8">
-        <h1 className="font-serif text-3xl font-bold mb-2">Settings</h1>
-        <p className="text-muted-foreground">
-          Customize your Recipe Stash experience
-        </p>
+      {/* Header - compact on mobile */}
+      <div className="mb-6 md:mb-8">
+        <h1 className="font-serif text-xl md:text-3xl font-bold mb-1 md:mb-2">Settings</h1>
+        {!isMobile && (
+          <p className="text-muted-foreground">
+            Customize your Recipe Stash experience
+          </p>
+        )}
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6 md:space-y-8">
         {/* Household Management */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Home className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Household</h2>
+            <Home className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Household</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             Create a household to share meal plans and shopping lists with family members.
@@ -108,10 +112,10 @@ export default function SettingsPage() {
         <Separator />
 
         {/* Household Settings */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Meal Planning</h2>
+            <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Meal Planning</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             {hasHousehold
@@ -124,15 +128,18 @@ export default function SettingsPage() {
             </p>
           )}
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+          <div className="space-y-3 md:space-y-4">
+            <div className={cn(
+              "rounded-xl bg-muted/30 border border-border/50",
+              isMobile ? "p-3 space-y-3" : "p-4 flex items-center justify-between"
+            )}>
               <div>
                 <Label className="font-medium">Household size</Label>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
                   Dinner servings will default to this number
                 </p>
               </div>
-              <div className="flex items-center gap-2 bg-background rounded-lg p-1 border">
+              <div className="flex items-center gap-2 bg-background rounded-lg p-1 border w-fit">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -155,10 +162,13 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
-              <div>
+            <div className={cn(
+              "rounded-xl bg-muted/30 border border-border/50",
+              isMobile ? "p-3 space-y-3" : "p-4 flex items-center justify-between"
+            )}>
+              <div className={cn(isMobile && "flex-1")}>
                 <Label className="font-medium">Suggest leftovers for lunch</Label>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
                   When adding dinner, suggest making extra for tomorrow's lunch
                 </p>
               </div>
@@ -173,11 +183,131 @@ export default function SettingsPage() {
 
         <Separator />
 
-        {/* Dietary Preferences */}
-        <section className="space-y-4">
+        {/* Nutrition Goals */}
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Dietary Preferences</h2>
+            <Target className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Nutrition Goals</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Set your nutrition goals to track progress in the Weekly Summary.
+          </p>
+
+          <div className="space-y-3 md:space-y-4">
+            {/* Primary Goal */}
+            <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Label className="font-medium mb-2 md:mb-3 block">What's your primary goal?</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'none', label: 'No specific goal', desc: 'General balanced eating' },
+                  { value: 'weight_loss', label: 'Weight loss', desc: 'Calorie-conscious meals' },
+                  { value: 'muscle_gain', label: 'Muscle gain', desc: 'High protein focus' },
+                  { value: 'balanced', label: 'Balanced macros', desc: 'Even macro distribution' },
+                ].map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateSettings({
+                      nutritionGoals: { ...nutritionGoals, primaryGoal: value as NutritionGoal }
+                    })}
+                    className={cn(
+                      "rounded-lg border text-left transition-colors",
+                      isMobile ? "p-2" : "p-3",
+                      nutritionGoals?.primaryGoal === value
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background hover:bg-muted/50 border-border/50'
+                    )}
+                  >
+                    <span className={cn("font-medium block", isMobile ? "text-xs" : "text-sm")}>{label}</span>
+                    <span className={cn(
+                      isMobile ? "text-[10px]" : "text-xs",
+                      nutritionGoals?.primaryGoal === value ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                    )}>{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Values - only show when a goal is selected */}
+            {nutritionGoals?.primaryGoal && nutritionGoals.primaryGoal !== 'none' && (
+              <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+                <Label className="font-medium mb-2 md:mb-3 block">Daily targets (optional)</Label>
+                <p className="text-xs text-muted-foreground mb-2 md:mb-3">
+                  Leave blank to let AI suggest targets based on your goal.
+                </p>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Calories</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 2000"
+                      value={nutritionGoals?.targetCalories || ''}
+                      onChange={(e) => updateSettings({
+                        nutritionGoals: {
+                          ...nutritionGoals,
+                          targetCalories: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Protein (g)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 100"
+                      value={nutritionGoals?.targetProtein || ''}
+                      onChange={(e) => updateSettings({
+                        nutritionGoals: {
+                          ...nutritionGoals,
+                          targetProtein: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Carbs (g)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 250"
+                      value={nutritionGoals?.targetCarbs || ''}
+                      onChange={(e) => updateSettings({
+                        nutritionGoals: {
+                          ...nutritionGoals,
+                          targetCarbs: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Fat (g)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 65"
+                      value={nutritionGoals?.targetFat || ''}
+                      onChange={(e) => updateSettings({
+                        nutritionGoals: {
+                          ...nutritionGoals,
+                          targetFat: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* Dietary Preferences */}
+        <section className="space-y-3 md:space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Dietary Preferences</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             Set dietary restrictions and allergens to see warnings in your shopping list.
@@ -189,11 +319,11 @@ export default function SettingsPage() {
             </p>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {/* Dietary Restrictions */}
-            <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-              <Label className="font-medium mb-3 block">Dietary Restrictions</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Label className="font-medium mb-2 md:mb-3 block">Dietary Restrictions</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3">
                 {allRestrictions.map(({ value, label }) => (
                   <div key={value} className="flex items-center space-x-2">
                     <Checkbox
@@ -204,7 +334,7 @@ export default function SettingsPage() {
                     />
                     <label
                       htmlFor={`restriction-${value}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      className="text-xs md:text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
                       {label}
                     </label>
@@ -214,9 +344,9 @@ export default function SettingsPage() {
             </div>
 
             {/* Allergens */}
-            <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-              <Label className="font-medium mb-3 block">Allergens to Avoid</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Label className="font-medium mb-2 md:mb-3 block">Allergens to Avoid</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3">
                 {allAllergens.map(({ value, label }) => (
                   <div key={value} className="flex items-center space-x-2">
                     <Checkbox
@@ -227,7 +357,7 @@ export default function SettingsPage() {
                     />
                     <label
                       htmlFor={`allergen-${value}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      className="text-xs md:text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
                       {label}
                     </label>
@@ -241,17 +371,17 @@ export default function SettingsPage() {
         <Separator />
 
         {/* Categories */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Tags className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Categories</h2>
+            <Tags className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Categories</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             Categories help organize your recipes into meal types.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
             {categories.map(category => (
-              <Badge key={category} variant="secondary">
+              <Badge key={category} variant="secondary" className={cn(isMobile && "text-xs")}>
                 {category}
               </Badge>
             ))}
@@ -272,17 +402,17 @@ export default function SettingsPage() {
         <Separator />
 
         {/* Tags */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Tags className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Tags</h2>
+            <Tags className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Tags</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             Tags provide additional ways to filter and find recipes.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
             {tags.map(tag => (
-              <Badge key={tag} variant="outline">
+              <Badge key={tag} variant="outline" className={cn(isMobile && "text-xs")}>
                 {tag}
               </Badge>
             ))}
@@ -303,17 +433,17 @@ export default function SettingsPage() {
         <Separator />
 
         {/* Pantry Staples */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">Pantry Staples</h2>
+            <Package className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Pantry Staples</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             These items can be excluded from your shopping list. Common items you always have on hand.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
             {localStaples.map(staple => (
-              <Badge key={staple} variant="secondary" className="gap-1 pr-1">
+              <Badge key={staple} variant="secondary" className={cn("gap-1 pr-1", isMobile && "text-xs")}>
                 {staple}
                 <button
                   onClick={() => handleRemoveStaple(staple)}
@@ -335,7 +465,7 @@ export default function SettingsPage() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={handleSaveStaples} className="gap-2">
+          <Button onClick={handleSaveStaples} className="gap-2" size={isMobile ? "sm" : "default"}>
             <Save className="h-4 w-4" />
             Save Pantry Staples
           </Button>
@@ -344,16 +474,16 @@ export default function SettingsPage() {
         <Separator />
 
         {/* About */}
-        <section className="space-y-4">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl font-semibold">About Recipe Stash</h2>
+            <Settings className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">About Recipe Stash</h2>
           </div>
-          <div className="rounded-xl bg-muted/50 p-4 space-y-2">
+          <div className="rounded-xl bg-muted/50 p-3 md:p-4 space-y-2">
             <p className="text-sm">
               <strong>Recipe Stash</strong> helps you save recipes, plan meals, and generate shopping lists effortlessly.
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               Version 1.0.0 • Built with love for home cooks
             </p>
           </div>

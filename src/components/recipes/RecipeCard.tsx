@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -36,6 +37,8 @@ export function RecipeCard({
   isLibraryRecipe = false,
   onCopyToPersonal,
 }: RecipeCardProps) {
+  const isMobile = useIsMobile();
+
   return (
     <div
       className={cn(
@@ -50,7 +53,10 @@ export function RecipeCard({
       }}
     >
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      <div className={cn(
+        "relative overflow-hidden bg-muted",
+        isMobile ? "aspect-[4/3]" : "aspect-[4/3]"
+      )}>
         {recipe.imageUrl ? (
           <img
             src={recipe.imageUrl}
@@ -59,10 +65,10 @@ export function RecipeCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-secondary">
-            <span className="text-4xl">🍳</span>
+            <span className={cn(isMobile ? "text-2xl" : "text-4xl")}>🍳</span>
           </div>
         )}
-        
+
         {/* Favorite button - only show for personal recipes */}
         {!isLibraryRecipe && (
           <button
@@ -71,13 +77,17 @@ export function RecipeCard({
               onToggleFavorite(recipe.id);
             }}
             className={cn(
-              "absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all",
-              recipe.isFavorite 
-                ? "bg-accent text-accent-foreground" 
+              "absolute rounded-full backdrop-blur-sm transition-all",
+              isMobile ? "top-2 right-2 p-1.5" : "top-3 right-3 p-2",
+              recipe.isFavorite
+                ? "bg-accent text-accent-foreground"
                 : "bg-background/80 text-muted-foreground hover:text-accent"
             )}
           >
-            <Heart className={cn("h-4 w-4", recipe.isFavorite && "fill-current")} />
+            <Heart className={cn(
+              recipe.isFavorite && "fill-current",
+              isMobile ? "h-3.5 w-3.5" : "h-4 w-4"
+            )} />
           </button>
         )}
 
@@ -88,24 +98,40 @@ export function RecipeCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-3 left-3 p-2 rounded-full bg-background/80 text-muted-foreground hover:text-foreground backdrop-blur-sm transition-all"
+            className={cn(
+              "absolute rounded-full bg-background/80 text-muted-foreground hover:text-foreground backdrop-blur-sm transition-all",
+              isMobile ? "top-2 left-2 p-1.5" : "top-3 left-3 p-2"
+            )}
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
           </a>
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-serif text-lg font-semibold leading-tight line-clamp-2">
+      {/* Content - compact on mobile */}
+      <div className={cn(
+        "flex flex-col",
+        isMobile ? "p-2.5 h-[100px]" : "p-4 h-[140px]"
+      )}>
+        <div className="flex items-start justify-between gap-1.5 mb-1.5">
+          <h3 className={cn(
+            "font-serif font-semibold leading-tight line-clamp-2",
+            isMobile ? "text-sm min-h-[2.5rem]" : "text-lg min-h-[3.5rem]"
+          )}>
             {recipe.title}
           </h3>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={cn(
+                  "shrink-0 transition-opacity",
+                  isMobile ? "opacity-100 h-7 w-7" : "opacity-0 group-hover:opacity-100"
+                )}
+              >
+                <MoreHorizontal className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -116,7 +142,7 @@ export function RecipeCard({
                 <Calendar className="h-4 w-4 mr-2" />
                 Add to Meal Plan
               </DropdownMenuItem>
-              
+
               {isLibraryRecipe && onCopyToPersonal && (
                 <DropdownMenuItem onClick={(e) => {
                   e.stopPropagation();
@@ -126,7 +152,7 @@ export function RecipeCard({
                   Copy to My Recipes
                 </DropdownMenuItem>
               )}
-              
+
               {!isLibraryRecipe && (
                 <>
                   <DropdownMenuItem onClick={(e) => {
@@ -144,7 +170,7 @@ export function RecipeCard({
                     {recipe.isArchived ? 'Unarchive' : 'Archive'}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
                       onDelete(recipe.id);
@@ -161,47 +187,52 @@ export function RecipeCard({
         </div>
 
         {/* Meta info */}
-        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
+        <div className={cn(
+          "flex items-center text-muted-foreground",
+          isMobile ? "gap-2 text-xs mb-1.5" : "gap-3 text-sm mb-3"
+        )}>
           {recipe.totalTime && (
             <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
+              <Clock className={cn(isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
               {recipe.totalTime}m
             </span>
           )}
           <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
+            <Users className={cn(isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
             {recipe.servings}
           </span>
         </div>
 
-        {/* Tags */}
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary" className="text-xs">
-            {recipe.category}
+        {/* Meal type and tags - limit on mobile */}
+        <div className="flex flex-wrap gap-1 mt-auto">
+          <Badge variant="secondary" className={cn(isMobile ? "text-[10px] px-1.5 py-0" : "text-xs")}>
+            {recipe.mealTypes?.[0] || recipe.category}
           </Badge>
-          {recipe.tags.slice(0, 2).map(tag => (
-            <Badge key={tag} variant="outline" className="text-xs">
+          {recipe.tags.slice(0, isMobile ? 1 : 2).map(tag => (
+            <Badge key={tag} variant="outline" className={cn(isMobile ? "text-[10px] px-1.5 py-0" : "text-xs")}>
               {tag}
             </Badge>
           ))}
         </div>
       </div>
 
-      {/* Quick add to meal plan button (visible on hover) */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pt-8 bg-gradient-to-t from-card via-card to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button 
-          variant="default" 
-          size="sm" 
-          className="w-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToMealPlan(recipe);
-          }}
-        >
-          <Calendar className="h-4 w-4 mr-2" />
-          Add to Meal Plan
-        </Button>
-      </div>
+      {/* Quick add to meal plan button (visible on hover) - hidden on mobile */}
+      {!isMobile && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 pt-8 bg-gradient-to-t from-card via-card to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToMealPlan(recipe);
+            }}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Add to Meal Plan
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

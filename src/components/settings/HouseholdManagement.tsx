@@ -39,10 +39,13 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export function HouseholdManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const {
     household,
     members,
@@ -131,14 +134,14 @@ export function HouseholdManagement() {
   // No household - show creation UI
   if (!hasHousehold) {
     return (
-      <div className="space-y-4">
-        <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-          <p className="text-sm text-muted-foreground mb-4">
+      <div className="space-y-3 md:space-y-4">
+        <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+          <p className="text-sm text-muted-foreground mb-3 md:mb-4">
             Create a household to share meal plans and recipes with family members.
           </p>
           <div className="flex gap-2">
             <Input
-              placeholder="Household name (e.g., 'The Smiths')"
+              placeholder={isMobile ? "Household name..." : "Household name (e.g., 'The Smiths')"}
               value={householdName}
               onChange={(e) => setHouseholdName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateHousehold()}
@@ -161,11 +164,14 @@ export function HouseholdManagement() {
 
   // Has household - show management UI
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {/* Household Info */}
-      <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-lg">{household?.name}</h3>
+      <div className="p-3 md:p-4 rounded-xl bg-muted/30 border border-border/50">
+        <div className={cn(
+          "mb-2",
+          isMobile ? "space-y-1.5" : "flex items-center justify-between"
+        )}>
+          <h3 className={cn("font-semibold", isMobile ? "text-base" : "text-lg")}>{household?.name}</h3>
           {getRoleBadge(userRole!)}
         </div>
         <p className="text-sm text-muted-foreground">
@@ -180,29 +186,35 @@ export function HouseholdManagement() {
           {members.map((member) => (
             <div
               key={member.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-background border"
+              className={cn(
+                "rounded-lg bg-background border",
+                isMobile ? "p-2 space-y-2" : "p-3 flex items-center justify-between"
+              )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
                 {getRoleIcon(member.role)}
-                <div>
-                  <p className="font-medium">
+                <div className="min-w-0 flex-1">
+                  <p className={cn("font-medium truncate", isMobile && "text-sm")}>
                     {member.profiles?.display_name || member.profiles?.email || 'Unknown User'}
                     {member.user_id === user.id && (
-                      <span className="text-muted-foreground ml-2">(you)</span>
+                      <span className="text-muted-foreground ml-1 md:ml-2">(you)</span>
                     )}
                   </p>
                   {member.profiles?.email && member.profiles?.display_name && (
-                    <p className="text-xs text-muted-foreground">{member.profiles.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{member.profiles.email}</p>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className={cn(
+                "flex items-center gap-2",
+                isMobile && "justify-between"
+              )}>
                 {getRoleBadge(member.role)}
                 {/* Remove button - owners/admins can remove others (except owner), members can remove themselves */}
                 {member.role !== 'owner' && (isAdmin || member.user_id === user.id) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-destructive shrink-0">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -248,23 +260,29 @@ export function HouseholdManagement() {
             {pendingInvites.map((invite) => (
               <div
                 key={invite.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-dashed"
+                className={cn(
+                  "rounded-lg bg-muted/50 border border-dashed",
+                  isMobile ? "p-2 space-y-2" : "p-3 flex items-center justify-between"
+                )}
               >
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{invite.email}</p>
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className={cn("font-medium truncate", isMobile && "text-sm")}>{invite.email}</p>
                     <p className="text-xs text-muted-foreground">
                       Invited {formatDistanceToNow(new Date(invite.invited_at))} ago
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">{invite.role}</Badge>
+                <div className={cn(
+                  "flex items-center gap-1.5 md:gap-2",
+                  isMobile && "justify-between"
+                )}>
+                  <Badge variant="outline" className={cn("capitalize", isMobile && "text-xs")}>{invite.role}</Badge>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-7 w-7 md:h-8 md:w-8"
                     onClick={() => resendInvite(invite.id)}
                     title="Resend invitation"
                   >
@@ -273,7 +291,7 @@ export function HouseholdManagement() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive"
+                    className="h-7 w-7 md:h-8 md:w-8 text-destructive"
                     onClick={() => cancelPendingInvite(invite.id)}
                     title="Cancel invitation"
                   >
@@ -290,34 +308,39 @@ export function HouseholdManagement() {
       {isAdmin && (
         <div className="space-y-2">
           <Label className="text-sm font-medium">Invite Member</Label>
-          <div className="flex gap-2">
+          <div className={cn(
+            "gap-2",
+            isMobile ? "space-y-2" : "flex"
+          )}>
             <Input
               placeholder="Email address"
               type="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleInviteMember()}
-              className="flex-1"
+              className={cn(!isMobile && "flex-1")}
             />
-            <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as HouseholdRole)}>
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={handleInviteMember}
-              disabled={!inviteEmail.trim() || isInviting}
-            >
-              {isInviting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <UserPlus className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as HouseholdRole)}>
+                <SelectTrigger className={cn(isMobile ? "flex-1" : "w-28")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleInviteMember}
+                disabled={!inviteEmail.trim() || isInviting}
+              >
+                {isInviting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             If the user doesn't have an account, they'll receive an email invitation and be added automatically when they sign up.

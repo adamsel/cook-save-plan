@@ -149,14 +149,11 @@ export function RecipeDetailDialog({
               )}
             </div>
 
-            {/* Tags */}
+            {/* Meal type and tags */}
             <div className="flex flex-wrap gap-2 mb-6">
-              <Badge variant="secondary">{recipe.category}</Badge>
+              <Badge variant="secondary">{recipe.mealTypes?.[0] || recipe.category}</Badge>
               {recipe.tags.map(tag => (
                 <Badge key={tag} variant="outline">{tag}</Badge>
-              ))}
-              {recipe.mealTypes?.map(meal => (
-                <Badge key={meal} variant="outline" className="bg-accent/10">{meal}</Badge>
               ))}
             </div>
 

@@ -1,4 +1,5 @@
-import { Search, Filter, X, Heart, Clock, ChevronDown, SortAsc, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Filter, X, Heart, Clock, ChevronDown, SortAsc, AlertCircle, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,8 @@ import {
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileFilterSheet } from './MobileFilterSheet';
 
 export type SortOption = 'recent' | 'oldest' | 'favorites' | 'prep-time' | 'title';
 
@@ -61,6 +64,9 @@ export function RecipeFilters({
   missingCategoryCount = 0,
   hidePersonalFilters = false,
 }: RecipeFiltersProps) {
+  const isMobile = useIsMobile();
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+
   const toggleCategory = (category: string) => {
     onCategoriesChange(
       selectedCategories.includes(category)
@@ -102,6 +108,129 @@ export function RecipeFilters({
     'title': 'Title A-Z',
   };
 
+  // Count active filters for badge
+  const activeFilterCount =
+    (sortBy !== 'recent' ? 1 : 0) +
+    selectedCategories.length +
+    selectedTags.length +
+    (timeFilter !== 'all' ? 1 : 0) +
+    (showFavoritesOnly ? 1 : 0) +
+    (showMissingCategory ? 1 : 0);
+
+  // Mobile view: search + filter button
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        {/* Search + Filter button */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search recipes..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button
+            variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+            onClick={() => setShowFilterSheet(true)}
+            className="gap-2 shrink-0"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="default" className="h-5 px-1.5 text-xs">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        {/* Active filter badges (removable) */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2">
+            {selectedCategories.map(cat => (
+              <Badge
+                key={cat}
+                variant="secondary"
+                className="gap-1 pr-1 cursor-pointer"
+                onClick={() => toggleCategory(cat)}
+              >
+                {cat}
+                <X className="h-3 w-3" />
+              </Badge>
+            ))}
+            {selectedTags.map(tag => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="gap-1 pr-1 cursor-pointer"
+                onClick={() => toggleTag(tag)}
+              >
+                {tag}
+                <X className="h-3 w-3" />
+              </Badge>
+            ))}
+            {timeFilter !== 'all' && (
+              <Badge
+                variant="secondary"
+                className="gap-1 pr-1 cursor-pointer"
+                onClick={() => onTimeFilterChange('all')}
+              >
+                {timeFilter === 'quick' ? '< 30min' : timeFilter === 'medium' ? '30-60min' : '> 60min'}
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {showFavoritesOnly && (
+              <Badge
+                variant="secondary"
+                className="gap-1 pr-1 cursor-pointer"
+                onClick={() => onFavoritesChange(false)}
+              >
+                Favorites
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {(selectedCategories.length > 0 || selectedTags.length > 0 || timeFilter !== 'all' || showFavoritesOnly) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-6 px-2 text-xs text-muted-foreground"
+              >
+                Clear all
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Mobile Filter Sheet */}
+        <MobileFilterSheet
+          open={showFilterSheet}
+          onOpenChange={setShowFilterSheet}
+          sortBy={sortBy}
+          onSortChange={onSortChange}
+          selectedCategories={selectedCategories}
+          onCategoriesChange={onCategoriesChange}
+          categories={categories}
+          timeFilter={timeFilter}
+          onTimeFilterChange={onTimeFilterChange}
+          selectedTags={selectedTags}
+          onTagsChange={onTagsChange}
+          tags={tags}
+          showFavoritesOnly={showFavoritesOnly}
+          onFavoritesChange={onFavoritesChange}
+          showMissingCategory={showMissingCategory}
+          onMissingCategoryChange={onMissingCategoryChange}
+          missingCategoryCount={missingCategoryCount}
+          hidePersonalFilters={hidePersonalFilters}
+        />
+      </div>
+    );
+  }
+
+  // Desktop view: full filter UI
   return (
     <div className="space-y-4">
       {/* Search and main filters */}
@@ -171,8 +300,8 @@ export function RecipeFilters({
           {/* Time filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant={timeFilter !== 'all' ? 'secondary' : 'outline'} 
+              <Button
+                variant={timeFilter !== 'all' ? 'secondary' : 'outline'}
                 className="gap-2"
               >
                 <Clock className="h-4 w-4" />

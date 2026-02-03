@@ -62,7 +62,7 @@ async function processItemBatch(
   const userPrompt = `Please clean up and consolidate this shopping list:\n\n${itemsList}`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -78,7 +78,9 @@ async function processItemBatch(
   );
 
   if (!response.ok) {
-    throw new Error(`AI API error: ${response.status}`);
+    const errorBody = await response.text();
+    console.error(`AI API error: ${response.status}`, errorBody);
+    throw new Error(`AI API error: ${response.status} - ${errorBody.slice(0, 200)}`);
   }
 
   const data = await response.json();

@@ -36,6 +36,7 @@ import { DayListView } from '@/components/recipes/DayListView';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
+import { MobileRecipePickerSheet } from '@/components/recipes/MobileRecipePickerSheet';
 import { WeeklySummary } from '@/components/recipes/WeeklySummary';
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { MealCard } from '@/components/recipes/MealCard';
@@ -77,7 +78,7 @@ export default function MealPlanPage() {
     deleteRecipe
   } = useRecipes();
   const { toast } = useToast();
-  const { householdSize } = useHouseholdSettings();
+  const { householdSize, nutritionGoals } = useHouseholdSettings();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
@@ -104,6 +105,9 @@ export default function MealPlanPage() {
 
   // Side panel editing state - store ID instead of copy for real-time updates
   const [editingItemId, setEditingItemId] = useState<{ itemId: string; recipe: Recipe } | null>(null);
+
+  // Mobile recipe picker sheet state
+  const [pickerSlot, setPickerSlot] = useState<{ day: DayOfWeek; slot: MealSlot } | null>(null);
 
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
@@ -181,11 +185,12 @@ export default function MealPlanPage() {
           targetDay = customPos.day as DayOfWeek;
           targetSlot = customPos.slot;
         } else {
-          // Default: next day's lunch
+          // Default: next day, with slot based on source meal type
           const targetDayIndex = dayIndex + 1 + i;
           if (targetDayIndex >= DAYS_OF_WEEK.length) continue; // Skip if beyond the week
           targetDay = DAYS_OF_WEEK[targetDayIndex];
-          targetSlot = 'lunch';
+          // Dinner leftovers go to lunch (common household pattern), others stay in same slot
+          targetSlot = item.mealSlot === 'dinner' ? 'lunch' : item.mealSlot;
         }
 
         const key = `${targetDay}-${targetSlot}`;
@@ -215,6 +220,90 @@ export default function MealPlanPage() {
 
     return map;
   }, [selectedWeekPlan, recipes]);
+
+  // Calculate weekly nutrition for AI insights
+  const weeklyNutrition = useMemo(() => {
+    const dailyNutrition: Record<string, { calories: number; protein: number; carbs: number; fat: number }> = {};
+    let totalMeals = 0;
+    let daysPlanned = 0;
+    const daysWithMeals = new Set<string>();
+
+    DAYS_OF_WEEK.forEach(day => {
+      dailyNutrition[day] = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    });
+
+    selectedWeekPlan.items.forEach(item => {
+      const recipe = recipes.find(r => r.id === item.recipeId);
+      if (!recipe?.nutrition) return;
+
+      daysWithMeals.add(item.day);
+      totalMeals++;
+
+      const leftoverCount = item.leftoverMeals || 0;
+      const totalMealsForRecipe = 1 + leftoverCount;
+      const multiplier = item.servingsMultiplier;
+
+      const sessionCalories = recipe.nutrition.perServing.calories * recipe.servings * multiplier;
+      const sessionProtein = recipe.nutrition.perServing.protein * recipe.servings * multiplier;
+      const sessionCarbs = recipe.nutrition.perServing.carbs * recipe.servings * multiplier;
+      const sessionFat = recipe.nutrition.perServing.fat * recipe.servings * multiplier;
+
+      const caloriesPerMeal = sessionCalories / totalMealsForRecipe;
+      const proteinPerMeal = sessionProtein / totalMealsForRecipe;
+      const carbsPerMeal = sessionCarbs / totalMealsForRecipe;
+      const fatPerMeal = sessionFat / totalMealsForRecipe;
+
+      const eaters = item.eventType && item.guestCount ? item.guestCount : householdSize;
+
+      if (dailyNutrition[item.day]) {
+        dailyNutrition[item.day].calories += caloriesPerMeal / eaters;
+        dailyNutrition[item.day].protein += proteinPerMeal / eaters;
+        dailyNutrition[item.day].carbs += carbsPerMeal / eaters;
+        dailyNutrition[item.day].fat += fatPerMeal / eaters;
+      }
+
+      // Add leftover days too
+      const dayIndex = DAYS_OF_WEEK.indexOf(item.day as typeof DAYS_OF_WEEK[number]);
+      for (let i = 0; i < leftoverCount; i++) {
+        const targetDayIndex = dayIndex + 1 + i;
+        if (targetDayIndex < DAYS_OF_WEEK.length) {
+          const targetDay = DAYS_OF_WEEK[targetDayIndex];
+          daysWithMeals.add(targetDay);
+          if (dailyNutrition[targetDay]) {
+            dailyNutrition[targetDay].calories += caloriesPerMeal / householdSize;
+            dailyNutrition[targetDay].protein += proteinPerMeal / householdSize;
+            dailyNutrition[targetDay].carbs += carbsPerMeal / householdSize;
+            dailyNutrition[targetDay].fat += fatPerMeal / householdSize;
+          }
+        }
+      }
+    });
+
+    daysPlanned = daysWithMeals.size;
+
+    // Calculate averages
+    const avgDailyCalories = daysPlanned > 0
+      ? DAYS_OF_WEEK.reduce((sum, day) => sum + dailyNutrition[day].calories, 0) / daysPlanned
+      : 0;
+    const avgDailyProtein = daysPlanned > 0
+      ? DAYS_OF_WEEK.reduce((sum, day) => sum + dailyNutrition[day].protein, 0) / daysPlanned
+      : 0;
+    const avgDailyCarbs = daysPlanned > 0
+      ? DAYS_OF_WEEK.reduce((sum, day) => sum + dailyNutrition[day].carbs, 0) / daysPlanned
+      : 0;
+    const avgDailyFat = daysPlanned > 0
+      ? DAYS_OF_WEEK.reduce((sum, day) => sum + dailyNutrition[day].fat, 0) / daysPlanned
+      : 0;
+
+    return {
+      avgDailyCalories,
+      avgDailyProtein,
+      avgDailyCarbs,
+      avgDailyFat,
+      totalMeals,
+      daysPlanned,
+    };
+  }, [selectedWeekPlan.items, recipes, householdSize]);
 
   const filteredRecipes = useMemo(() => {
     let filtered = recipes.filter(r => !r.isArchived);
@@ -273,13 +362,6 @@ export default function MealPlanPage() {
       const leftoverIndex = leftoverIndexStr ? parseInt(leftoverIndexStr, 10) : 0;
       try {
         await updateLeftoverPosition(sourceItemId, leftoverIndex, day, slot);
-        const recipe = recipes.find(r => r.id === recipeId);
-        if (recipe) {
-          toast({
-            title: "Leftover moved",
-            description: `${recipe.title} → ${day} ${slot}`,
-          });
-        }
       } catch (err) {
         console.error('Failed to update leftover position:', err);
         toast({
@@ -292,13 +374,6 @@ export default function MealPlanPage() {
     // Moving an existing meal plan item
     else if (itemId && draggingItem) {
       updateMealPlanItem(itemId, { day, mealSlot: slot });
-      const recipe = recipes.find(r => r.id === draggingItem.recipeId);
-      if (recipe) {
-        toast({
-          title: "Moved",
-          description: `${recipe.title} → ${day} ${slot}`,
-        });
-      }
     }
     // Adding a new recipe - auto-set servings and leftovers based on household size
     else if (recipeId) {
@@ -316,22 +391,12 @@ export default function MealPlanPage() {
           if (multiplier !== 1) {
             updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
           }
-          toast({
-            title: "Added",
-            description: `${recipe.title} scaled to ${householdSize} servings`,
-          });
         } else {
           // Recipe makes more than one meal - auto-suggest leftovers
           const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
           updateMealPlanItem(result.id, {
             servingsMultiplier: 1, // Cook full recipe as written
             leftoverMeals: suggestedLeftovers,
-          });
-          toast({
-            title: "Added",
-            description: suggestedLeftovers > 0
-              ? `${recipe.title} + ${suggestedLeftovers} leftover${suggestedLeftovers > 1 ? 's' : ''}`
-              : `${recipe.title} added`,
           });
         }
       }
@@ -462,13 +527,13 @@ export default function MealPlanPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {/* View mode toggle */}
-              <div className="flex items-center rounded-lg border border-border/50 p-0.5">
+              {/* View mode toggle - hidden on mobile (auto uses list view) */}
+              <div className="hidden md:flex items-center rounded-lg border border-border/50 p-0.5">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="h-7 px-2"
+                  className="h-8 px-2"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -476,14 +541,14 @@ export default function MealPlanPage() {
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
-                  className="h-7 px-2"
+                  className="h-8 px-2"
                 >
                   <List className="h-4 w-4" />
                 </Button>
               </div>
 
               <Button
-                variant={showRecipePanel ? 'outline' : 'default'}
+                variant={showRecipePanel ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowRecipePanel(!showRecipePanel)}
                 className="gap-2"
@@ -580,41 +645,45 @@ export default function MealPlanPage() {
                 />
               </div>
 
-              {/* Quick Filters */}
-              <div className="flex flex-wrap gap-2">
-                {quickFilters.map(filter => (
-                  <Button
-                    key={filter.id}
-                    variant={activeFilter === filter.id ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setActiveFilter(filter.id);
-                      setSelectedCategory(null);
-                    }}
-                    className="text-xs"
-                  >
-                    <filter.icon className="h-3 w-3 mr-1" />
-                    {filter.label}
-                  </Button>
-                ))}
-              </div>
+              {/* Quick Filters - Hidden on mobile to reduce clutter */}
+              {!isMobile && (
+                <div className="flex flex-wrap gap-2">
+                  {quickFilters.map(filter => (
+                    <Button
+                      key={filter.id}
+                      variant={activeFilter === filter.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setActiveFilter(filter.id);
+                        setSelectedCategory(null);
+                      }}
+                      className="text-xs"
+                    >
+                      <filter.icon className="h-3 w-3 mr-1" />
+                      {filter.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
 
-              {/* Category Filter */}
-              <div className="flex flex-wrap gap-1.5">
-                {categories.slice(0, 6).map(category => (
-                  <Badge
-                    key={category}
-                    variant={selectedCategory === category ? 'default' : 'outline'}
-                    className="cursor-pointer text-xs"
-                    onClick={() => {
-                      setActiveFilter('category');
-                      setSelectedCategory(selectedCategory === category ? null : category);
-                    }}
-                  >
-                    {category}
-                  </Badge>
-                ))}
-              </div>
+              {/* Category Filter - Hidden on mobile to reduce clutter */}
+              {!isMobile && (
+                <div className="flex flex-wrap gap-1.5">
+                  {categories.slice(0, 6).map(category => (
+                    <Badge
+                      key={category}
+                      variant={selectedCategory === category ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => {
+                        setActiveFilter('category');
+                        setSelectedCategory(selectedCategory === category ? null : category);
+                      }}
+                    >
+                      {category}
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
               {/* Recipe List */}
               <ScrollArea className="h-[calc(100vh-420px)]">
@@ -703,9 +772,7 @@ export default function MealPlanPage() {
               <div className="min-w-[700px]">
                 {/* Empty state when no meals planned */}
                 {selectedWeekPlan.items.length === 0 && (
-                  <MealPlanEmptyState
-                    onBrowseRecipes={() => setShowRecipePanel(true)}
-                  />
+                  <MealPlanEmptyState />
                 )}
 
                 {/* Day Headers - Hero treatment for today */}
@@ -838,22 +905,33 @@ export default function MealPlanPage() {
                 ))}
               </div>
             ) : (
-              <DayListView
-                selectedDay={selectedDay}
-                onDayChange={setSelectedDay}
-                weekStartDate={selectedWeekStart}
-                displayItemsMap={displayItemsMap}
-                householdSize={householdSize}
-                canEdit={canEdit}
-                draggingItem={draggingItem}
-                dragOverSlot={dragOverSlot}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDragStart={handleMealItemDragStart}
-                onDragEnd={handleMealItemDragEnd}
-                onCardClick={handleCardClick}
-              />
+              <>
+                {/* DayListView with accordion mode on mobile (shows all days) */}
+                <DayListView
+                  selectedDay={selectedDay}
+                  onDayChange={setSelectedDay}
+                  weekStartDate={selectedWeekStart}
+                  displayItemsMap={displayItemsMap}
+                  householdSize={householdSize}
+                  canEdit={canEdit}
+                  draggingItem={draggingItem}
+                  dragOverSlot={dragOverSlot}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDragStart={handleMealItemDragStart}
+                  onDragEnd={handleMealItemDragEnd}
+                  onCardClick={handleCardClick}
+                  onAddMealClick={(day, slot) => {
+                    if (isMobile) {
+                      setPickerSlot({ day, slot });
+                    } else {
+                      setShowRecipePanel(true);
+                    }
+                  }}
+                  accordionMode={isMobile}
+                />
+              </>
             )}
 
             {/* Weekly Summary Panel */}
@@ -875,6 +953,8 @@ export default function MealPlanPage() {
           open={!!selectedRecipeForPlan}
           onOpenChange={() => setSelectedRecipeForPlan(null)}
           recipe={selectedRecipeForPlan}
+          displayItemsMap={displayItemsMap}
+          weekStartDate={selectedWeekStart}
         />
 
         {/* Recipe detail dialog */}
@@ -911,6 +991,43 @@ export default function MealPlanPage() {
             setSelectedRecipeForView(recipe);
           }}
         />
+
+        {/* Mobile recipe picker sheet - for adding meals from empty slots */}
+        <MobileRecipePickerSheet
+          open={!!pickerSlot}
+          onOpenChange={(open) => !open && setPickerSlot(null)}
+          recipes={recipes}
+          day={pickerSlot?.day || null}
+          slot={pickerSlot?.slot || null}
+          onSelectRecipe={async (recipe, day, slot) => {
+            const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+            const result = await addToMealPlan(recipe.id, day, slot, weekStartStr);
+
+            // Auto-adjust servings and leftovers based on household size
+            if (result && recipe.servings > 0) {
+              const mealsFromRecipe = recipe.servings / householdSize;
+
+              if (mealsFromRecipe <= 1) {
+                const multiplier = householdSize / recipe.servings;
+                if (multiplier !== 1) {
+                  await updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+                }
+              } else {
+                const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
+                await updateMealPlanItem(result.id, {
+                  servingsMultiplier: 1,
+                  leftoverMeals: suggestedLeftovers,
+                });
+              }
+            }
+
+            toast({
+              title: "Added to meal plan",
+              description: `${recipe.title} added to ${day} ${slot}`,
+            });
+          }}
+        />
+
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
-// Use Resend's test domain until you verify your own domain
-// Test domain only sends to your verified Resend email address
-// To use your own domain: verify it at https://resend.com/domains
-const DEFAULT_FROM_EMAIL = 'Recipe Stash <onboarding@resend.dev>';
+// For testing: Using Resend test domain (only sends to verified recipients)
+// For production: Replace with your verified domain (e.g., invites@recipestash.app)
+// Verify domain at https://resend.com/domains
+const DEFAULT_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'Recipe Stash <onboarding@resend.dev>';
 
 interface EmailOptions {
   to: string;
@@ -12,10 +12,15 @@ interface EmailOptions {
   from?: string;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
+interface SendEmailResult {
+  success: boolean;
+  error?: string;
+}
+
+export async function sendEmail(options: EmailOptions): Promise<SendEmailResult> {
   if (!RESEND_API_KEY) {
     console.error('RESEND_API_KEY not configured');
-    return false;
+    return { success: false, error: 'RESEND_API_KEY not configured' };
   }
 
   const fromEmail = options.from || DEFAULT_FROM_EMAIL;
@@ -40,14 +45,15 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const responseData = await response.json();
 
     if (!response.ok) {
-      console.error('Resend API error:', JSON.stringify(responseData));
-      return false;
+      const errorMsg = responseData.message || responseData.error || JSON.stringify(responseData);
+      console.error('Resend API error:', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     console.log('Email sent successfully:', JSON.stringify(responseData));
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('Email send error:', error);
-    return false;
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }

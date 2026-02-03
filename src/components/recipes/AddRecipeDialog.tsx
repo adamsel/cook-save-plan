@@ -109,8 +109,8 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       // Load editing recipe data - ensure stable IDs
       setTitle(editingRecipe.title);
       setDescription(editingRecipe.description || '');
-      setCategory(editingRecipe.category);
-      setSelectedTags(editingRecipe.tags);
+      setCategory(editingRecipe.category || '');
+      setSelectedTags(editingRecipe.tags || []);
       setPrepTime(editingRecipe.prepTime?.toString() || '');
       setCookTime(editingRecipe.cookTime?.toString() || '');
       setServings(editingRecipe.servings.toString());
@@ -139,13 +139,6 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       setImportMethod(editingRecipe.importMethod || 'manual');
       setNutrition(editingRecipe.nutrition || null);
       setImportStep('edit');
-      
-      // Debug log
-      console.log('[AddRecipeDialog] Loaded recipe for editing:', {
-        title: editingRecipe.title,
-        ingredientCount: loadedIngredients.length,
-        firstIngredient: loadedIngredients[0],
-      });
     } else if (open) {
       resetForm();
     }
@@ -312,12 +305,12 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setNewTag('');
   };
 
-  // Meal type toggle
+  // Meal type selector (single-select: clicking a new one replaces the old one)
   const toggleMealType = (mealType: MealType) => {
     setSelectedMealTypes(prev =>
       prev.includes(mealType)
-        ? prev.filter(m => m !== mealType)
-        : [...prev, mealType]
+        ? [] // Clicking the already-selected one deselects it
+        : [mealType] // Clicking a new one replaces any existing selection
     );
   };
 
@@ -460,7 +453,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   };
 
   // Submit recipe
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) {
       toast({
         title: "Title required",
@@ -526,11 +519,9 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     };
 
     if (editingRecipe) {
-      updateRecipe({ ...editingRecipe, ...recipeData });
-      toast({ title: "Recipe updated", description: `"${title}" has been updated.` });
+      await updateRecipe({ ...editingRecipe, ...recipeData });
     } else {
-      addRecipe(recipeData);
-      toast({ title: "Recipe added", description: `"${title}" has been added to your stash.` });
+      await addRecipe(recipeData);
     }
 
     resetForm();
@@ -896,7 +887,8 @@ Instructions:
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {availableTags.map(tag => (
+            {/* Show all tags: availableTags + any recipe-specific tags */}
+            {[...new Set([...availableTags, ...selectedTags])].map(tag => (
               <Badge
                 key={tag}
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
@@ -1147,7 +1139,8 @@ Instructions:
         <div className="space-y-2">
           <Label>Tags</Label>
           <div className="flex flex-wrap gap-2">
-            {availableTags.map(tag => (
+            {/* Show all tags: availableTags + any recipe-specific tags */}
+            {[...new Set([...availableTags, ...selectedTags])].map(tag => (
               <Badge
                 key={tag}
                 variant={selectedTags.includes(tag) ? "default" : "outline"}

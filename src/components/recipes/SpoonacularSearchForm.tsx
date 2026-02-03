@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SpoonacularSearchFormProps {
   onSearch: (params: {
@@ -65,6 +66,7 @@ const TIME_OPTIONS = [
 ];
 
 export function SpoonacularSearchForm({ onSearch, isSearching }: SpoonacularSearchFormProps) {
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState('');
   const [diet, setDiet] = useState('');
   const [selectedIntolerances, setSelectedIntolerances] = useState<string[]>([]);
@@ -104,7 +106,7 @@ export function SpoonacularSearchForm({ onSearch, isSearching }: SpoonacularSear
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search recipes (e.g., pasta, chicken curry, vegan tacos...)"
+            placeholder={isMobile ? "Search recipes..." : "Search recipes (e.g., pasta, chicken curry, vegan tacos...)"}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-10"
@@ -114,15 +116,15 @@ export function SpoonacularSearchForm({ onSearch, isSearching }: SpoonacularSear
         {/* Filters popover */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button 
-              type="button" 
-              variant={hasFilters ? "secondary" : "outline"} 
-              className="gap-2"
+            <Button
+              type="button"
+              variant={hasFilters ? "secondary" : "outline"}
+              className="gap-2 shrink-0"
             >
               <Filter className="h-4 w-4" />
-              Filters
+              {!isMobile && "Filters"}
               {hasFilters && (
-                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full">
+                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-xs">
                   {(diet ? 1 : 0) + (selectedIntolerances.length > 0 ? 1 : 0) + (maxReadyTime ? 1 : 0)}
                 </Badge>
               )}
@@ -195,16 +197,16 @@ export function SpoonacularSearchForm({ onSearch, isSearching }: SpoonacularSear
         </Popover>
 
         {/* Search button */}
-        <Button type="submit" disabled={isSearching}>
+        <Button type="submit" disabled={isSearching} size={isMobile ? "icon" : "default"}>
           {isSearching ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Searching...
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {!isMobile && <span className="ml-2">Searching...</span>}
             </>
           ) : (
             <>
-              <Globe className="h-4 w-4 mr-2" />
-              Search
+              <Globe className="h-4 w-4" />
+              {!isMobile && <span className="ml-2">Search</span>}
             </>
           )}
         </Button>

@@ -1,12 +1,7 @@
 import { Calendar, ChefHat, Clock, ShoppingCart } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface MealPlanEmptyStateProps {
-  onBrowseRecipes?: () => void;
-}
-
-export function MealPlanEmptyState({ onBrowseRecipes }: MealPlanEmptyStateProps) {
+export function MealPlanEmptyState() {
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-20 text-center px-4">
       {/* Animated icon container */}
@@ -47,17 +42,6 @@ export function MealPlanEmptyState({ onBrowseRecipes }: MealPlanEmptyStateProps)
         />
       </div>
 
-      {onBrowseRecipes && (
-        <Button
-          size="lg"
-          className="gap-2 animate-fade-up"
-          style={{ animationDelay: '0.4s' }}
-          onClick={onBrowseRecipes}
-        >
-          <ChefHat className="h-5 w-5" />
-          Browse Recipes
-        </Button>
-      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Recipe } from '@/types/recipe';
+import { Recipe, MealType } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { RecipeCard } from '@/components/recipes/RecipeCard';
 import { RecipeFilters, SortOption } from '@/components/recipes/RecipeFilters';
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type RecipeTab = 'personal' | 'discover';
 
@@ -42,6 +43,7 @@ export default function RecipesPage() {
     revokePendingShare,
   } = useRecipes();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   // Spoonacular integration
   const {
@@ -131,9 +133,13 @@ export default function RecipesPage() {
         }
       }
 
-      // Categories
-      if (selectedCategories.length > 0 && !selectedCategories.includes(recipe.category)) {
-        return false;
+      // Categories - check both category AND mealTypes
+      if (selectedCategories.length > 0) {
+        const categoryMatch = selectedCategories.includes(recipe.category);
+        const mealTypeMatch = recipe.mealTypes?.some(mt => selectedCategories.includes(mt)) || false;
+        if (!categoryMatch && !mealTypeMatch) {
+          return false;
+        }
       }
 
       // Tags
@@ -217,10 +223,6 @@ export default function RecipesPage() {
         updateRecipe({ ...recipe, category: bulkCategory });
       }
     });
-    toast({ 
-      title: "Category updated", 
-      description: `Updated ${selectedRecipes.size} recipes to "${bulkCategory}".` 
-    });
     setBulkCategory('');
   };
 
@@ -231,10 +233,6 @@ export default function RecipesPage() {
       if (recipe && !recipe.tags.includes(bulkTag)) {
         updateRecipe({ ...recipe, tags: [...recipe.tags, bulkTag] });
       }
-    });
-    toast({ 
-      title: "Tag added", 
-      description: `Added "${bulkTag}" to ${selectedRecipes.size} recipes.` 
     });
     setBulkTag('');
   };
@@ -252,8 +250,19 @@ export default function RecipesPage() {
       title: spoonacularRecipe.title,
       imageUrl: spoonacularRecipe.image,
       description: spoonacularRecipe.summary?.slice(0, 500) || undefined,
-      category: spoonacularRecipe.dishTypes?.[0] || 'Main Course',
-      tags: [...(spoonacularRecipe.cuisines || []), ...(spoonacularRecipe.diets || [])],
+      category: 'Dinner',  // Default category
+      tags: [
+        ...(spoonacularRecipe.cuisines || []),
+        ...(spoonacularRecipe.diets || []),
+        // Filter out meal-type values from dishTypes (they go to mealTypes instead)
+        ...(spoonacularRecipe.dishTypes || []).filter(
+          type => !['breakfast', 'lunch', 'dinner', 'snack', 'brunch'].includes(type.toLowerCase())
+        ),
+      ],
+      // Extract meal types from dishTypes and capitalize correctly
+      mealTypes: (spoonacularRecipe.dishTypes || [])
+        .filter(type => ['breakfast', 'lunch', 'dinner', 'snack'].includes(type.toLowerCase()))
+        .map(type => (type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()) as MealType),
       prepTime: spoonacularRecipe.prepTime || undefined,
       cookTime: spoonacularRecipe.cookTime || undefined,
       totalTime: spoonacularRecipe.readyInMinutes || undefined,
@@ -274,10 +283,6 @@ export default function RecipesPage() {
 
     const added = await addRecipe(newRecipe);
     if (added) {
-      toast({
-        title: "Recipe saved!",
-        description: `"${spoonacularRecipe.title}" has been added to your collection.`,
-      });
       setShowSpoonacularDetailDialog(false);
       clearSpoonacularRecipe();
     }
@@ -298,30 +303,34 @@ export default function RecipesPage() {
 
   return (
     <div className="container py-6 animate-fade-in">
-      <div className="mb-6">
-        <h1 className="font-serif text-3xl font-bold mb-2">Recipe Collection</h1>
-        <p className="text-muted-foreground">
-          Browse your personal recipes or explore the community library
-        </p>
+      {/* Header - compact on mobile */}
+      <div className="mb-4 md:mb-6">
+        <h1 className="font-serif text-xl md:text-3xl font-bold mb-1 md:mb-2">Recipe Collection</h1>
+        {!isMobile && (
+          <p className="text-muted-foreground">
+            Browse your personal recipes or explore the community library
+          </p>
+        )}
       </div>
 
-      {/* Tabs for Personal vs Library vs Discover */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Tabs - compact on mobile */}
+      <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as RecipeTab)}>
-          <TabsList>
-            <TabsTrigger value="personal" className="gap-2">
-              <BookUser className="h-4 w-4" />
-              My Recipes
-              <Badge variant="secondary" className="ml-1">{recipes.length}</Badge>
+          <TabsList className="h-9 md:h-10">
+            <TabsTrigger value="personal" className="gap-1.5 md:gap-2 text-xs md:text-sm px-2.5 md:px-3">
+              <BookUser className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden xs:inline">My</span> Recipes
+              <Badge variant="secondary" className="ml-1 h-4 md:h-5 px-1 md:px-1.5 text-[10px] md:text-xs">{recipes.length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="discover" className="gap-2">
-              <Globe className="h-4 w-4" />
+            <TabsTrigger value="discover" className="gap-1.5 md:gap-2 text-xs md:text-sm px-2.5 md:px-3">
+              <Globe className="h-3.5 w-3.5 md:h-4 md:w-4" />
               Discover
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {activeTab === 'personal' && filteredRecipes.length > 0 && (
+        {/* Bulk Edit - hide on mobile */}
+        {!isMobile && activeTab === 'personal' && filteredRecipes.length > 0 && (
           <Button
             variant={bulkEditMode ? 'secondary' : 'outline'}
             size="sm"
@@ -411,7 +420,7 @@ export default function RecipesPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Found {spoonacularTotal} recipes
               </p>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {spoonacularResults.map(recipe => (
                   <SpoonacularRecipeCard
                     key={recipe.id}
@@ -466,7 +475,7 @@ export default function RecipesPage() {
           />
 
           {filteredRecipes.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-6">
+            <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 md:mt-6">
               {filteredRecipes.map(recipe => (
                 <div key={recipe.id} className="relative">
                   {activeTab === 'personal' && bulkEditMode && (

@@ -24,7 +24,8 @@ import {
   Loader2,
   Check,
   X,
-  AlertTriangle
+  AlertTriangle,
+  MoreHorizontal
 } from 'lucide-react';
 import {
   Popover,
@@ -49,24 +50,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ToastAction } from '@/components/ui/toast';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useShoppingListState } from '@/hooks/useShoppingListState';
-import { usePantry } from '@/hooks/usePantry';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { format, startOfWeek, addWeeks, endOfWeek } from 'date-fns';
 
 export default function ShoppingListPage() {
-  const { recipes, getMealPlanForWeek, mealPlans, pantryStaples, aisleCategories } = useRecipes();
+  const { recipes, getMealPlanForWeek, mealPlans, aisleCategories } = useRecipes();
   const { toast } = useToast();
   const { dietaryRestrictions, allergens } = useDietaryPreferences();
-  const { addFromShoppingList, isLoading: isPantryLoading } = usePantry();
 
   // Shopping list state - syncs with database for logged-in users
   const {
@@ -82,10 +80,11 @@ export default function ShoppingListPage() {
   const [selectedDays, setSelectedDays] = useLocalStorage<DayOfWeek[]>('shoppingListDays', [...DAYS_OF_WEEK]);
   const [newItemText, setNewItemText] = useState('');
   const [groupByAisle, setGroupByAisle] = useState(true);
-  const [excludeStaples, setExcludeStaples] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const [weekCount, setWeekCount] = useState(1); // 1, 2, or 3 weeks
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [additionalMealPlans, setAdditionalMealPlans] = useState<MealPlan[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   // AI cleanup state
@@ -103,29 +102,62 @@ export default function ShoppingListPage() {
   const selectedWeekEnd = endOfWeek(selectedWeekStart, { weekStartsOn: 1 });
   const isCurrentWeek = selectedWeekOffset === 0;
 
-  // Fetch meal plan when week changes
+  // Fetch meal plan(s) when week or week count changes
   useEffect(() => {
-    const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-    
-    // First check if we already have it in mealPlans
-    const existingPlan = mealPlans.find(mp => mp.weekStartDate === weekStartStr);
-    if (existingPlan) {
-      setMealPlan(existingPlan);
-    } else {
-      getMealPlanForWeek(weekStartStr).then(plan => {
+    const fetchAllPlans = async () => {
+      // Fetch the primary week
+      const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+      const existingPlan = mealPlans.find(mp => mp.weekStartDate === weekStartStr);
+      if (existingPlan) {
+        setMealPlan(existingPlan);
+      } else {
+        const plan = await getMealPlanForWeek(weekStartStr);
         setMealPlan(plan);
-      });
-    }
-  }, [selectedWeekOffset, getMealPlanForWeek, mealPlans, selectedWeekStart]);
+      }
+
+      // Fetch additional weeks if weekCount > 1
+      if (weekCount > 1) {
+        const additionalPlans: MealPlan[] = [];
+        for (let i = 1; i < weekCount; i++) {
+          const additionalWeekStart = addWeeks(selectedWeekStart, i);
+          const additionalWeekStartStr = format(additionalWeekStart, 'yyyy-MM-dd');
+          const existingAdditional = mealPlans.find(mp => mp.weekStartDate === additionalWeekStartStr);
+          if (existingAdditional) {
+            additionalPlans.push(existingAdditional);
+          } else {
+            const plan = await getMealPlanForWeek(additionalWeekStartStr);
+            if (plan) {
+              additionalPlans.push(plan);
+            }
+          }
+        }
+        setAdditionalMealPlans(additionalPlans);
+      } else {
+        setAdditionalMealPlans([]);
+      }
+    };
+
+    fetchAllPlans();
+  }, [selectedWeekOffset, weekCount, getMealPlanForWeek, mealPlans, selectedWeekStart]);
 
   const effectiveMealPlan = mealPlan || { id: '', weekStartDate: '', items: [] };
 
+  // Combine all meal plans for multi-week shopping
+  const allMealPlanItems = useMemo(() => {
+    const items = [...effectiveMealPlan.items];
+    additionalMealPlans.forEach(plan => {
+      items.push(...plan.items);
+    });
+    return items;
+  }, [effectiveMealPlan.items, additionalMealPlans]);
+
   // Generate shopping list from meal plan with smart ingredient normalization and merging
   const shoppingList = useMemo(() => {
-    // Filter meal plan items by selected days
-    const filteredPlanItems = effectiveMealPlan.items.filter(item => 
-      selectedDays.includes(item.day as DayOfWeek)
-    );
+    // Filter meal plan items by selected days (for single week) or include all (for multi-week)
+    // For multi-week, we include all days since user wants everything
+    const filteredPlanItems = weekCount > 1
+      ? allMealPlanItems
+      : allMealPlanItems.filter(item => selectedDays.includes(item.day as DayOfWeek));
 
     // Collect all ingredients for smart merging
     const rawIngredients: RawIngredientInput[] = [];
@@ -147,18 +179,9 @@ export default function ShoppingListPage() {
 
     // Use the smart merging system
     const mergedIngredients = mergeIngredients(rawIngredients);
-    
-    // Convert to ShoppingListItem format and filter staples
+
+    // Convert to ShoppingListItem format
     const items: ShoppingListItem[] = mergedIngredients
-      .filter(item => {
-        if (!excludeStaples) return true;
-        // Check if item matches any pantry staple
-        const key = item.key.toLowerCase();
-        return !pantryStaples.some(staple => 
-          key.includes(staple.toLowerCase()) || 
-          item.originalNames.some(n => n.toLowerCase().includes(staple.toLowerCase()))
-        );
-      })
       .map(item => {
         // Extract the primary quantity for display
         const primaryQty = item.quantities[0];
@@ -202,7 +225,7 @@ export default function ShoppingListPage() {
     });
 
     return items;
-  }, [effectiveMealPlan, recipes, customItems, checkedItems, excludeStaples, pantryStaples, selectedDays, categoryOverrides]);
+  }, [allMealPlanItems, recipes, customItems, checkedItems, selectedDays, categoryOverrides, weekCount]);
 
   const toggleDay = (day: DayOfWeek) => {
     setSelectedDays(prev => {
@@ -246,54 +269,7 @@ export default function ShoppingListPage() {
   }, [shoppingList, groupByAisle, aisleCategories]);
 
   const toggleItem = (id: string) => {
-    const wasChecked = checkedItems[id];
     setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
-
-    // If item is being checked (not unchecked), show one-tap pantry prompt
-    if (!wasChecked) {
-      const item = shoppingList.find(i => i.id === id);
-      if (item) {
-        toast({
-          title: `"${item.ingredient}" checked off`,
-          description: "Add it to your pantry?",
-          action: (
-            <ToastAction
-              altText="Add to pantry"
-              onClick={async () => {
-                try {
-                  const pantryItem = {
-                    displayName: item.ingredient,
-                    quantity: typeof item.quantity === 'number' ? item.quantity : undefined,
-                    unit: item.unit || undefined,
-                    category: item.category || 'Other',
-                  };
-                  const added = await addFromShoppingList([pantryItem]);
-                  // usePantry hook shows its own success toast, but if item already existed
-                  // (added === 0), it means quantity was updated silently
-                  if (added === 0) {
-                    toast({
-                      title: "Pantry updated",
-                      description: `Updated quantity for "${item.ingredient}"`,
-                    });
-                  }
-                } catch (error) {
-                  console.error('Failed to add to pantry:', error);
-                  toast({
-                    title: "Failed to add to pantry",
-                    description: "Please try again",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              <Package className="h-3.5 w-3.5 mr-1.5" />
-              Add to Pantry
-            </ToastAction>
-          ),
-          duration: 4000,
-        });
-      }
-    }
   };
 
   const toggleCategory = (category: string) => {
@@ -316,7 +292,6 @@ export default function ShoppingListPage() {
 
     setCustomItems(prev => [...prev, newItem]);
     setNewItemText('');
-    toast({ title: "Item added", description: `"${newItemText}" added to your list.` });
   };
 
   const removeCustomItem = (id: string) => {
@@ -325,7 +300,6 @@ export default function ShoppingListPage() {
 
   const clearChecked = () => {
     setCheckedItems({});
-    toast({ title: "List reset", description: "All items unchecked." });
   };
 
   const copyToClipboard = () => {
@@ -337,36 +311,10 @@ export default function ShoppingListPage() {
       })
       .join('\n');
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied!", description: "Shopping list copied to clipboard." });
   };
 
   const printList = () => {
     window.print();
-  };
-
-  // Add checked items to pantry
-  const addCheckedToPantry = async () => {
-    const checkedShoppingItems = shoppingList.filter(i => i.checked);
-    if (checkedShoppingItems.length === 0) {
-      toast({ title: "No items selected", description: "Check off items first to add them to your pantry." });
-      return;
-    }
-
-    // Convert shopping list items to pantry format
-    const pantryItems = checkedShoppingItems.map(item => ({
-      displayName: item.ingredient,
-      quantity: typeof item.quantity === 'number' ? item.quantity : undefined,
-      unit: item.unit || undefined,
-      category: item.category || 'Other',
-    }));
-
-    const addedCount = await addFromShoppingList(pantryItems);
-
-    // Toast is already shown by usePantry hook if items were added
-    // Clear checked items after adding to pantry
-    if (addedCount > 0 || checkedShoppingItems.length > 0) {
-      setCheckedItems({});
-    }
   };
 
   const runAICleanup = async () => {
@@ -533,7 +481,7 @@ export default function ShoppingListPage() {
   const totalCount = shoppingList.length;
 
   return (
-    <div className="container py-6 animate-fade-in max-w-2xl">
+    <div className="container py-6 pb-28 md:pb-6 px-4 md:px-6 animate-fade-in max-w-2xl">
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <h1 className="font-serif text-3xl font-bold mb-2">Shopping List</h1>
@@ -552,6 +500,27 @@ export default function ShoppingListPage() {
 
       {/* Week Selector */}
       <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
+        {/* Week count selector */}
+        <div className="flex items-center justify-center gap-2 mb-4 pb-4 border-b border-border/30">
+          <span className="text-sm text-muted-foreground">Shopping for:</span>
+          <div className="flex rounded-lg border border-border/50 p-0.5">
+            {[1, 2, 3].map((count) => (
+              <button
+                key={count}
+                onClick={() => setWeekCount(count)}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  weekCount === count
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                {count} {count === 1 ? 'week' : 'weeks'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
@@ -561,22 +530,28 @@ export default function ShoppingListPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Calendar className="h-4 w-4 text-primary" />
               <span className="font-medium">
-                {isCurrentWeek ? 'This Week' : selectedWeekOffset > 0 ? 'Next Week' : 'Previous Week'}
+                {weekCount === 1
+                  ? (isCurrentWeek ? 'This Week' : selectedWeekOffset > 0 ? 'Next Week' : 'Previous Week')
+                  : `Starting ${isCurrentWeek ? 'This Week' : selectedWeekOffset > 0 ? 'Next Week' : 'Previous Week'}`
+                }
               </span>
-              {isCurrentWeek && (
+              {isCurrentWeek && weekCount === 1 && (
                 <Badge variant="secondary" className="text-xs">Current</Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              {format(selectedWeekStart, 'MMM d')} - {format(selectedWeekEnd, 'MMM d, yyyy')}
+              {weekCount === 1
+                ? `${format(selectedWeekStart, 'MMM d')} - ${format(selectedWeekEnd, 'MMM d, yyyy')}`
+                : `${format(selectedWeekStart, 'MMM d')} - ${format(endOfWeek(addWeeks(selectedWeekStart, weekCount - 1), { weekStartsOn: 1 }), 'MMM d, yyyy')}`
+              }
             </p>
           </div>
-          
+
           <Button
             variant="ghost"
             size="icon"
@@ -586,12 +561,12 @@ export default function ShoppingListPage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        
+
         {!isCurrentWeek && (
           <div className="flex justify-center mt-3">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setSelectedWeekOffset(0)}
               className="text-xs"
             >
@@ -601,94 +576,79 @@ export default function ShoppingListPage() {
         )}
       </div>
 
-      {/* Day Selection */}
-      <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
-        <div className="flex items-center gap-2 mb-3">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span className="font-medium text-sm">Days to include</span>
-          <div className="flex-1" />
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectAllDays}>All</Button>
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectWeekdays}>Weekdays</Button>
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectWeekend}>Weekend</Button>
+      {/* Day Selection - only shown for single week */}
+      {weekCount === 1 && (
+        <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="h-4 w-4 text-primary" />
+            <span className="font-medium text-sm">Days to include</span>
+          </div>
+          <div className="grid grid-cols-7 gap-1.5 mb-3">
+            {DAYS_OF_WEEK.map(day => (
+              <button
+                key={day}
+                onClick={() => toggleDay(day)}
+                className={cn(
+                  "py-2.5 rounded-lg text-xs font-medium capitalize transition-colors",
+                  selectedDays.includes(day)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {day.slice(0, 3)}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 text-xs">
+            <button onClick={selectAllDays} className="text-primary hover:underline">All</button>
+            <span className="text-muted-foreground">·</span>
+            <button onClick={selectWeekdays} className="text-primary hover:underline">Weekdays</button>
+            <span className="text-muted-foreground">·</span>
+            <button onClick={selectWeekend} className="text-primary hover:underline">Weekend</button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {DAYS_OF_WEEK.map(day => (
-            <Badge
-              key={day}
-              variant={selectedDays.includes(day) ? 'default' : 'outline'}
-              className={cn(
-                "cursor-pointer capitalize transition-colors",
-                selectedDays.includes(day) && "bg-primary"
-              )}
-              onClick={() => toggleDay(day)}
-            >
-              {day.slice(0, 3)}
-            </Badge>
-          ))}
-        </div>
-      </div>
+      )}
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2">
+      {/* Controls - Toggle switches */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6 mb-4 md:mb-6">
+        <label className="flex items-center gap-3 py-2 cursor-pointer">
           <Switch
             id="group-by-aisle"
             checked={groupByAisle}
             onCheckedChange={setGroupByAisle}
           />
-          <Label htmlFor="group-by-aisle" className="text-sm">Group by aisle</Label>
-        </div>
+          <span className="text-sm">Group by aisle</span>
+        </label>
 
-        <div className="flex items-center gap-2">
-          <Switch
-            id="exclude-staples"
-            checked={excludeStaples}
-            onCheckedChange={setExcludeStaples}
-          />
-          <Label htmlFor="exclude-staples" className="text-sm">Exclude pantry staples</Label>
-        </div>
+      </div>
 
-        <div className="flex-1" />
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={runAICleanup}
-            disabled={isCleaningUp || shoppingList.filter(i => !i.checked).length === 0}
-          >
-            {isCleaningUp ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-1" />
-            )}
-            Smart Cleanup
-          </Button>
-          <Button variant="outline" size="sm" onClick={clearChecked}>
-            <RotateCcw className="h-4 w-4 mr-1" />
-            Reset
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addCheckedToPantry}
-            disabled={isPantryLoading || checkedCount === 0}
-            title={checkedCount === 0 ? "Check off items first to add them to pantry" : `Add ${checkedCount} item${checkedCount !== 1 ? 's' : ''} to pantry`}
-          >
-            <Package className="h-4 w-4 mr-1" />
-            Add to Pantry {checkedCount > 0 && `(${checkedCount})`}
-          </Button>
-          <Button variant="outline" size="sm" onClick={copyToClipboard}>
-            <Copy className="h-4 w-4 mr-1" />
-            Copy
-          </Button>
-          <Button variant="outline" size="sm" onClick={printList}>
-            <Printer className="h-4 w-4 mr-1" />
-            Print
-          </Button>
-        </div>
+      {/* Desktop action buttons - hidden on mobile */}
+      <div className="hidden md:flex flex-wrap items-center gap-2 mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={runAICleanup}
+          disabled={isCleaningUp || shoppingList.filter(i => !i.checked).length === 0}
+        >
+          {isCleaningUp ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 mr-1" />
+          )}
+          Smart Cleanup
+        </Button>
+        <Button variant="outline" size="sm" onClick={clearChecked}>
+          <RotateCcw className="h-4 w-4 mr-1" />
+          Reset
+        </Button>
+        <Button variant="outline" size="sm" onClick={copyToClipboard}>
+          <Copy className="h-4 w-4 mr-1" />
+          Copy
+        </Button>
+        <Button variant="outline" size="sm" onClick={printList}>
+          <Printer className="h-4 w-4 mr-1" />
+          Print
+        </Button>
       </div>
 
       {/* Add custom item */}
@@ -704,32 +664,31 @@ export default function ShoppingListPage() {
         </Button>
       </div>
 
-      {/* Shopping list - single column for easy scanning */}
+      {/* Shopping list - flat structure for sticky headers */}
       {totalCount > 0 ? (
-        <div className="space-y-4">
-          {Object.entries(groupedItems).map(([category, items]) => (
-            <Collapsible
-              key={category}
-              open={expandedCategories[category] !== false}
-              onOpenChange={() => toggleCategory(category)}
-              className="bg-card border border-border/50 rounded-xl overflow-hidden"
+        <div className="border border-border/50 rounded-xl">
+          {Object.entries(groupedItems).flatMap(([category, items]) => [
+            /* Sticky category header - rendered as sibling, not nested */
+            <button
+              key={`header-${category}`}
+              onClick={() => toggleCategory(category)}
+              className="sticky top-16 z-10 flex items-center gap-3 w-full py-4 px-4 md:px-5 bg-card hover:bg-muted/30 transition-colors border-b border-border/30 first:rounded-t-xl"
             >
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-3 w-full py-4 px-5 hover:bg-muted/30 transition-colors">
-                  {expandedCategories[category] === false ? (
-                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  )}
-                  <span className="font-semibold text-base">{category}</span>
-                  <span className="ml-auto text-sm text-muted-foreground">
-                    {items.filter(i => i.checked).length}/{items.length}
-                  </span>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="divide-y divide-border/40">
-                  {items.map(item => {
+              {expandedCategories[category] === false ? (
+                <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              )}
+              <span className="font-semibold text-base">{category}</span>
+              <span className="ml-auto text-sm text-muted-foreground">
+                {items.filter(i => i.checked).length}/{items.length}
+              </span>
+            </button>,
+
+            /* Items - conditionally rendered based on expanded state */
+            expandedCategories[category] !== false && (
+              <div key={`items-${category}`} className="divide-y divide-border/40 bg-card">
+                {items.map(item => {
                     const extItem = item as ShoppingListItem & {
                       _totalDisplay?: string;
                       _alternatives?: string[];
@@ -745,15 +704,15 @@ export default function ShoppingListPage() {
                         key={item.id}
                         onClick={() => toggleItem(item.id)}
                         className={cn(
-                          "flex items-center gap-4 min-h-[52px] py-3 px-5 cursor-pointer transition-colors select-none",
+                          "flex items-center gap-3 md:gap-4 min-h-[56px] md:min-h-[52px] py-3.5 md:py-3 px-4 md:px-5 cursor-pointer transition-colors select-none",
                           item.checked
                             ? "bg-muted/20"
                             : "hover:bg-muted/30 active:bg-muted/50"
                         )}
                       >
-                        {/* Custom checkbox visual - larger touch target */}
+                        {/* Custom checkbox visual - larger touch target on mobile */}
                         <div className={cn(
-                          "h-6 w-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all",
+                          "h-7 w-7 md:h-6 md:w-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all",
                           item.checked
                             ? "bg-primary border-primary"
                             : "border-muted-foreground/40"
@@ -869,13 +828,7 @@ export default function ShoppingListPage() {
                                       {aisleCategories.map(cat => (
                                         <button
                                           key={cat}
-                                          onClick={() => {
-                                            setCategoryOverride(item.id, cat);
-                                            toast({
-                                              title: "Category updated",
-                                              description: `${item.ingredient} moved to ${cat}`,
-                                            });
-                                          }}
+                                          onClick={() => setCategoryOverride(item.id, cat)}
                                           className={cn(
                                             "flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left text-sm",
                                             item.category === cat && "bg-muted font-medium"
@@ -912,9 +865,8 @@ export default function ShoppingListPage() {
                     );
                   })}
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
-          ))}
+            )
+          ])}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1026,6 +978,45 @@ export default function ShoppingListPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Mobile bottom action bar */}
+      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-sm border-t z-20 pb-safe">
+        <div className="flex items-center justify-between gap-2 p-4 max-w-2xl mx-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearChecked}
+            className="h-10"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-10">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={runAICleanup}
+                disabled={isCleaningUp || shoppingList.filter(i => !i.checked).length === 0}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Smart Cleanup
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={copyToClipboard}>
+                <Copy className="h-4 w-4 mr-2" />
+                Copy List
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={printList}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </div>
   );
 }

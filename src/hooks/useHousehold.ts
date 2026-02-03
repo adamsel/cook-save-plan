@@ -116,18 +116,33 @@ export function useHousehold() {
           household_id,
           user_id,
           role,
-          joined_at,
-          profiles (
-            display_name,
-            email
-          )
+          joined_at
         `)
         .eq('household_id', householdData.id);
 
       if (membersError) {
         console.error('Error fetching household members:', membersError);
+      } else if (membersData && membersData.length > 0) {
+        // Fetch profiles separately since there's no direct FK relationship
+        const userIds = membersData.map(m => m.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, email')
+          .in('user_id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching member profiles:', profilesError);
+        }
+
+        // Merge profiles into members
+        const membersWithProfiles = membersData.map(member => ({
+          ...member,
+          profiles: profilesData?.find(p => p.user_id === member.user_id) || null,
+        }));
+
+        setMembers(membersWithProfiles as HouseholdMember[]);
       } else {
-        setMembers(membersData as unknown as HouseholdMember[]);
+        setMembers([]);
       }
 
       // Fetch pending invites
@@ -224,11 +239,6 @@ export function useHousehold() {
         return null;
       }
 
-      toast({
-        title: 'Household created!',
-        description: `"${name}" has been created. You can now invite others.`,
-      });
-
       await fetchHousehold();
       return householdData;
     } catch (error) {
@@ -313,20 +323,28 @@ export function useHousehold() {
         .eq('user_id', user.id)
         .single();
 
-      // Send invitation email (fire and forget)
-      supabase.functions.invoke('send-household-invitation', {
-        body: {
-          email: normalizedEmail,
-          householdName: household.name,
-          inviterName: inviterProfile?.display_name || 'Someone',
-          role: role === 'owner' ? 'member' : role,
-        },
-      }).catch(err => console.error('Failed to send household invitation email:', err));
-
-      toast({
-        title: 'Invitation sent!',
-        description: `An email has been sent to ${normalizedEmail}. They'll be added when they create an account.`,
-      });
+      // Send invitation email
+      console.log('Invoking send-household-invitation function for:', normalizedEmail);
+      try {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('send-household-invitation', {
+          body: {
+            email: normalizedEmail,
+            householdName: household.name,
+            inviterName: inviterProfile?.display_name || 'Someone',
+            role: role === 'owner' ? 'member' : role,
+          },
+        });
+        console.log('Email function response:', { data: emailData, error: emailError });
+        if (emailError) {
+          console.error('Email function error:', emailError);
+        } else if (emailData?.success === false) {
+          console.error('Email sending failed - Resend error:', emailData?.error || 'Unknown error');
+        } else {
+          console.log('Email sent successfully');
+        }
+      } catch (err) {
+        console.error('Failed to invoke email function:', err);
+      }
 
       await fetchHousehold();
       return { error: null };
@@ -361,11 +379,6 @@ export function useHousehold() {
       });
       return { error: 'Failed to add member' };
     }
-
-    toast({
-      title: 'Member added!',
-      description: `${normalizedEmail} has been added to your household.`,
-    });
 
     await fetchHousehold();
     return { error: null };
@@ -412,11 +425,6 @@ export function useHousehold() {
       });
       return false;
     }
-
-    toast({
-      title: 'Member removed',
-      description: 'The member has been removed from the household.',
-    });
 
     await fetchHousehold();
     return true;
@@ -486,11 +494,6 @@ export function useHousehold() {
       return false;
     }
 
-    toast({
-      title: 'Left household',
-      description: 'You have left the household.',
-    });
-
     setHousehold(null);
     setMembers([]);
     setSettings(null);
@@ -525,11 +528,6 @@ export function useHousehold() {
       });
       return false;
     }
-
-    toast({
-      title: 'Household deleted',
-      description: 'The household has been deleted.',
-    });
 
     setHousehold(null);
     setMembers([]);
@@ -566,11 +564,6 @@ export function useHousehold() {
       return false;
     }
 
-    toast({
-      title: 'Invitation canceled',
-      description: 'The invitation has been canceled.',
-    });
-
     setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
     return true;
   };
@@ -605,7 +598,8 @@ export function useHousehold() {
       .single();
 
     try {
-      await supabase.functions.invoke('send-household-invitation', {
+      console.log('Resending invitation to:', invite.email);
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('send-household-invitation', {
         body: {
           email: invite.email,
           householdName: household.name,
@@ -613,18 +607,24 @@ export function useHousehold() {
           role: invite.role,
         },
       });
+      console.log('Resend email function response:', { data: emailData, error: emailError });
 
-      toast({
-        title: 'Invitation resent',
-        description: `A new invitation email has been sent to ${invite.email}.`,
-      });
+      if (emailError) {
+        console.error('Resend email function error:', emailError);
+        throw emailError;
+      }
+      if (emailData?.success === false) {
+        const resendError = emailData?.error || 'Unknown error';
+        console.error('Resend email failed - Resend error:', resendError);
+        throw new Error(`Email sending failed: ${resendError}`);
+      }
 
       return true;
     } catch (error) {
       console.error('Error resending invitation:', error);
       toast({
         title: 'Error',
-        description: 'Failed to resend invitation email',
+        description: error instanceof Error ? error.message : 'Failed to resend invitation email',
         variant: 'destructive',
       });
       return false;

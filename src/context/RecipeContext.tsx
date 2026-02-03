@@ -84,7 +84,34 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const [tags, setTags] = useLocalStorage<string[]>('tags', ['Italian', 'Quick', 'Healthy', 'Vegetarian', 'Comfort Food']);
   const [pantryStaples, setPantryStaples] = useLocalStorage<string[]>('pantryStaples', DEFAULT_PANTRY_STAPLES);
   const [aisleCategories] = useLocalStorage<string[]>('aisleCategories', DEFAULT_AISLE_CATEGORIES);
-  
+
+  // Migrate localStorage: remove deprecated categories and add new ones
+  useEffect(() => {
+    let updated = [...categories];
+    let needsUpdate = false;
+
+    // Remove deprecated "Main Course" category
+    if (updated.includes('Main Course')) {
+      updated = updated.filter(c => c !== 'Main Course');
+      needsUpdate = true;
+    }
+
+    // Add "Dinner" and "Lunch" if missing
+    if (!updated.includes('Dinner')) {
+      updated = ['Dinner', ...updated];
+      needsUpdate = true;
+    }
+    if (!updated.includes('Lunch')) {
+      const dinnerIndex = updated.indexOf('Dinner');
+      updated.splice(dinnerIndex + 1, 0, 'Lunch');
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      setCategories(updated);
+    }
+  }, []);
+
   // For unauthenticated fallback - local storage recipes
   const [localRecipes, setLocalRecipes] = useLocalStorage<Recipe[]>('recipes', []);
   const [localMealPlans, setLocalMealPlans] = useLocalStorage<MealPlan[]>('mealPlans', []);

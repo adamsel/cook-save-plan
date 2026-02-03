@@ -79,7 +79,7 @@ When you identify or create a recipe, respond with a JSON object in the followin
       "Step 1 instruction text",
       "Step 2 instruction text"
     ],
-    "category": "Main Course",
+    "category": "Dinner",
     "tags": ["Italian", "Quick"],
     "nutrition": {
       "perServing": {
@@ -99,7 +99,7 @@ When you identify or create a recipe, respond with a JSON object in the followin
 }
 \`\`\`
 
-Categories to use: Main Course, Side Dish, Appetizer, Salad, Soup, Breakfast, Dessert, Beverage, Snack, Other
+Categories to use: Dinner, Lunch, Side Dish, Appetizer, Salad, Soup, Dessert, Beverage, Other
 
 For ingredient IDs, generate unique IDs like "ing-1", "ing-2", etc.
 

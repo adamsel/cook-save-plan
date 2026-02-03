@@ -2,7 +2,6 @@ import { Ingredient } from '@/types/recipe';
 
 // Keywords that suggest certain categories
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'Main Course': ['dinner', 'entree', 'main dish', 'chicken', 'beef', 'pork', 'fish', 'steak', 'roast', 'casserole', 'stir fry', 'curry'],
   'Side Dish': ['side', 'rice', 'potatoes', 'vegetables', 'beans', 'coleslaw', 'slaw'],
   'Appetizer': ['appetizer', 'starter', 'dip', 'spread', 'bruschetta', 'crostini', 'bite', 'finger food'],
   'Salad': ['salad', 'slaw', 'greens', 'vinaigrette'],

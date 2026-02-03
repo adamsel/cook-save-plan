@@ -65,20 +65,20 @@ serve(async (req) => {
 
     console.log(`Sending household invitation to: ${email} for household: ${householdName}`);
 
-    const success = await sendEmail({
+    const result = await sendEmail({
       to: email,
       subject: `${inviterName || 'Someone'} invited you to join "${householdName}" on Recipe Stash`,
       html,
     });
 
-    if (success) {
+    if (result.success) {
       console.log(`Household invitation email sent successfully to: ${email}`);
     } else {
-      console.error(`Failed to send household invitation email to: ${email}`);
+      console.error(`Failed to send household invitation email to: ${email}:`, result.error);
     }
 
     return new Response(
-      JSON.stringify({ success }),
+      JSON.stringify({ success: result.success, error: result.error }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

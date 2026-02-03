@@ -241,7 +241,7 @@ export function useRecipesData() {
   // Update recipe
   const updateRecipe = async (recipe: Recipe) => {
     if (!user) return;
-    
+
     const { error } = await supabase
       .from('recipes')
       .update({
@@ -268,6 +268,7 @@ export function useRecipesData() {
       .eq('id', recipe.id);
     
     if (error) {
+      console.error('[useRecipesData] Error updating recipe:', error);
       toast({
         title: 'Error updating recipe',
         description: error.message,
@@ -275,7 +276,7 @@ export function useRecipesData() {
       });
       return;
     }
-    
+
     setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...recipe, updatedAt: new Date().toISOString() } : r));
   };
 
@@ -396,10 +397,6 @@ export function useRecipesData() {
         return { error: 'Failed to share recipe', shared: false, pending: false };
       }
 
-      toast({
-        title: 'Recipe shared!',
-        description: `${normalizedEmail} can now view this recipe.`,
-      });
       return { error: null, shared: true, pending: false };
     } else {
       // User doesn't exist - create pending share
@@ -436,10 +433,6 @@ export function useRecipesData() {
         },
       }).catch(err => console.error('Failed to send invitation email:', err));
 
-      toast({
-        title: 'Invitation sent!',
-        description: `When ${normalizedEmail} signs up, they'll have access to this recipe.`,
-      });
       return { error: null, shared: false, pending: true };
     }
   };
@@ -502,10 +495,6 @@ export function useRecipesData() {
       return false;
     }
 
-    toast({
-      title: 'Share revoked',
-      description: 'User no longer has access to this recipe.',
-    });
     return true;
   };
 
@@ -529,10 +518,6 @@ export function useRecipesData() {
       return false;
     }
 
-    toast({
-      title: 'Invitation revoked',
-      description: 'The invitation has been cancelled.',
-    });
     return true;
   };
 
@@ -574,12 +559,7 @@ export function useRecipesData() {
     
     const newRecipe = dbToRecipe(data as unknown as DbRecipe);
     setRecipes(prev => [newRecipe, ...prev]);
-    
-    toast({
-      title: 'Recipe saved!',
-      description: `${newRecipe.title} has been added to your collection.`,
-    });
-    
+
     return newRecipe;
   };
 
