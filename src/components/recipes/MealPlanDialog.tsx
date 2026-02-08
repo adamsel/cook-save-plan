@@ -18,16 +18,26 @@ interface MealPlanDialogProps {
   recipe: Recipe | null;
   displayItemsMap?: Map<string, DisplayMealItem[]>;
   weekStartDate?: Date;
+  // Optional callback to handle slot selection - if provided, defers adding to parent
+  onSelectSlot?: (recipe: Recipe, day: DayOfWeek, slot: MealSlot) => void;
 }
 
-export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, weekStartDate }: MealPlanDialogProps) {
+export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, weekStartDate, onSelectSlot }: MealPlanDialogProps) {
   const { addToMealPlan, updateMealPlanItem } = useRecipes();
   const { toast } = useToast();
   const { householdSize } = useHouseholdSettings();
 
   if (!recipe) return null;
 
-  const handleAddToSlot = async (day: string, slot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+  const handleAddToSlot = async (day: DayOfWeek, slot: MealSlot) => {
+    // If parent wants to handle slot selection (e.g., for linked recipes prompt)
+    if (onSelectSlot) {
+      onSelectSlot(recipe, day, slot);
+      onOpenChange(false);
+      return;
+    }
+
+    // Direct add (fallback behavior)
     const weekStartStr = weekStartDate ? format(weekStartDate, 'yyyy-MM-dd') : undefined;
     const result = await addToMealPlan(recipe.id, day, slot, weekStartStr);
 

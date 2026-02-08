@@ -2,6 +2,7 @@
 // Combines alias mapping, unit conversion, and smart merging
 
 import { INGREDIENT_ALIASES, DESCRIPTORS_TO_REMOVE } from './aliases';
+import { fuzzyMatchIngredient } from './fuzzyMatcher';
 import {
   normalizeUnit,
   toBaseUnits,
@@ -87,7 +88,13 @@ export function normalizeIngredient(ingredient: string): string {
   if (INGREDIENT_ALIASES[singularizedPhrase]) {
     return INGREDIENT_ALIASES[singularizedPhrase];
   }
-  
+
+  // Fuzzy match fallback for typos and variations not in static aliases
+  const fuzzyMatch = fuzzyMatchIngredient(singularizedPhrase);
+  if (fuzzyMatch) {
+    return fuzzyMatch;
+  }
+
   // Return the cleaned, singularized form
   return singularizedPhrase || normalized || ingredient.toLowerCase().trim();
 }
@@ -415,8 +422,14 @@ function categorizeIngredient(ingredient: string): string {
     return 'Dairy';
   }
 
+  // Baking starches & sweeteners (check BEFORE Produce to catch cornstarch, honey, etc.)
+  if (/starch|cornstarch|flour|sugar|honey|maple syrup|molasses|baking powder|baking soda|yeast|vanilla|chocolate|cocoa/.test(lower)) {
+    return 'Baking';
+  }
+
   // Produce (added radish, beet, turnip, parsnip)
-  if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|scallion|green onion|leek|shallot|radish|beet|turnip|parsnip|asparagus|artichoke|corn|pea|bean sprout/.test(lower)) {
+  // Use word boundaries for corn/pea to avoid matching cornstarch, peanut, etc.
+  if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|scallion|green onion|leek|shallot|radish|beet|turnip|parsnip|asparagus|artichoke|\bcorn\b|\bpea\b|bean sprout/.test(lower)) {
     return 'Produce';
   }
 
@@ -445,10 +458,8 @@ function categorizeIngredient(ingredient: string): string {
     return 'Pasta & Grains';
   }
 
-  // Baking
-  if (/flour|sugar|baking powder|baking soda|yeast|vanilla|chocolate|cocoa|honey|maple syrup|molasses/.test(lower)) {
-    return 'Baking';
-  }
+  // Note: Baking items (flour, sugar, starch, honey, etc.) are checked earlier to prevent
+  // cornstarch from matching "corn" in Produce. No duplicate check needed here.
 
   // Oils (separate from condiments for clearer categorization)
   if (/oil/.test(lower)) {

@@ -80,6 +80,28 @@ export interface PendingShare {
   created_at: string;
 }
 
+// Recipe linking types ("Goes with" feature)
+export type RecipeLinkType = 'goes_with' | 'component' | 'variation' | 'side';
+
+// Ingredient replacement - which ingredient from linked recipe replaces one from main recipe
+export interface IngredientReplacement {
+  linkedIngredientId: string;    // Ingredient ID from the linked recipe
+  replacesIngredientId: string;  // Ingredient ID from the main recipe it replaces
+  notes?: string;                // Optional note (e.g., "Homemade version")
+}
+
+export interface RecipeLink {
+  id: string;
+  recipeId: string;
+  linkedRecipeId: string;
+  linkType: RecipeLinkType;
+  createdAt: string;
+  userId: string;
+  replacements?: IngredientReplacement[];  // Which ingredients the linked recipe replaces
+  // Joined data when fetching
+  linkedRecipe?: Recipe;
+}
+
 // Entry for custom leftover position (stored as JSON in meal_plan_items)
 export interface LeftoverPositionEntry {
   index: number; // Which leftover (0 = first, 1 = second, etc.)

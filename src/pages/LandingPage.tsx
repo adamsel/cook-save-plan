@@ -56,7 +56,7 @@ export default function LandingPage() {
             </Button>
           </Link>
           <p className="text-sm text-muted-foreground">
-            Free • No signup required to try
+            Quick signup • Start planning in minutes
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function LandingPage() {
             </div>
             <div className="flex items-start gap-3">
               <Check className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-              <span className="text-sm">No paywall, no limits</span>
+              <span className="text-sm">Export your recipes anytime</span>
             </div>
           </div>
         </div>
@@ -220,11 +220,11 @@ export default function LandingPage() {
         <div className="flex items-center justify-center gap-6 mt-8 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Check className="h-4 w-4 text-green-500" />
-            Free forever
+            Set up in under a minute
           </div>
           <div className="flex items-center gap-1.5">
             <Check className="h-4 w-4 text-green-500" />
-            No signup required to try
+            Your recipes stay yours
           </div>
         </div>
       </section>
@@ -238,7 +238,7 @@ export default function LandingPage() {
             </div>
             <div>
               <span className="font-medium">Recipe Stash</span>
-              <p className="text-xs text-muted-foreground">Free forever. Your recipes, your data.</p>
+              <p className="text-xs text-muted-foreground">Your recipes, your data.</p>
             </div>
           </div>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">

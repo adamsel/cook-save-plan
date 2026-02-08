@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Recipe, RecipeShare, PendingShare } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library, Share2 } from 'lucide-react';
+import { Recipe, RecipeShare, PendingShare, IngredientReplacement } from '@/types/recipe';
+import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library, Share2, Link2, X, Loader2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ShareRecipeDialog } from './ShareRecipeDialog';
+import { RecipeLinkPicker } from './RecipeLinkPicker';
+import { IngredientReplacementPicker } from './IngredientReplacementPicker';
+import { useRecipeLinks } from '@/hooks/useRecipeLinks';
+import { useRecipes } from '@/context/RecipeContext';
 
 interface RecipeDetailDialogProps {
   recipe: Recipe | null;
@@ -50,10 +54,71 @@ export function RecipeDetailDialog({
   onRevokePendingShare,
 }: RecipeDetailDialogProps) {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [replacementPickerState, setReplacementPickerState] = useState<{
+    open: boolean;
+    linkedRecipe: Recipe | null;
+    linkId: string | null;
+    existingReplacements: IngredientReplacement[];
+  }>({ open: false, linkedRecipe: null, linkId: null, existingReplacements: [] });
+
+  const { recipes: allRecipes } = useRecipes();
+  const { linkedRecipes, isLoading: isLoadingLinks, addLink, removeLink, updateReplacements } = useRecipeLinks(recipe?.id);
 
   if (!recipe) return null;
 
+  // Handle adding a new link - show replacement picker after
+  const handleAddLink = async (linkedRecipe: Recipe) => {
+    const linkId = await addLink(linkedRecipe.id);
+    if (linkId) {
+      // Open the replacement picker with the created link ID
+      setReplacementPickerState({
+        open: true,
+        linkedRecipe,
+        linkId,
+        existingReplacements: [],
+      });
+    }
+  };
+
+  // Open replacement picker for existing link
+  const openReplacementPicker = (linkedRecipe: Recipe, linkId: string, existingReplacements: IngredientReplacement[]) => {
+    setReplacementPickerState({
+      open: true,
+      linkedRecipe,
+      linkId,
+      existingReplacements,
+    });
+  };
+
+  // Save replacements
+  const handleSaveReplacements = async (replacements: IngredientReplacement[]) => {
+    // Find the link ID if not already set
+    let linkId = replacementPickerState.linkId;
+    if (!linkId && replacementPickerState.linkedRecipe) {
+      const link = linkedRecipes.find(
+        lr => lr.recipe.id === replacementPickerState.linkedRecipe?.id
+      );
+      linkId = link?.link.id || null;
+    }
+
+    if (linkId) {
+      await updateReplacements(linkId, replacements.length > 0 ? replacements : null);
+    }
+  };
+
+  // Helper to get ingredient name by ID
+  const getIngredientName = (ingredientId: string) => {
+    const ing = recipe.ingredients.find(i => i.id === ingredientId);
+    return ing?.item || 'Unknown ingredient';
+  };
+
   const nutrition = recipe.nutrition?.perServing;
+
+  // IDs to exclude from the link picker (current recipe + already linked)
+  const excludeFromPicker = [
+    recipe.id,
+    ...linkedRecipes.map(lr => lr.recipe.id),
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,6 +325,95 @@ export function RecipeDetailDialog({
               </div>
             </div>
 
+            {/* Goes with - Linked recipes (only for personal recipes) */}
+            {!isLibraryRecipe && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-serif text-lg font-semibold flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Goes with
+                  </h3>
+                  <RecipeLinkPicker
+                    recipes={allRecipes}
+                    excludeRecipeIds={excludeFromPicker}
+                    onSelectRecipe={handleAddLink}
+                  />
+                </div>
+
+                {isLoadingLinks ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading linked recipes...
+                  </div>
+                ) : linkedRecipes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">
+                    No linked recipes yet. Link recipes that go well together.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {linkedRecipes.map(({ link, recipe: linkedRecipe }) => (
+                      <div
+                        key={link.id}
+                        className="p-2 rounded-lg bg-muted/50 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {linkedRecipe.imageUrl ? (
+                            <img
+                              src={linkedRecipe.imageUrl}
+                              alt=""
+                              className="w-10 h-10 rounded object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                              <ChefHat className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{linkedRecipe.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {linkedRecipe.totalTime ? `${linkedRecipe.totalTime}m` : linkedRecipe.category}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => openReplacementPicker(
+                              linkedRecipe,
+                              link.id,
+                              link.replacements || []
+                            )}
+                            title="Configure ingredient replacements"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeLink(link.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {/* Show replacement info if configured */}
+                        {link.replacements && link.replacements.length > 0 && (
+                          <div className="mt-2 ml-[52px] pl-2 border-l-2 border-primary/30">
+                            <p className="text-xs text-muted-foreground">
+                              Replaces:{' '}
+                              <span className="text-foreground">
+                                {link.replacements.map(r => getIngredientName(r.replacesIngredientId)).join(', ')}
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 mt-6 pt-6 border-t">
               <Button onClick={() => onAddToMealPlan(recipe)}>
@@ -331,6 +485,18 @@ export function RecipeDetailDialog({
           onGetShares={onGetShares}
           onRevokeShare={onRevokeShare}
           onRevokePendingShare={onRevokePendingShare}
+        />
+      )}
+
+      {/* Ingredient Replacement Picker Dialog */}
+      {replacementPickerState.linkedRecipe && (
+        <IngredientReplacementPicker
+          open={replacementPickerState.open}
+          onOpenChange={(open) => setReplacementPickerState(prev => ({ ...prev, open }))}
+          mainRecipe={recipe}
+          linkedRecipe={replacementPickerState.linkedRecipe}
+          existingReplacements={replacementPickerState.existingReplacements}
+          onSave={handleSaveReplacements}
         />
       )}
     </Dialog>

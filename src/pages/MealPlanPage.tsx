@@ -42,6 +42,7 @@ import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { MealCard } from '@/components/recipes/MealCard';
 import { MealEditSheet } from '@/components/recipes/MealEditSheet';
 import { MealPlanEmptyState } from '@/components/recipes/MealPlanEmptyState';
+import { LinkedRecipePrompt } from '@/components/recipes/LinkedRecipePrompt';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -108,6 +109,13 @@ export default function MealPlanPage() {
 
   // Mobile recipe picker sheet state
   const [pickerSlot, setPickerSlot] = useState<{ day: DayOfWeek; slot: MealSlot } | null>(null);
+
+  // Linked recipe prompt state - shown after selecting a recipe to check for linked recipes
+  const [pendingRecipeAdd, setPendingRecipeAdd] = useState<{
+    recipe: Recipe;
+    day: DayOfWeek;
+    slot: MealSlot;
+  } | null>(null);
 
   const currentMealPlan = getCurrentMealPlan();
   const today = new Date();
@@ -375,30 +383,13 @@ export default function MealPlanPage() {
     else if (itemId && draggingItem) {
       updateMealPlanItem(itemId, { day, mealSlot: slot });
     }
-    // Adding a new recipe - auto-set servings and leftovers based on household size
+    // Adding a new recipe - trigger LinkedRecipePrompt flow
     else if (recipeId) {
       const recipe = recipes.find(r => r.id === recipeId);
-      const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-      const result = await addToMealPlan(recipeId, day, slot, weekStartStr);
-
-      if (result && recipe) {
-        // Calculate how many meals this recipe provides for the household
-        const mealsFromRecipe = recipe.servings / householdSize;
-
-        if (mealsFromRecipe <= 1) {
-          // Recipe doesn't make enough for one meal - scale up to household size
-          const multiplier = householdSize / recipe.servings;
-          if (multiplier !== 1) {
-            updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
-          }
-        } else {
-          // Recipe makes more than one meal - auto-suggest leftovers
-          const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
-          updateMealPlanItem(result.id, {
-            servingsMultiplier: 1, // Cook full recipe as written
-            leftoverMeals: suggestedLeftovers,
-          });
-        }
+      if (recipe) {
+        // Use LinkedRecipePrompt flow - it will check for linked recipes
+        // and handle adding them along with the main recipe
+        setPendingRecipeAdd({ recipe, day: day as DayOfWeek, slot });
       }
     }
 
@@ -955,6 +946,11 @@ export default function MealPlanPage() {
           recipe={selectedRecipeForPlan}
           displayItemsMap={displayItemsMap}
           weekStartDate={selectedWeekStart}
+          onSelectSlot={(recipe, day, slot) => {
+            // Close the MealPlanDialog and open LinkedRecipePrompt
+            setSelectedRecipeForPlan(null);
+            setPendingRecipeAdd({ recipe, day, slot });
+          }}
         />
 
         {/* Recipe detail dialog */}
@@ -999,32 +995,64 @@ export default function MealPlanPage() {
           recipes={recipes}
           day={pickerSlot?.day || null}
           slot={pickerSlot?.slot || null}
-          onSelectRecipe={async (recipe, day, slot) => {
+          onSelectRecipe={(recipe, day, slot) => {
+            // Close picker and open linked recipe prompt
+            setPickerSlot(null);
+            setPendingRecipeAdd({ recipe, day, slot });
+          }}
+        />
+
+        {/* Linked recipe prompt - shows when adding a recipe that may have linked recipes */}
+        <LinkedRecipePrompt
+          open={!!pendingRecipeAdd}
+          onOpenChange={(open) => !open && setPendingRecipeAdd(null)}
+          recipe={pendingRecipeAdd?.recipe || null}
+          day={pendingRecipeAdd?.day || null}
+          slot={pendingRecipeAdd?.slot || null}
+          onConfirm={async (mainRecipe, linkedRecipes, day, slot) => {
             const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-            const result = await addToMealPlan(recipe.id, day, slot, weekStartStr);
 
-            // Auto-adjust servings and leftovers based on household size
-            if (result && recipe.servings > 0) {
-              const mealsFromRecipe = recipe.servings / householdSize;
+            // Helper to add a recipe and auto-adjust servings
+            const addRecipeToSlot = async (recipe: Recipe, targetDay: DayOfWeek, targetSlot: MealSlot) => {
+              const result = await addToMealPlan(recipe.id, targetDay, targetSlot, weekStartStr);
 
-              if (mealsFromRecipe <= 1) {
-                const multiplier = householdSize / recipe.servings;
-                if (multiplier !== 1) {
-                  await updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+              if (result && recipe.servings > 0) {
+                const mealsFromRecipe = recipe.servings / householdSize;
+
+                if (mealsFromRecipe <= 1) {
+                  const multiplier = householdSize / recipe.servings;
+                  if (multiplier !== 1) {
+                    await updateMealPlanItem(result.id, { servingsMultiplier: multiplier });
+                  }
+                } else {
+                  const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
+                  await updateMealPlanItem(result.id, {
+                    servingsMultiplier: 1,
+                    leftoverMeals: suggestedLeftovers,
+                  });
                 }
-              } else {
-                const suggestedLeftovers = Math.floor(mealsFromRecipe) - 1;
-                await updateMealPlanItem(result.id, {
-                  servingsMultiplier: 1,
-                  leftoverMeals: suggestedLeftovers,
-                });
               }
+              return result;
+            };
+
+            // Add main recipe
+            await addRecipeToSlot(mainRecipe, day, slot);
+
+            // Add linked recipes to the same slot
+            for (const linkedRecipe of linkedRecipes) {
+              await addRecipeToSlot(linkedRecipe, day, slot);
             }
 
+            // Show toast
+            const totalAdded = 1 + linkedRecipes.length;
             toast({
               title: "Added to meal plan",
-              description: `${recipe.title} added to ${day} ${slot}`,
+              description: totalAdded > 1
+                ? `${mainRecipe.title} and ${linkedRecipes.length} linked recipe${linkedRecipes.length > 1 ? 's' : ''} added`
+                : `${mainRecipe.title} added to ${day} ${slot}`,
             });
+
+            setPendingRecipeAdd(null);
           }}
         />
 

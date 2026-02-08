@@ -119,6 +119,51 @@ export type Database = {
         }
         Relationships: []
       }
+      recipe_links: {
+        Row: {
+          id: string
+          recipe_id: string
+          linked_recipe_id: string
+          link_type: string
+          created_at: string
+          user_id: string
+          replacements: Json | null
+        }
+        Insert: {
+          id?: string
+          recipe_id: string
+          linked_recipe_id: string
+          link_type?: string
+          created_at?: string
+          user_id: string
+          replacements?: Json | null
+        }
+        Update: {
+          id?: string
+          recipe_id?: string
+          linked_recipe_id?: string
+          link_type?: string
+          created_at?: string
+          user_id?: string
+          replacements?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_links_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_links_linked_recipe_id_fkey"
+            columns: ["linked_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_shares: {
         Row: {
           can_edit: boolean

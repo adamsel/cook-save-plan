@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
-import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan } from '@/types/recipe';
+import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan, MealSlot } from '@/types/recipe';
 import { mergeIngredients, type RawIngredientInput } from '@/lib/ingredientNormalizer/index';
 import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
 import { checkDietaryFlags } from '@/lib/dietaryFlags';
+import { useUnplannedLinkedRecipes, useActiveReplacements } from '@/hooks/useRecipeLinks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -20,12 +21,12 @@ import {
   Calendar,
   UtensilsCrossed,
   Info,
-  Sparkles,
   Loader2,
   Check,
   X,
   AlertTriangle,
-  MoreHorizontal
+  MoreHorizontal,
+  Link2
 } from 'lucide-react';
 import {
   Popover,
@@ -40,12 +41,10 @@ import {
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -62,7 +61,7 @@ import { Switch } from '@/components/ui/switch';
 import { format, startOfWeek, addWeeks, endOfWeek } from 'date-fns';
 
 export default function ShoppingListPage() {
-  const { recipes, getMealPlanForWeek, mealPlans, aisleCategories } = useRecipes();
+  const { recipes, getMealPlanForWeek, mealPlans, aisleCategories, addToMealPlan } = useRecipes();
   const { toast } = useToast();
   const { dietaryRestrictions, allergens } = useDietaryPreferences();
 
@@ -87,15 +86,8 @@ export default function ShoppingListPage() {
   const [additionalMealPlans, setAdditionalMealPlans] = useState<MealPlan[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
-  // AI cleanup state
-  const [isCleaningUp, setIsCleaningUp] = useState(false);
-  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<{
-    items: Array<{ id: string; ingredient: string; quantity: string; category: string; notes?: string }>;
-    changes: string[];
-  } | null>(null);
-  const [cleanupError, setCleanupError] = useState<string | null>(null);
-  const { session } = useAuth();
+  // Dismissed linked recipe reminders (per recipe ID)
+  const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
 
   const today = new Date();
   const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
@@ -151,6 +143,40 @@ export default function ShoppingListPage() {
     return items;
   }, [effectiveMealPlan.items, additionalMealPlans]);
 
+  // Check for linked recipes that aren't in the meal plan
+  const { unplannedLinks, isLoading: isLoadingLinks } = useUnplannedLinkedRecipes(
+    allMealPlanItems,
+    recipes
+  );
+
+  // Get active ingredient replacements for recipes in the meal plan
+  const { replacementsMap, replacementDetails } = useActiveReplacements(allMealPlanItems, recipes);
+
+  // Filter out dismissed reminders
+  const activeUnplannedLinks = useMemo(() => {
+    return unplannedLinks.filter(
+      link => !dismissedReminders.has(link.unplannedLinkedRecipe.id)
+    );
+  }, [unplannedLinks, dismissedReminders]);
+
+  // Handle adding a linked recipe to the meal plan
+  const handleAddLinkedRecipe = async (recipeId: string, day: DayOfWeek, slot: MealSlot) => {
+    const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
+    const result = await addToMealPlan(recipeId, day, slot, weekStartStr);
+
+    if (result) {
+      toast({
+        title: 'Added to meal plan',
+        description: 'The linked recipe has been added to your meal plan.',
+      });
+    }
+  };
+
+  // Dismiss a reminder (user chose "skip" or "buy store-bought")
+  const dismissReminder = (recipeId: string) => {
+    setDismissedReminders(prev => new Set([...prev, recipeId]));
+  };
+
   // Generate shopping list from meal plan with smart ingredient normalization and merging
   const shoppingList = useMemo(() => {
     // Filter meal plan items by selected days (for single week) or include all (for multi-week)
@@ -166,7 +192,15 @@ export default function ShoppingListPage() {
       const recipe = recipes.find(r => r.id === planItem.recipeId);
       if (!recipe) return;
 
+      // Get the set of ingredient IDs to exclude for this recipe (replaced by linked recipes)
+      const excludedIngredientIds = replacementsMap.get(planItem.recipeId) || new Set();
+
       recipe.ingredients.forEach(ingredient => {
+        // Skip ingredients that are being replaced by a linked recipe
+        if (ingredient.id && excludedIngredientIds.has(ingredient.id)) {
+          return; // This ingredient is being replaced - don't add to shopping list
+        }
+
         rawIngredients.push({
           item: ingredient.item,
           quantity: ingredient.quantity,
@@ -225,7 +259,7 @@ export default function ShoppingListPage() {
     });
 
     return items;
-  }, [allMealPlanItems, recipes, customItems, checkedItems, selectedDays, categoryOverrides, weekCount]);
+  }, [allMealPlanItems, recipes, customItems, checkedItems, selectedDays, categoryOverrides, weekCount, replacementsMap]);
 
   const toggleDay = (day: DayOfWeek) => {
     setSelectedDays(prev => {
@@ -317,93 +351,6 @@ export default function ShoppingListPage() {
     window.print();
   };
 
-  const runAICleanup = async () => {
-    if (!session?.access_token) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to use AI cleanup.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCleaningUp(true);
-    setCleanupError(null);
-    setCleanupResult(null);
-
-    try {
-      // Prepare items for the AI
-      const itemsForCleanup = shoppingList
-        .filter(i => !i.checked)
-        .map(i => {
-          const extItem = i as ShoppingListItem & { _totalDisplay?: string };
-          return {
-            id: i.id,
-            ingredient: i.ingredient,
-            quantity: extItem._totalDisplay || (i.quantity ? `${i.quantity} ${i.unit}` : ''),
-            category: i.category || 'Other',
-          };
-        });
-
-      if (itemsForCleanup.length === 0) {
-        toast({
-          title: "No items",
-          description: "Add some items to your shopping list first.",
-        });
-        setIsCleaningUp(false);
-        return;
-      }
-
-      // Debug: Log session and URL info
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shopping-list-cleanup`;
-      console.log('🔍 Debug - Function URL:', functionUrl);
-      console.log('🔍 Debug - Items to cleanup:', itemsForCleanup.length);
-      console.log('🔍 Debug - Request body:', JSON.stringify({ items: itemsForCleanup }).substring(0, 500));
-
-      // Use direct fetch for better error visibility
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items: itemsForCleanup }),
-      });
-
-      console.log('🔍 Debug - Response status:', response.status);
-      const responseText = await response.text();
-      console.log('🔍 Debug - Response body:', responseText);
-
-      if (!response.ok) {
-        throw new Error(`Function error (${response.status}): ${responseText}`);
-      }
-
-      const result = JSON.parse(responseText);
-
-      if (result?.error) {
-        console.error('Function returned error:', result);
-        throw new Error(result.error);
-      }
-
-      if (result?.error) {
-        console.error('Function returned error:', result);
-        throw new Error(result.error);
-      }
-
-      setCleanupResult(result);
-      setCleanupDialogOpen(true);
-    } catch (error) {
-      console.error('AI cleanup error:', error);
-      setCleanupError(error instanceof Error ? error.message : 'An error occurred');
-      toast({
-        title: "Cleanup failed",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCleaningUp(false);
-    }
-  };
-
   function categorizeIngredient(ingredient: string): string {
     const lower = ingredient.toLowerCase();
 
@@ -435,47 +382,6 @@ export default function ShoppingListPage() {
 
     return 'Pantry';
   }
-
-  // Apply AI cleanup results to the shopping list
-  const applyCleanupResults = () => {
-    if (!cleanupResult) return;
-
-    // Mark all current recipe-based items as checked (they're being replaced by consolidated items)
-    const newCheckedItems: Record<string, boolean> = { ...checkedItems };
-    shoppingList.forEach(item => {
-      if (!item.isCustom) {
-        newCheckedItems[item.id] = true;
-      }
-    });
-
-    // Create new custom items from the AI cleanup result
-    const newCustomItems: ShoppingListItem[] = cleanupResult.items.map(item => ({
-      id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      ingredient: item.ingredient,
-      quantity: null, // Quantity is in the display string
-      unit: item.quantity, // Store the full quantity string (e.g., "150g") in unit field for display
-      recipeIds: [],
-      checked: false,
-      category: item.category,
-      isCustom: true,
-    }));
-
-    // Update state
-    setCheckedItems(newCheckedItems);
-    setCustomItems(prev => {
-      // Keep existing custom items that weren't part of the cleanup
-      const existingCustom = prev.filter(item => checkedItems[item.id]);
-      return [...existingCustom, ...newCustomItems];
-    });
-
-    // Close dialog and show success
-    setCleanupDialogOpen(false);
-    setCleanupResult(null);
-    toast({
-      title: "Cleanup applied!",
-      description: `Your shopping list has been consolidated to ${cleanupResult.items.length} items.`,
-    });
-  };
 
   const checkedCount = shoppingList.filter(i => i.checked).length;
   const totalCount = shoppingList.length;
@@ -624,19 +530,6 @@ export default function ShoppingListPage() {
 
       {/* Desktop action buttons - hidden on mobile */}
       <div className="hidden md:flex flex-wrap items-center gap-2 mb-6">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={runAICleanup}
-          disabled={isCleaningUp || shoppingList.filter(i => !i.checked).length === 0}
-        >
-          {isCleaningUp ? (
-            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-          ) : (
-            <Sparkles className="h-4 w-4 mr-1" />
-          )}
-          Smart Cleanup
-        </Button>
         <Button variant="outline" size="sm" onClick={clearChecked}>
           <RotateCcw className="h-4 w-4 mr-1" />
           Reset
@@ -663,6 +556,102 @@ export default function ShoppingListPage() {
           <Plus className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Active replacements info banner */}
+      {replacementDetails.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/30">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm text-blue-800 dark:text-blue-200 mb-1">
+                Ingredient Replacements Active
+              </p>
+              <div className="space-y-1">
+                {replacementDetails.map((detail) => (
+                  <p key={`${detail.mainRecipeId}-${detail.linkedRecipeId}`} className="text-sm text-blue-700 dark:text-blue-300">
+                    <span className="font-medium">{detail.linkedRecipeTitle}</span> replaces{' '}
+                    <span className="italic">{detail.replacedIngredientNames.join(', ')}</span> in{' '}
+                    <span className="font-medium">{detail.mainRecipeTitle}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Linked recipes reminder banner */}
+      {activeUnplannedLinks.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {activeUnplannedLinks.map(({ plannedRecipe, unplannedLinkedRecipe }) => (
+            <div
+              key={unplannedLinkedRecipe.id}
+              className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30"
+            >
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Link2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-amber-800 dark:text-amber-200 mb-1">
+                    Heads up
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    You're making <span className="font-medium">{plannedRecipe.title}</span> but didn't plan{' '}
+                    <span className="font-medium">{unplannedLinkedRecipe.title}</span>. Need to make it?
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="default" className="h-8 bg-amber-600 hover:bg-amber-700 text-white">
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          Add to plan
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="start">
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                          Add to which day?
+                        </p>
+                        <div className="space-y-1">
+                          {DAYS_OF_WEEK.map(day => (
+                            <button
+                              key={day}
+                              onClick={() => {
+                                handleAddLinkedRecipe(unplannedLinkedRecipe.id, day, 'dinner');
+                                dismissReminder(unplannedLinkedRecipe.id);
+                              }}
+                              className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted transition-colors text-left text-sm capitalize"
+                            >
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                      onClick={() => dismissReminder(unplannedLinkedRecipe.id)}
+                    >
+                      Buy store-bought
+                    </Button>
+                  </div>
+                </div>
+                <button
+                  onClick={() => dismissReminder(unplannedLinkedRecipe.id)}
+                  className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 flex-shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Shopping list - flat structure for sticky headers */}
       {totalCount > 0 ? (
@@ -891,94 +880,6 @@ export default function ShoppingListPage() {
         isLibraryRecipe={false}
       />
 
-      {/* AI Cleanup Results Dialog */}
-      <Dialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Smart Cleanup Results
-            </DialogTitle>
-            <DialogDescription>
-              AI has analyzed your shopping list and suggests the following improvements:
-            </DialogDescription>
-          </DialogHeader>
-
-          {cleanupResult && (
-            <div className="space-y-4 mt-4">
-              {/* Changes summary */}
-              {cleanupResult.changes.length > 0 && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    Changes Made
-                  </h4>
-                  <ul className="space-y-1">
-                    {cleanupResult.changes.map((change, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        {change}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Cleaned items preview */}
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium text-sm mb-3">Cleaned Shopping List</h4>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {cleanupResult.items.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50"
-                    >
-                      <span className="text-sm">
-                        <span className="font-medium">{item.quantity} </span>
-                        {item.ingredient}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {item.category}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCleanupDialogOpen(false);
-                    setCleanupResult(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={applyCleanupResults}
-                >
-                  <Check className="h-4 w-4 mr-1" />
-                  Apply Changes
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {cleanupError && (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 mt-4">
-              <p className="text-sm text-destructive flex items-center gap-2">
-                <X className="h-4 w-4" />
-                {cleanupError}
-              </p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Mobile bottom action bar */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-sm border-t z-20 pb-safe">
         <div className="flex items-center justify-between gap-2 p-4 max-w-2xl mx-auto">
@@ -998,13 +899,6 @@ export default function ShoppingListPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={runAICleanup}
-                disabled={isCleaningUp || shoppingList.filter(i => !i.checked).length === 0}
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Smart Cleanup
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={copyToClipboard}>
                 <Copy className="h-4 w-4 mr-2" />
                 Copy List

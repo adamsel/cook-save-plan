@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { analyzeIngredientDiversity, FOOD_GROUP_INFO, FoodGroup } from '@/lib/ingredientCategories';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 interface NutritionGoals {
   primaryGoal?: 'weight_loss' | 'muscle_gain' | 'balanced' | 'none';
@@ -54,6 +55,8 @@ interface AggregatedIngredient {
 }
 
 export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, householdSize }: WeeklySummaryProps) {
+  const { user } = useAuth();
+
   // Load nutrition goals from localStorage (stored inside householdSettings)
   const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>({});
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
@@ -111,6 +114,11 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
     daysWithMeals: number,
     forceRefresh: boolean = false
   ) => {
+    // Skip if user not logged in (prevents 401 errors)
+    if (!user) {
+      return;
+    }
+
     // Skip if no meals planned
     if (totalMeals === 0) {
       setAiInsights([]);
@@ -208,7 +216,7 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
     } finally {
       setIsLoadingInsights(false);
     }
-  }, [householdSize, nutritionGoals]);
+  }, [user, householdSize, nutritionGoals]);
 
   const summary = useMemo(() => {
     // Track per-day nutrition for accurate daily averages

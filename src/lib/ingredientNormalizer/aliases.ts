@@ -160,7 +160,21 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'cider vinegar': 'apple cider vinegar',
   'rice vinegar': 'rice vinegar',
   'rice wine vinegar': 'rice vinegar',
-  
+
+  // Cooking Wines
+  'red wine': 'red wine',
+  'dry red wine': 'red wine',
+  'red cooking wine': 'red wine',
+  'white wine': 'white wine',
+  'dry white wine': 'white wine',
+  'white cooking wine': 'white wine',
+  'cooking wine': 'white wine',
+  'sherry': 'sherry',
+  'cooking sherry': 'sherry',
+  'dry sherry': 'sherry',
+  'marsala': 'marsala wine',
+  'marsala wine': 'marsala wine',
+
   // Broths/Stocks
   'chicken broth': 'chicken stock',
   'chicken stock': 'chicken stock',
@@ -223,6 +237,10 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'minced garlic': 'garlic',
   'fresh garlic': 'garlic',
   'crushed garlic': 'garlic',
+  'head of garlic': 'garlic',
+  'garlic head': 'garlic',
+  'heads of garlic': 'garlic',
+  'whole garlic': 'garlic',
   
   // Onions
   'onions': 'onion',
@@ -247,13 +265,38 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'roma tomato': 'tomato',
   'vine tomatoes': 'tomato',
   'beefsteak tomato': 'tomato',
-  
+
+  'cucumbers': 'cucumber',
+  'english cucumber': 'cucumber',
+  'english cucumbers': 'cucumber',
+  'seedless cucumber': 'cucumber',
+  'seedless cucumbers': 'cucumber',
+  'hothouse cucumber': 'cucumber',
+  'hothouse cucumbers': 'cucumber',
+  'mini cucumber': 'cucumber',
+  'mini cucumbers': 'cucumber',
+  'persian cucumber': 'cucumber',
+  'persian cucumbers': 'cucumber',
+
   'potatoes': 'potato',
   'russet potatoes': 'potato',
   'russet potato': 'potato',
   'baking potatoes': 'potato',
   'baking potato': 'potato',
   'white potatoes': 'potato',
+  'white potato': 'potato',
+  'medium potato': 'potato',
+  'medium potatoes': 'potato',
+  'large potato': 'potato',
+  'large potatoes': 'potato',
+  'small potato': 'potato',
+  'small potatoes': 'potato',
+  'red potato': 'potato',
+  'red potatoes': 'potato',
+  'baby potato': 'potato',
+  'baby potatoes': 'potato',
+  'new potato': 'potato',
+  'new potatoes': 'potato',
   
   'yukon gold potatoes': 'yukon gold potato',
   'yukon gold': 'yukon gold potato',
@@ -268,6 +311,9 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'stalks celery': 'celery',
   'ribs celery': 'celery',
   'celery ribs': 'celery',
+  'celery rib': 'celery',
+  'celery stick': 'celery',
+  'celery sticks': 'celery',
   
   // Peppers
   'bell pepper': 'bell pepper',
@@ -466,6 +512,540 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'pine nuts': 'pine nut',
   'pignoli': 'pine nut',
   'pinoli': 'pine nut',
+
+  // ========================================
+  // International/Regional Variants
+  // ========================================
+
+  // Indian names (from CulinaryDB)
+  'palak': 'spinach',
+  'saag': 'spinach',
+  'jeera': 'cumin',
+  'zeera': 'cumin',
+  'haldi': 'turmeric',
+  'dhania': 'cilantro',
+  'dhania powder': 'coriander powder',
+  'methi': 'fenugreek',
+  'methi leaves': 'fenugreek leaves',
+  'kasuri methi': 'dried fenugreek leaves',
+  'hing': 'asafoetida',
+  'heeng': 'asafoetida',
+  'kali mirch': 'black pepper',
+  'lal mirch': 'red chili powder',
+  'rai': 'mustard seeds',
+  'sarson': 'mustard',
+  'chana': 'chickpea',
+  'chole': 'chickpea',
+  'kabuli chana': 'chickpea',
+  'masoor': 'red lentil',
+  'masoor dal': 'red lentil',
+  'urad': 'black lentil',
+  'urad dal': 'black lentil',
+  'moong': 'mung bean',
+  'moong dal': 'mung bean',
+  'toor dal': 'pigeon pea',
+  'arhar dal': 'pigeon pea',
+  'chana dal': 'split chickpea',
+  'besan': 'chickpea flour',
+  'gram flour': 'chickpea flour',
+  'atta': 'whole wheat flour',
+  'maida': 'flour',
+  'ghee': 'ghee',
+  'desi ghee': 'ghee',
+  'clarified butter': 'ghee',
+  'paneer': 'paneer',
+  'cottage cheese': 'paneer',
+  'dahi': 'yogurt',
+  'curd': 'yogurt',
+  'elaichi': 'cardamom',
+  'green cardamom': 'cardamom',
+  'black cardamom': 'black cardamom',
+  'badi elaichi': 'black cardamom',
+  'dalchini': 'cinnamon',
+  'laung': 'cloves',
+  'lavang': 'cloves',
+  'jaiphal': 'nutmeg',
+  'javitri': 'mace',
+  'ajwain': 'carom seeds',
+  'kalonji': 'nigella seeds',
+  'saunf': 'fennel seeds',
+  'til': 'sesame seeds',
+  'imli': 'tamarind',
+  'amchur': 'dried mango powder',
+  'amchoor': 'dried mango powder',
+  'garam masala': 'garam masala',
+
+  // UK/Australian/British terms
+  'swede': 'rutabaga',
+  'neep': 'rutabaga',
+  'mangetout': 'snow pea',
+  'mange tout': 'snow pea',
+  'cos lettuce': 'romaine',
+  'celeriac': 'celery root',
+  'broad beans': 'fava beans',
+  'broad bean': 'fava beans',
+  'runner beans': 'green beans',
+  'french beans': 'green beans',
+  'haricot beans': 'navy beans',
+  'haricot vert': 'green beans',
+  'haricots verts': 'green beans',
+  'sultanas': 'golden raisins',
+  'sultana': 'golden raisins',
+  'currants': 'dried currants',
+  'bicarb': 'baking soda',
+  'beetroot': 'beet',
+  'beetroots': 'beet',
+  'spring greens': 'collard greens',
+  'cavolo nero': 'tuscan kale',
+  'black cabbage': 'tuscan kale',
+  'marrow': 'zucchini',
+  'vegetable marrow': 'zucchini',
+  'treacle': 'molasses',
+  'black treacle': 'molasses',
+  'golden syrup': 'light corn syrup',
+  'digestive biscuit': 'graham cracker',
+  'digestives': 'graham cracker',
+  'clotted cream': 'clotted cream',
+  'creme fraiche': 'sour cream',
+  'crème fraîche': 'sour cream',
+  'rashers': 'bacon',
+  'back bacon': 'canadian bacon',
+  'gammon': 'ham',
+  'mince': 'ground beef',
+  'lamb mince': 'ground lamb',
+
+  // ========================================
+  // Seafood
+  // ========================================
+
+  // Salmon
+  'atlantic salmon': 'salmon',
+  'sockeye salmon': 'salmon',
+  'king salmon': 'salmon',
+  'chinook salmon': 'salmon',
+  'coho salmon': 'salmon',
+  'wild salmon': 'salmon',
+  'salmon fillet': 'salmon',
+  'salmon fillets': 'salmon',
+  'salmon steak': 'salmon',
+  'fresh salmon': 'salmon',
+
+  // Cod
+  'cod fillet': 'cod',
+  'cod fillets': 'cod',
+  'pacific cod': 'cod',
+  'atlantic cod': 'cod',
+  'fresh cod': 'cod',
+  'salt cod': 'salt cod',
+  'bacalao': 'salt cod',
+  'baccala': 'salt cod',
+
+  // Tuna
+  'ahi tuna': 'tuna',
+  'yellowfin tuna': 'tuna',
+  'albacore tuna': 'tuna',
+  'bluefin tuna': 'tuna',
+  'tuna steak': 'tuna',
+  'tuna steaks': 'tuna',
+  'fresh tuna': 'tuna',
+  'sushi grade tuna': 'tuna',
+
+  // Other fish
+  'sea bass': 'bass',
+  'striped bass': 'bass',
+  'chilean sea bass': 'chilean sea bass',
+  'branzino': 'branzino',
+  'european sea bass': 'branzino',
+
+  'tilapia fillet': 'tilapia',
+  'tilapia fillets': 'tilapia',
+
+  'halibut fillet': 'halibut',
+  'halibut fillets': 'halibut',
+  'pacific halibut': 'halibut',
+
+  'mahi mahi': 'mahi mahi',
+  'mahi-mahi': 'mahi mahi',
+  'dorado': 'mahi mahi',
+  'dolphinfish': 'mahi mahi',
+
+  'swordfish steak': 'swordfish',
+  'swordfish steaks': 'swordfish',
+
+  'red snapper': 'snapper',
+  'yellowtail snapper': 'snapper',
+  'snapper fillet': 'snapper',
+
+  'rainbow trout': 'trout',
+  'steelhead trout': 'trout',
+  'trout fillet': 'trout',
+
+  'catfish fillet': 'catfish',
+  'catfish fillets': 'catfish',
+
+  'sardines': 'sardine',
+  'fresh sardines': 'sardine',
+  'canned sardines': 'canned sardines',
+
+  'anchovies': 'anchovy',
+  'anchovy fillets': 'anchovy',
+  'canned anchovies': 'anchovy',
+
+  // Shellfish - Shrimp
+  'raw shrimp': 'shrimp',
+  'cooked shrimp': 'shrimp',
+  'prawns': 'shrimp',
+  'king prawns': 'shrimp',
+  'tiger prawns': 'shrimp',
+  'large shrimp': 'shrimp',
+  'jumbo shrimp': 'shrimp',
+  'medium shrimp': 'shrimp',
+  'small shrimp': 'shrimp',
+  'shell-on shrimp': 'shrimp',
+  'peeled shrimp': 'shrimp',
+  'deveined shrimp': 'shrimp',
+  'peeled and deveined shrimp': 'shrimp',
+  'shrimp (peeled and deveined)': 'shrimp',
+
+  // Shellfish - Other
+  'sea scallops': 'scallops',
+  'bay scallops': 'scallops',
+  'diver scallops': 'scallops',
+  'dry scallops': 'scallops',
+
+  'littleneck clams': 'clams',
+  'cherrystone clams': 'clams',
+  'manila clams': 'clams',
+  'razor clams': 'clams',
+  'canned clams': 'canned clams',
+  'clam juice': 'clam juice',
+
+  'mussels': 'mussel',
+  'fresh mussels': 'mussel',
+  'pei mussels': 'mussel',
+  'black mussels': 'mussel',
+  'green lip mussels': 'mussel',
+
+  'maine lobster': 'lobster',
+  'lobster tail': 'lobster',
+  'lobster tails': 'lobster',
+  'spiny lobster': 'lobster',
+
+  'dungeness crab': 'crab',
+  'blue crab': 'crab',
+  'king crab': 'crab',
+  'lump crab': 'crab',
+  'crab meat': 'crab',
+  'crabmeat': 'crab',
+
+  'squid': 'calamari',
+  'calamari rings': 'calamari',
+  'squid rings': 'calamari',
+
+  'octopus': 'octopus',
+  'baby octopus': 'octopus',
+
+  // ========================================
+  // Produce Varieties
+  // ========================================
+
+  // Mushrooms
+  'white mushrooms': 'mushroom',
+  'button mushrooms': 'mushroom',
+  'white button mushrooms': 'mushroom',
+  'mushrooms': 'mushroom',
+  'cremini mushrooms': 'cremini',
+  'creminis': 'cremini',
+  'baby bella mushrooms': 'cremini',
+  'baby bellas': 'cremini',
+  'portobello mushrooms': 'portobello',
+  'portabella mushrooms': 'portobello',
+  'portabellas': 'portobello',
+  'portobellos': 'portobello',
+  'portobello caps': 'portobello',
+  'shiitake mushrooms': 'shiitake',
+  'shiitakes': 'shiitake',
+  'fresh shiitake': 'shiitake',
+  'dried shiitake': 'dried shiitake',
+  'oyster mushrooms': 'oyster mushroom',
+  'king oyster mushrooms': 'king oyster mushroom',
+  'chanterelle mushrooms': 'chanterelle',
+  'chanterelles': 'chanterelle',
+  'porcini mushrooms': 'porcini',
+  'dried porcini': 'dried porcini',
+  'morel mushrooms': 'morel',
+  'morels': 'morel',
+  'enoki mushrooms': 'enoki',
+  'maitake mushrooms': 'maitake',
+  'hen of the woods': 'maitake',
+
+  // Greens
+  'baby spinach': 'spinach',
+  'mature spinach': 'spinach',
+  'spinach leaves': 'spinach',
+  'fresh spinach': 'spinach',
+  'kale leaves': 'kale',
+  'curly kale': 'kale',
+  'lacinato kale': 'lacinato kale',
+  'tuscan kale': 'lacinato kale',
+  'dinosaur kale': 'lacinato kale',
+  'baby kale': 'kale',
+  'swiss chard': 'chard',
+  'rainbow chard': 'chard',
+  'red chard': 'chard',
+  'chard leaves': 'chard',
+  'collard greens': 'collard greens',
+  'collards': 'collard greens',
+  'mustard greens': 'mustard greens',
+  'turnip greens': 'turnip greens',
+  'beet greens': 'beet greens',
+  'dandelion greens': 'dandelion greens',
+  'watercress': 'watercress',
+  'baby arugula': 'arugula',
+  'wild arugula': 'arugula',
+  'arugula leaves': 'arugula',
+
+  // Lettuce varieties
+  'iceberg lettuce': 'lettuce',
+  'head lettuce': 'lettuce',
+  'butter lettuce': 'butter lettuce',
+  'bibb lettuce': 'butter lettuce',
+  'boston lettuce': 'butter lettuce',
+  'butterhead lettuce': 'butter lettuce',
+  'romaine lettuce': 'romaine',
+  'romaine hearts': 'romaine',
+  'little gem lettuce': 'little gem',
+  'gem lettuce': 'little gem',
+  'red leaf lettuce': 'red leaf lettuce',
+  'green leaf lettuce': 'green leaf lettuce',
+  'mixed greens': 'mixed greens',
+  'spring mix': 'mixed greens',
+  'mesclun': 'mixed greens',
+  'salad greens': 'mixed greens',
+
+  // Squash varieties
+  'butternut squash': 'butternut squash',
+  'butternut': 'butternut squash',
+  'acorn squash': 'acorn squash',
+  'delicata squash': 'delicata squash',
+  'delicata': 'delicata squash',
+  'spaghetti squash': 'spaghetti squash',
+  'kabocha squash': 'kabocha',
+  'kabocha': 'kabocha',
+  'japanese pumpkin': 'kabocha',
+  'hubbard squash': 'hubbard squash',
+  'honeynut squash': 'honeynut squash',
+  'yellow squash': 'yellow squash',
+  'summer squash': 'yellow squash',
+  'crookneck squash': 'yellow squash',
+  'pattypan squash': 'pattypan squash',
+  'zucchini squash': 'zucchini',
+  'green zucchini': 'zucchini',
+  'baby zucchini': 'zucchini',
+
+  // ========================================
+  // Spice Blends
+  // ========================================
+
+  'chinese five spice': 'five spice powder',
+  'five-spice powder': 'five spice powder',
+  'five spice': 'five spice powder',
+  'chinese 5 spice': 'five spice powder',
+  '5 spice powder': 'five spice powder',
+
+  'garam masala powder': 'garam masala',
+
+  'curry powder': 'curry powder',
+  'madras curry powder': 'curry powder',
+  'thai curry powder': 'curry powder',
+  'hot curry powder': 'curry powder',
+  'mild curry powder': 'curry powder',
+
+  'italian seasoning': 'italian seasoning',
+  'italian herb blend': 'italian seasoning',
+  'italian herbs': 'italian seasoning',
+
+  'herbes de provence': 'herbs de provence',
+  'herbs de provence': 'herbs de provence',
+  'provence herbs': 'herbs de provence',
+
+  'taco seasoning': 'taco seasoning',
+  'taco spice': 'taco seasoning',
+  'taco spice mix': 'taco seasoning',
+
+  'cajun seasoning': 'cajun seasoning',
+  'cajun spice': 'cajun seasoning',
+  'creole seasoning': 'cajun seasoning',
+  'cajun spice blend': 'cajun seasoning',
+
+  'old bay': 'old bay seasoning',
+  'old bay seasoning': 'old bay seasoning',
+
+  'za\'atar': 'zaatar',
+  'zaatar': 'zaatar',
+  'zatar': 'zaatar',
+
+  'ras el hanout': 'ras el hanout',
+  'ras-el-hanout': 'ras el hanout',
+
+  'berbere': 'berbere',
+  'berbere spice': 'berbere',
+
+  'harissa': 'harissa',
+  'harissa paste': 'harissa',
+  'harissa powder': 'harissa',
+
+  'baharat': 'baharat',
+  'middle eastern spice blend': 'baharat',
+
+  'shichimi togarashi': 'shichimi togarashi',
+  'shichimi': 'shichimi togarashi',
+  'togarashi': 'shichimi togarashi',
+  'japanese seven spice': 'shichimi togarashi',
+
+  'furikake': 'furikake',
+  'rice seasoning': 'furikake',
+
+  'chili powder': 'chili powder',
+  'chile powder': 'chili powder',
+  'ancho chili powder': 'ancho chili powder',
+  'chipotle powder': 'chipotle powder',
+  'chipotle chili powder': 'chipotle powder',
+  'cayenne powder': 'cayenne pepper',
+  'ground cayenne': 'cayenne pepper',
+
+  'adobo seasoning': 'adobo seasoning',
+  'sazon': 'sazon seasoning',
+  'sazon seasoning': 'sazon seasoning',
+
+  'jerk seasoning': 'jerk seasoning',
+  'jamaican jerk': 'jerk seasoning',
+  'jerk spice': 'jerk seasoning',
+
+  'pumpkin pie spice': 'pumpkin pie spice',
+  'pumpkin spice': 'pumpkin pie spice',
+
+  'apple pie spice': 'apple pie spice',
+
+  'everything bagel seasoning': 'everything bagel seasoning',
+  'everything seasoning': 'everything bagel seasoning',
+
+  // ========================================
+  // Legumes & Grains
+  // ========================================
+
+  // White beans
+  'cannellini beans': 'white beans',
+  'cannellini': 'white beans',
+  'great northern beans': 'white beans',
+  'navy beans': 'white beans',
+  'white kidney beans': 'white beans',
+  'white beans': 'white beans',
+
+  // Other beans
+  'pinto beans': 'pinto beans',
+  'kidney beans': 'kidney beans',
+  'red kidney beans': 'kidney beans',
+  'dark red kidney beans': 'kidney beans',
+  'light red kidney beans': 'kidney beans',
+  'black beans': 'black beans',
+  'black turtle beans': 'black beans',
+  'canned black beans': 'black beans',
+
+  // Chickpeas
+  'garbanzo beans': 'chickpeas',
+  'chickpeas': 'chickpeas',
+  'canned chickpeas': 'chickpeas',
+  'dried chickpeas': 'chickpeas',
+
+  // Lentils
+  'green lentils': 'lentils',
+  'brown lentils': 'lentils',
+  'french lentils': 'french lentils',
+  'puy lentils': 'french lentils',
+  'du puy lentils': 'french lentils',
+  'beluga lentils': 'black lentils',
+  'black lentils': 'black lentils',
+  'red lentils': 'red lentils',
+  'yellow lentils': 'yellow lentils',
+  'split red lentils': 'red lentils',
+  'split lentils': 'lentils',
+
+  // Grains - Barley
+  'pearled barley': 'barley',
+  'pearl barley': 'barley',
+  'hulled barley': 'barley',
+  'barley': 'barley',
+
+  // Grains - Oats
+  'steel cut oats': 'oats',
+  'steel-cut oats': 'oats',
+  'rolled oats': 'oats',
+  'old fashioned oats': 'oats',
+  'old-fashioned oats': 'oats',
+  'quick oats': 'oats',
+  'quick cooking oats': 'oats',
+  'instant oats': 'oats',
+  'oat flakes': 'oats',
+
+  // Grains - Others
+  'farro': 'farro',
+  'pearled farro': 'farro',
+  'semi-pearled farro': 'farro',
+
+  'bulgur wheat': 'bulgur',
+  'bulgur': 'bulgur',
+  'cracked wheat': 'bulgur',
+  'bulghur': 'bulgur',
+
+  'freekeh': 'freekeh',
+  'cracked freekeh': 'freekeh',
+
+  'quinoa': 'quinoa',
+  'white quinoa': 'quinoa',
+  'red quinoa': 'quinoa',
+  'tri-color quinoa': 'quinoa',
+  'tricolor quinoa': 'quinoa',
+
+  'couscous': 'couscous',
+  'israeli couscous': 'israeli couscous',
+  'pearl couscous': 'israeli couscous',
+  'ptitim': 'israeli couscous',
+
+  'polenta': 'polenta',
+  'instant polenta': 'polenta',
+  'cornmeal': 'cornmeal',
+  'corn meal': 'cornmeal',
+  'yellow cornmeal': 'cornmeal',
+  'white cornmeal': 'cornmeal',
+  'coarse cornmeal': 'cornmeal',
+  'fine cornmeal': 'cornmeal',
+
+  'grits': 'grits',
+  'stone ground grits': 'grits',
+  'hominy grits': 'grits',
+
+  'buckwheat': 'buckwheat',
+  'buckwheat groats': 'buckwheat',
+  'kasha': 'buckwheat',
+
+  'millet': 'millet',
+
+  'amaranth': 'amaranth',
+
+  'teff': 'teff',
+  'teff grain': 'teff',
+
+  'wild rice': 'wild rice',
+  'wild rice blend': 'wild rice',
+
+  'arborio rice': 'arborio rice',
+  'carnaroli rice': 'arborio rice',
+  'risotto rice': 'arborio rice',
+
+  'sushi rice': 'sushi rice',
+  'short grain japanese rice': 'sushi rice',
+  'calrose rice': 'sushi rice',
 };
 
 // Words to strip from ingredient names (don't affect shopping)
@@ -562,4 +1142,23 @@ export const DESCRIPTORS_TO_REMOVE = [
   'rounded',
   'scant',
   'generous',
+  // Size/count descriptors for produce
+  'sized',
+  'stick',
+  'sticks',
+  'head',
+  'head of',
+  'english',
+  'bunch',
+  'bunch of',
+  'clove',
+  'cloves',
+  'sprig',
+  'sprigs',
+  'sprig of',
+  'sprigs of',
+  'rib',
+  'ribs',
+  'stalk',
+  'stalks',
 ];
