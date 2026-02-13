@@ -67,6 +67,11 @@ function singularize(word: string): string {
  * Get the canonical form of an ingredient name
  */
 export function normalizeIngredient(ingredient: string): string {
+  // Guard against null/undefined input
+  if (!ingredient) {
+    return '';
+  }
+
   // Clean up the input first (lowercase, trim, remove parenthetical content)
   const cleaned = ingredient.toLowerCase().trim().replace(/\([^)]*\)/g, '').trim();
 
@@ -178,6 +183,11 @@ export interface MergedIngredient {
  *   "coconut oil (or butter)" → { primary: "coconut oil", alternatives: ["butter"] }
  */
 function parseAlternatives(item: string): { primary: string; alternatives: string[] } {
+  // Guard against null/undefined input
+  if (!item) {
+    return { primary: '', alternatives: [] };
+  }
+
   // Match patterns like "X or Y" or "X (or Y)"
   const orMatch = item.match(/^(.+?)\s+(?:\()?or\s+(.+?)(?:\))?$/i);
   if (orMatch) {
@@ -216,17 +226,24 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     alternatives: Set<string>;
   }>();
 
+  // Filter out inputs with null/undefined items
+  const validInputs = inputs.filter(input => input.item && input.item.trim());
+
   // First pass: collect all normalized keys (to check if alternatives are already on list)
   const allKeys = new Set<string>();
-  for (const input of inputs) {
+  for (const input of validInputs) {
     const { primary } = parseAlternatives(input.item);
-    allKeys.add(getIngredientKey(primary));
+    if (primary) {
+      allKeys.add(getIngredientKey(primary));
+    }
   }
 
-  for (const input of inputs) {
+  for (const input of validInputs) {
     // Parse "or" alternatives from the ingredient name
     const { primary, alternatives } = parseAlternatives(input.item);
+    if (!primary) continue; // Skip empty items
     const key = getIngredientKey(primary);
+    if (!key) continue; // Skip if normalization returns empty
     const multiplier = input.servingsMultiplier ?? 1;
 
     if (!groups.has(key)) {
