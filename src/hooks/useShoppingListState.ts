@@ -222,6 +222,18 @@ export function useShoppingListState() {
     });
   }, []);
 
+  // Clear ALL category overrides (useful for resetting stale data)
+  const clearAllCategoryOverrides = useCallback(() => {
+    setCategoryOverridesState({});
+    setToLocalStorage(STORAGE_KEY_CATEGORY_OVERRIDES, {});
+  }, []);
+
+  // Clear ALL custom items
+  const clearAllCustomItems = useCallback(() => {
+    setCustomItemsState([]);
+    debouncedSave(checkedItems, []);
+  }, [checkedItems, debouncedSave]);
+
   return {
     checkedItems,
     setCheckedItems,
@@ -230,6 +242,8 @@ export function useShoppingListState() {
     categoryOverrides,
     setCategoryOverride,
     removeCategoryOverride,
+    clearAllCategoryOverrides,
+    clearAllCustomItems,
     isLoading,
     isSyncing,
     resetForNewWeek,

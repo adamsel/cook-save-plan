@@ -351,38 +351,6 @@ export default function ShoppingListPage() {
     window.print();
   };
 
-  function categorizeIngredient(ingredient: string): string {
-    const lower = ingredient.toLowerCase();
-
-    // Categorization rules - order matters (check specific patterns first)
-
-    // Meat & Seafood (comprehensive list including steak, turkey, etc.)
-    if (/chicken|beef|steak|pork|lamb|turkey|duck|veal|fish|salmon|tuna|cod|tilapia|halibut|shrimp|prawn|crab|lobster|scallop|bacon|pancetta|ham|sausage|mince|ground meat/.test(lower)) return 'Meat & Seafood';
-
-    // Dairy & Eggs
-    if (/milk|cheese|cream|butter|yogurt|egg|sour cream|cottage cheese|ricotta|mozzarella|parmesan|cheddar/.test(lower)) return 'Dairy';
-
-    // Produce (fruits and vegetables)
-    if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|mushroom|cabbage|kale|avocado|lemon|lime|orange|apple|banana|berry|grape/.test(lower)) return 'Produce';
-
-    // Bakery
-    if (/bread|bagel|tortilla|roll|bun|croissant|muffin|pita/.test(lower)) return 'Bakery';
-
-    // Frozen
-    if (/frozen/.test(lower)) return 'Frozen';
-
-    // Spices & Seasonings
-    if (/salt|pepper|oregano|basil|cumin|paprika|cinnamon|thyme|rosemary|sage|nutmeg|ginger|turmeric|curry|chili powder|cayenne|bay leaf|dill|parsley|cilantro|mint|seasoning|spice/.test(lower)) return 'Spices & Seasonings';
-
-    // Condiments (check BEFORE beverages to avoid "juice" false matches)
-    if (/sauce|ketchup|mustard|mayo|mayonnaise|vinegar|oil|dressing|relish|salsa|soy sauce|hot sauce|worcestershire|sriracha|honey|syrup|jam|jelly/.test(lower)) return 'Condiments';
-
-    // Beverages (check last for liquid-like words)
-    if (/water|juice|soda|coffee|tea|broth|stock|wine|beer/.test(lower) && !/steak/.test(lower)) return 'Beverages';
-
-    return 'Pantry';
-  }
-
   const checkedCount = shoppingList.filter(i => i.checked).length;
   const totalCount = shoppingList.length;
 

@@ -3,6 +3,7 @@
 
 import { INGREDIENT_ALIASES, DESCRIPTORS_TO_REMOVE } from './aliases';
 import { fuzzyMatchIngredient } from './fuzzyMatcher';
+import { INGREDIENT_CATEGORIES } from './categories';
 import {
   normalizeUnit,
   toBaseUnits,
@@ -66,30 +67,52 @@ function singularize(word: string): string {
  * Get the canonical form of an ingredient name
  */
 export function normalizeIngredient(ingredient: string): string {
-  // First remove descriptors
-  let normalized = removeDescriptors(ingredient);
-  
-  // Check for exact alias match
+  // Clean up the input first (lowercase, trim, remove parenthetical content)
+  const cleaned = ingredient.toLowerCase().trim().replace(/\([^)]*\)/g, '').trim();
+
+  // === STEP 1: Check alias BEFORE removing descriptors ===
+  // This preserves important terms like "ground" in "ground beef"
+  if (INGREDIENT_ALIASES[cleaned]) {
+    return INGREDIENT_ALIASES[cleaned];
+  }
+
+  // Try singularized version of cleaned input
+  const cleanedSingular = singularize(cleaned);
+  if (INGREDIENT_ALIASES[cleanedSingular]) {
+    return INGREDIENT_ALIASES[cleanedSingular];
+  }
+
+  // Try each word singularized on cleaned input
+  const cleanedWords = cleaned.split(' ');
+  const cleanedSingularized = cleanedWords.map(w => singularize(w)).join(' ');
+  if (INGREDIENT_ALIASES[cleanedSingularized]) {
+    return INGREDIENT_ALIASES[cleanedSingularized];
+  }
+
+  // === STEP 2: Remove descriptors and try again ===
+  // This handles cases like "fresh ground beef" → "ground beef" → alias match
+  const normalized = removeDescriptors(ingredient);
+
   if (INGREDIENT_ALIASES[normalized]) {
     return INGREDIENT_ALIASES[normalized];
   }
-  
+
   // Try singularized version
   const singularized = singularize(normalized);
   if (INGREDIENT_ALIASES[singularized]) {
     return INGREDIENT_ALIASES[singularized];
   }
-  
+
   // Try each word singularized
   const words = normalized.split(' ');
   const singularizedWords = words.map(w => singularize(w));
   const singularizedPhrase = singularizedWords.join(' ');
-  
+
   if (INGREDIENT_ALIASES[singularizedPhrase]) {
     return INGREDIENT_ALIASES[singularizedPhrase];
   }
 
-  // Fuzzy match fallback for typos and variations not in static aliases
+  // === STEP 3: Fuzzy match fallback for typos and variations ===
   const fuzzyMatch = fuzzyMatchIngredient(singularizedPhrase);
   if (fuzzyMatch) {
     return fuzzyMatch;
@@ -387,82 +410,93 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
 
 /**
  * Categorize an ingredient into a shopping aisle
- * Order matters: check SPECIFIC patterns before GENERIC ones
+ * Uses a 3-layer approach:
+ * 1. Direct lookup in INGREDIENT_CATEGORIES (most reliable)
+ * 2. Check each word of multi-word ingredients
+ * 3. Fall back to regex with word boundaries
  */
 function categorizeIngredient(ingredient: string): string {
-  const lower = ingredient.toLowerCase();
+  // First, normalize the ingredient to get the canonical form
+  const normalized = normalizeIngredient(ingredient);
+  const lower = normalized.toLowerCase();
 
-  // === SPECIFIC PATTERNS FIRST (to avoid false matches) ===
+  // === LAYER 1: Direct lookup (most reliable) ===
+  if (INGREDIENT_CATEGORIES[normalized]) {
+    return INGREDIENT_CATEGORIES[normalized];
+  }
+  if (INGREDIENT_CATEGORIES[lower]) {
+    return INGREDIENT_CATEGORIES[lower];
+  }
 
-  // Condiments & Sauces (check BEFORE "fish" matches Meat)
-  if (/sauce|ketchup|mustard|mayo|mayonnaise|vinegar|dressing|relish|salsa|hot sauce|soy sauce|fish sauce|oyster sauce|hoisin|teriyaki|worcestershire|sriracha/.test(lower)) {
+  // === LAYER 2: Check each word of multi-word ingredients ===
+  const words = lower.split(' ');
+  for (const word of words) {
+    if (INGREDIENT_CATEGORIES[word]) {
+      return INGREDIENT_CATEGORIES[word];
+    }
+  }
+
+  // === LAYER 3: Fallback regex with WORD BOUNDARIES ===
+  // This catches ingredients not in the lookup table
+  // Using \b prevents "buttery" from matching "butter"
+
+  // Condiments & Sauces
+  if (/\b(sauce|ketchup|mustard|mayo|mayonnaise|vinegar|dressing|relish|salsa|sriracha|hoisin|teriyaki|worcestershire)\b/.test(lower)) {
     return 'Condiments';
   }
 
-  // Beverages & Broths (check BEFORE "beef"/"chicken" matches Meat)
-  // Use word boundary for "tea" to avoid matching "steak"
-  if (/broth|stock|water|juice|soda|coffee|\btea\b|wine|beer/.test(lower)) {
+  // Beverages & Broths
+  if (/\b(broth|stock|juice|soda|coffee|tea|wine|beer)\b/.test(lower)) {
     return 'Beverages';
   }
 
-  // Spices & Seasonings (check "powder", "ground", "dried" BEFORE Produce)
-  if (/powder|ground |dried |salt|pepper|oregano|cumin|paprika|cinnamon|nutmeg|cayenne|chili powder|curry|turmeric|coriander|cardamom|clove|allspice|bay leaf|sage|tarragon|garlic powder|onion powder|ginger powder|seasoning|spice/.test(lower)) {
+  // Spices & Seasonings
+  if (/\b(seasoning|spice|powder|paprika|cumin|cinnamon|nutmeg|oregano|thyme|basil|rosemary)\b/.test(lower)) {
     return 'Spices & Seasonings';
   }
 
-  // === NOW CHECK GENERIC PATTERNS ===
-
-  // Proteins (safe now that sauces/broths are filtered)
-  if (/chicken|beef|steak|pork|lamb|turkey|duck|veal|salmon|tuna|shrimp|prawn|crab|lobster|bacon|ham|sausage|ground meat|mince|fish fillet|cod|tilapia|halibut/.test(lower)) {
+  // Meat & Seafood
+  if (/\b(chicken|beef|steak|pork|lamb|turkey|duck|salmon|tuna|shrimp|crab|lobster|bacon|ham|sausage|cod|tilapia|halibut|fish)\b/.test(lower)) {
     return 'Meat & Seafood';
   }
 
-  // Dairy
-  if (/milk|cream|butter|cheese|yogurt|yoghurt|egg|sour cream|cottage cheese|ricotta|mascarpone/.test(lower)) {
+  // Dairy - use word boundaries to prevent "buttery" matching "butter"
+  if (/\b(milk|cream|butter|cheese|yogurt|yoghurt|egg)\b/.test(lower)) {
     return 'Dairy';
   }
 
-  // Baking starches & sweeteners (check BEFORE Produce to catch cornstarch, honey, etc.)
-  if (/starch|cornstarch|flour|sugar|honey|maple syrup|molasses|baking powder|baking soda|yeast|vanilla|chocolate|cocoa/.test(lower)) {
+  // Baking
+  if (/\b(flour|sugar|starch|honey|syrup|molasses|baking|yeast|vanilla|chocolate|cocoa)\b/.test(lower)) {
     return 'Baking';
   }
 
-  // Produce (added radish, beet, turnip, parsnip)
-  // Use word boundaries for corn/pea to avoid matching cornstarch, peanut, etc.
-  if (/lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|scallion|green onion|leek|shallot|radish|beet|turnip|parsnip|asparagus|artichoke|\bcorn\b|\bpea\b|bean sprout/.test(lower)) {
-    return 'Produce';
-  }
-
-  // Fresh herbs go to Produce (not dried spices)
-  if (/fresh basil|fresh cilantro|fresh parsley|fresh mint|fresh dill|fresh thyme|fresh rosemary|fresh oregano|fresh sage|basil leaves|cilantro leaves|parsley leaves|mint leaves/.test(lower)) {
+  // Produce
+  if (/\b(lettuce|tomato|onion|garlic|pepper|cucumber|broccoli|spinach|carrot|celery|potato|zucchini|squash|eggplant|mushroom|cabbage|kale|arugula|lemon|lime|orange|apple|banana|berry|grape|melon|avocado|ginger|leek|shallot|radish|beet|turnip|parsnip|asparagus|artichoke|corn|pea|olive|basil|cilantro|parsley|mint|dill)\b/.test(lower)) {
     return 'Produce';
   }
 
   // Bakery
-  if (/bread|bagel|tortilla|roll|bun|pita|naan|croissant|muffin|baguette/.test(lower)) {
+  if (/\b(bread|bagel|tortilla|roll|bun|pita|naan|croissant|muffin|baguette)\b/.test(lower)) {
     return 'Bakery';
   }
 
   // Frozen
-  if (/frozen/.test(lower)) {
+  if (/\bfrozen\b/.test(lower)) {
     return 'Frozen';
   }
 
   // Canned goods
-  if (/canned|can of|tinned/.test(lower)) {
+  if (/\b(canned|tinned)\b/.test(lower)) {
     return 'Canned Goods';
   }
 
   // Pasta & Grains
-  if (/pasta|spaghetti|penne|rigatoni|fettuccine|linguine|rice|quinoa|couscous|orzo|noodle|macaroni/.test(lower)) {
+  if (/\b(pasta|spaghetti|penne|rigatoni|fettuccine|linguine|rice|quinoa|couscous|orzo|noodle|macaroni|oats|barley|farro)\b/.test(lower)) {
     return 'Pasta & Grains';
   }
 
-  // Note: Baking items (flour, sugar, starch, honey, etc.) are checked earlier to prevent
-  // cornstarch from matching "corn" in Produce. No duplicate check needed here.
-
-  // Oils (separate from condiments for clearer categorization)
-  if (/oil/.test(lower)) {
+  // Oils
+  if (/\boil\b/.test(lower)) {
     return 'Condiments';
   }
 
