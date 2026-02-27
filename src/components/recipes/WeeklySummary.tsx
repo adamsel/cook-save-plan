@@ -140,10 +140,6 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
           if (hash === requestHash || age < CACHE_TTL_MS) {
             setAiInsights(insights);
             lastFetchRef.current = requestHash;
-            // If hash changed but cache is recent, show cached data (don't fetch)
-            if (hash !== requestHash && age < CACHE_TTL_MS) {
-              console.log('Using recent cached insights (data changed slightly)');
-            }
             return;
           }
         }

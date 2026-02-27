@@ -218,7 +218,7 @@ export function MobileFilterSheet({
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                    <Label className="text-sm font-medium">Categories</Label>
+                    <Label className="text-sm font-medium">Dish Type</Label>
                     {draftCategories.length > 0 && (
                       <Badge variant="secondary" className="h-5 px-1.5 text-xs">
                         {draftCategories.length}

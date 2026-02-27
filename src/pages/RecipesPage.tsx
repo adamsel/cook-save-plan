@@ -10,7 +10,8 @@ import { SpoonacularRecipeCard } from '@/components/recipes/SpoonacularRecipeCar
 import { SpoonacularRecipeDetailDialog } from '@/components/recipes/SpoonacularRecipeDetailDialog';
 import { SpoonacularSearchForm } from '@/components/recipes/SpoonacularSearchForm';
 import { useSpoonacularRecipes, SpoonacularRecipeSearchResult, SpoonacularRecipeDetails } from '@/hooks/useSpoonacularRecipes';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2 } from 'lucide-react';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -100,12 +101,24 @@ export default function RecipesPage() {
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkTag, setBulkTag] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const RECIPES_PER_PAGE = 20;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategories, selectedTags, showFavoritesOnly, timeFilter, sortBy, showMissingCategory]);
+
   // Get recipes for display
   const sourceRecipes = recipes;
 
-  // Count uncategorized recipes
-  const missingCategoryCount = useMemo(() => 
-    recipes.filter(r => !r.category || r.category === 'Other').length,
+  // Count uncategorized recipes (no dish type AND no meal type)
+  const missingCategoryCount = useMemo(() =>
+    recipes.filter(r =>
+      !r.category &&
+      (!r.mealTypes || r.mealTypes.length === 0)
+    ).length,
     [recipes]
   );
 
@@ -114,8 +127,12 @@ export default function RecipesPage() {
       // Exclude archived unless toggled (only for personal recipes)
       if (activeTab === 'personal' && !showArchived && recipe.isArchived) return false;
 
-      // Missing category filter (only for personal recipes)
-      if (activeTab === 'personal' && showMissingCategory && recipe.category && recipe.category !== 'Other') return false;
+      // Missing category filter: show recipes with no dish type AND no meal type
+      if (activeTab === 'personal' && showMissingCategory) {
+        const hasCategory = recipe.category && recipe.category !== '';
+        const hasMealType = recipe.mealTypes && recipe.mealTypes.length > 0;
+        if (hasCategory || hasMealType) return false;
+      }
 
       // Search - now includes ingredients
       if (searchQuery) {
@@ -182,6 +199,27 @@ export default function RecipesPage() {
 
     return result;
   }, [sourceRecipes, searchQuery, selectedCategories, selectedTags, showFavoritesOnly, showArchived, timeFilter, sortBy, showMissingCategory, activeTab]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredRecipes.length / RECIPES_PER_PAGE);
+  const paginatedRecipes = filteredRecipes.slice(
+    (currentPage - 1) * RECIPES_PER_PAGE,
+    currentPage * RECIPES_PER_PAGE
+  );
+  const startIndex = (currentPage - 1) * RECIPES_PER_PAGE + 1;
+  const endIndex = Math.min(currentPage * RECIPES_PER_PAGE, filteredRecipes.length);
+
+  // Fixed meal type filters — always show all 4
+  const mealTypeFilters: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+
+  // Toggle category for quick filter chips
+  const toggleCategory = (category: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
 
   const handleEdit = (recipe: Recipe) => {
     setEditingRecipe(recipe);
@@ -250,7 +288,7 @@ export default function RecipesPage() {
       title: spoonacularRecipe.title,
       imageUrl: spoonacularRecipe.image,
       description: spoonacularRecipe.summary?.slice(0, 500) || undefined,
-      category: 'Dinner',  // Default category
+      category: '',  // Dish type set by user later; mealTypes handles timing
       tags: [
         ...(spoonacularRecipe.cuisines || []),
         ...(spoonacularRecipe.diets || []),
@@ -474,43 +512,113 @@ export default function RecipesPage() {
             hidePersonalFilters={false}
           />
 
+          {/* Quick Filter Chips */}
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap mt-3 scrollbar-hide">
+            {mealTypeFilters.map(mealType => (
+              <Badge
+                key={mealType}
+                variant={selectedCategories.includes(mealType) ? 'default' : 'outline'}
+                className="cursor-pointer whitespace-nowrap shrink-0 transition-colors hover:bg-primary/10"
+                onClick={() => toggleCategory(mealType)}
+              >
+                {mealType}
+              </Badge>
+            ))}
+            <Badge
+              variant={timeFilter === 'quick' ? 'default' : 'outline'}
+              className="cursor-pointer whitespace-nowrap shrink-0 transition-colors hover:bg-primary/10 gap-1"
+              onClick={() => setTimeFilter(timeFilter === 'quick' ? 'all' : 'quick')}
+            >
+              <Clock className="h-3 w-3" />
+              &lt; 30 min
+            </Badge>
+            <Badge
+              variant={showFavoritesOnly ? 'default' : 'outline'}
+              className="cursor-pointer whitespace-nowrap shrink-0 transition-colors hover:bg-primary/10 gap-1"
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            >
+              <Heart className={cn("h-3 w-3", showFavoritesOnly && "fill-current")} />
+              Favorites
+            </Badge>
+          </div>
+
+          {/* Recipe count */}
+          {filteredRecipes.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-3">
+              {filteredRecipes.length > RECIPES_PER_PAGE
+                ? `Showing ${startIndex}-${endIndex} of ${filteredRecipes.length} recipes`
+                : `${filteredRecipes.length} recipe${filteredRecipes.length !== 1 ? 's' : ''}`}
+            </p>
+          )}
+
           {filteredRecipes.length > 0 ? (
-            <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 md:mt-6">
-              {filteredRecipes.map(recipe => (
-                <div key={recipe.id} className="relative">
-                  {activeTab === 'personal' && bulkEditMode && (
-                    <div 
-                      className="absolute top-2 left-2 z-10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleRecipeSelection(recipe.id);
-                      }}
-                    >
-                      <div className={`w-6 h-6 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
-                        selectedRecipes.has(recipe.id) 
-                          ? 'bg-primary border-primary text-primary-foreground' 
-                          : 'bg-background border-muted-foreground/50 hover:border-primary'
-                      }`}>
-                        {selectedRecipes.has(recipe.id) && <CheckSquare className="h-4 w-4" />}
+            <>
+              <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 md:mt-6">
+                {paginatedRecipes.map(recipe => (
+                  <div key={recipe.id} className="relative">
+                    {activeTab === 'personal' && bulkEditMode && (
+                      <div
+                        className="absolute top-2 left-2 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleRecipeSelection(recipe.id);
+                        }}
+                      >
+                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
+                          selectedRecipes.has(recipe.id)
+                            ? 'bg-primary border-primary text-primary-foreground'
+                            : 'bg-background border-muted-foreground/50 hover:border-primary'
+                        }`}>
+                          {selectedRecipes.has(recipe.id) && <CheckSquare className="h-4 w-4" />}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <RecipeCard
-                    recipe={recipe}
-                    onToggleFavorite={toggleFavorite}
-                    onToggleArchive={toggleArchive}
-                    onEdit={handleEdit}
-                    onDelete={deleteRecipe}
-                    onAddToMealPlan={handleAddToMealPlan}
-                    onViewDetails={(recipe) => {
-                      setViewingRecipeId(recipe.id);
-                      setShowDetailDialog(true);
-                    }}
-                    isLibraryRecipe={false}
-                  />
+                    )}
+                    <RecipeCard
+                      recipe={recipe}
+                      onToggleFavorite={toggleFavorite}
+                      onToggleArchive={toggleArchive}
+                      onEdit={handleEdit}
+                      onDelete={deleteRecipe}
+                      onAddToMealPlan={handleAddToMealPlan}
+                      onViewDetails={(recipe) => {
+                        setViewingRecipeId(recipe.id);
+                        setShowDetailDialog(true);
+                      }}
+                      isLibraryRecipe={false}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    className="gap-1"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Previous</span>
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2 sm:px-4">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="gap-1"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRecipes } from '@/context/RecipeContext';
 import { ShoppingListItem, DEFAULT_AISLE_CATEGORIES, DAYS_OF_WEEK, DayOfWeek, MealPlan, MealSlot } from '@/types/recipe';
 import { mergeIngredients, type RawIngredientInput } from '@/lib/ingredientNormalizer/index';
@@ -73,6 +73,7 @@ export default function ShoppingListPage() {
     setCustomItems,
     categoryOverrides,
     setCategoryOverride,
+    clearAllCustomItems,
     isLoading: isStateLoading,
     isSyncing
   } = useShoppingListState();
@@ -89,6 +90,18 @@ export default function ShoppingListPage() {
   // Dismissed linked recipe reminders (per recipe ID)
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
 
+  // Use ref to access mealPlans without causing useEffect re-runs
+  const mealPlansRef = useRef(mealPlans);
+  mealPlansRef.current = mealPlans;
+
+  // One-time clear of stale custom items (can remove this effect after clearing)
+  useEffect(() => {
+    if (customItems.length > 0) {
+      clearAllCustomItems();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
   const today = new Date();
   const selectedWeekStart = startOfWeek(addWeeks(today, selectedWeekOffset), { weekStartsOn: 1 });
   const selectedWeekEnd = endOfWeek(selectedWeekStart, { weekStartsOn: 1 });
@@ -99,7 +112,7 @@ export default function ShoppingListPage() {
     const fetchAllPlans = async () => {
       // Fetch the primary week
       const weekStartStr = format(selectedWeekStart, 'yyyy-MM-dd');
-      const existingPlan = mealPlans.find(mp => mp.weekStartDate === weekStartStr);
+      const existingPlan = mealPlansRef.current.find(mp => mp.weekStartDate === weekStartStr);
       if (existingPlan) {
         setMealPlan(existingPlan);
       } else {
@@ -113,7 +126,7 @@ export default function ShoppingListPage() {
         for (let i = 1; i < weekCount; i++) {
           const additionalWeekStart = addWeeks(selectedWeekStart, i);
           const additionalWeekStartStr = format(additionalWeekStart, 'yyyy-MM-dd');
-          const existingAdditional = mealPlans.find(mp => mp.weekStartDate === additionalWeekStartStr);
+          const existingAdditional = mealPlansRef.current.find(mp => mp.weekStartDate === additionalWeekStartStr);
           if (existingAdditional) {
             additionalPlans.push(existingAdditional);
           } else {
@@ -130,7 +143,7 @@ export default function ShoppingListPage() {
     };
 
     fetchAllPlans();
-  }, [selectedWeekOffset, weekCount, getMealPlanForWeek, mealPlans, selectedWeekStart]);
+  }, [selectedWeekOffset, weekCount, getMealPlanForWeek]);
 
   const effectiveMealPlan = mealPlan || { id: '', weekStartDate: '', items: [] };
 

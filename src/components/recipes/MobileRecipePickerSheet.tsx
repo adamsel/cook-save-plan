@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Recipe, DayOfWeek, MealSlot } from '@/types/recipe';
+import { Recipe, DayOfWeek, MealSlot, MealType } from '@/types/recipe';
 import {
   Sheet,
   SheetContent,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { Search, Clock, Users, Heart, Utensils, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,10 +40,15 @@ export function MobileRecipePickerSheet({
   onSelectRecipe,
 }: MobileRecipePickerSheetProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMealType, setSelectedMealType] = useState<MealType | null>(null);
 
-  // Filter recipes by search query
+  // Filter recipes by search query and meal type
   const filteredRecipes = useMemo(() => {
-    const available = recipes.filter(r => !r.isArchived);
+    let available = recipes.filter(r => !r.isArchived);
+
+    if (selectedMealType) {
+      available = available.filter(r => r.mealTypes?.includes(selectedMealType));
+    }
 
     if (!searchQuery) return available;
 
@@ -50,9 +56,10 @@ export function MobileRecipePickerSheet({
     return available.filter(r =>
       r.title.toLowerCase().includes(query) ||
       r.category.toLowerCase().includes(query) ||
-      r.tags.some(t => t.toLowerCase().includes(query))
+      r.tags.some(t => t.toLowerCase().includes(query)) ||
+      r.mealTypes?.some(mt => mt.toLowerCase().includes(query))
     );
-  }, [recipes, searchQuery]);
+  }, [recipes, searchQuery, selectedMealType]);
 
   // Sort: favorites first, then by title
   const sortedRecipes = useMemo(() => {
@@ -68,6 +75,7 @@ export function MobileRecipePickerSheet({
       onSelectRecipe(recipe, day, slot);
       onOpenChange(false);
       setSearchQuery('');
+      setSelectedMealType(null);
     }
   };
 
@@ -95,8 +103,22 @@ export function MobileRecipePickerSheet({
           />
         </div>
 
+        {/* Meal Type Filter Chips */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {(['Breakfast', 'Lunch', 'Dinner', 'Snack'] as MealType[]).map(mealType => (
+            <Badge
+              key={mealType}
+              variant={selectedMealType === mealType ? 'default' : 'outline'}
+              className="cursor-pointer text-xs"
+              onClick={() => setSelectedMealType(selectedMealType === mealType ? null : mealType)}
+            >
+              {mealType}
+            </Badge>
+          ))}
+        </div>
+
         {/* Recipe List */}
-        <ScrollArea className="h-[calc(85vh-160px)]">
+        <ScrollArea className="h-[calc(85vh-200px)]">
           <div className="space-y-2 pr-2">
             {sortedRecipes.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -155,7 +177,7 @@ export function MobileRecipePickerSheet({
                       )}
                     </div>
                     <span className="text-[10px] text-muted-foreground/70 mt-1 block">
-                      {recipe.category}
+                      {recipe.mealTypes?.[0] || recipe.category}
                     </span>
                   </div>
                 </button>

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
-import { Recipe, MealPlan, MealPlanItem, DEFAULT_CATEGORIES, DEFAULT_AISLE_CATEGORIES, DEFAULT_PANTRY_STAPLES } from '@/types/recipe';
+import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
+import { Recipe, MealPlan, MealPlanItem, MealType, DEFAULT_CATEGORIES, DEFAULT_AISLE_CATEGORIES, DEFAULT_PANTRY_STAPLES } from '@/types/recipe';
 import { useRecipesData, RecipeSource } from '@/hooks/useRecipesData';
 import { useMealPlansData } from '@/hooks/useMealPlansData';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -84,28 +84,21 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const [tags, setTags] = useLocalStorage<string[]>('tags', ['Italian', 'Quick', 'Healthy', 'Vegetarian', 'Comfort Food']);
   const [pantryStaples, setPantryStaples] = useLocalStorage<string[]>('pantryStaples', DEFAULT_PANTRY_STAPLES);
   const [aisleCategories] = useLocalStorage<string[]>('aisleCategories', DEFAULT_AISLE_CATEGORIES);
+  const migrationInFlight = useRef(false);
 
-  // Migrate localStorage: remove deprecated categories and add new ones
+  // Migrate localStorage: remove meal-timing categories (now handled by mealTypes field)
   useEffect(() => {
     let updated = [...categories];
     let needsUpdate = false;
 
-    // Remove deprecated "Main Course" category
-    if (updated.includes('Main Course')) {
-      updated = updated.filter(c => c !== 'Main Course');
-      needsUpdate = true;
-    }
-
-    // Add "Dinner" and "Lunch" if missing
-    if (!updated.includes('Dinner')) {
-      updated = ['Dinner', ...updated];
-      needsUpdate = true;
-    }
-    if (!updated.includes('Lunch')) {
-      const dinnerIndex = updated.indexOf('Dinner');
-      updated.splice(dinnerIndex + 1, 0, 'Lunch');
-      needsUpdate = true;
-    }
+    // Remove categories that are now meal types only
+    const mealTypeOnly = ['Dinner', 'Lunch', 'Breakfast', 'Snack', 'Main Course'];
+    mealTypeOnly.forEach(cat => {
+      if (updated.includes(cat)) {
+        updated = updated.filter(c => c !== cat);
+        needsUpdate = true;
+      }
+    });
 
     if (needsUpdate) {
       setCategories(updated);
@@ -335,6 +328,46 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
   const allRecipes = user ? recipesData.allRecipes : localRecipes;
   const mealPlans = user ? mealPlansData.mealPlans : localMealPlans;
   const isLoading = user ? (recipesData.isLoading || mealPlansData.isLoading) : false;
+
+  // One-time migration: move Dinner/Lunch/Breakfast/Snack from category to mealTypes
+  useEffect(() => {
+    const migrationDone = localStorage.getItem('category-to-mealtype-migration');
+    if (migrationDone || migrationInFlight.current || !user || isLoading || recipes.length === 0) return;
+
+    const mealTimingCategories = ['Dinner', 'Lunch', 'Breakfast', 'Snack'];
+    const recipesToMigrate = recipes.filter(r =>
+      mealTimingCategories.includes(r.category)
+    );
+
+    if (recipesToMigrate.length === 0) {
+      localStorage.setItem('category-to-mealtype-migration', 'done');
+      return;
+    }
+
+    // Guard against re-triggering while updates are in-flight
+    migrationInFlight.current = true;
+
+    const updates = recipesToMigrate.map(recipe => {
+      const mealType = recipe.category as MealType;
+      const updatedMealTypes = recipe.mealTypes?.includes(mealType)
+        ? recipe.mealTypes
+        : [...(recipe.mealTypes || []), mealType];
+
+      return updateRecipe({
+        ...recipe,
+        category: '',
+        mealTypes: updatedMealTypes,
+      });
+    });
+
+    Promise.allSettled(updates).then(results => {
+      const allSucceeded = results.every(r => r.status === 'fulfilled');
+      if (allSucceeded) {
+        localStorage.setItem('category-to-mealtype-migration', 'done');
+      }
+      migrationInFlight.current = false;
+    });
+  }, [user, isLoading, recipes]);
 
   // Sharing functions - only available when authenticated
   const shareRecipe = async (recipeId: string, email: string, canEdit: boolean = false) => {

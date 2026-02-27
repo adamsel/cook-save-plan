@@ -122,7 +122,7 @@ export function RecipeLinkPicker({
                           {recipe.totalTime}m
                         </span>
                       )}
-                      <span>{recipe.category}</span>
+                      <span>{recipe.mealTypes?.[0] || recipe.category || 'Uncategorized'}</span>
                     </div>
                   </div>
                 </button>

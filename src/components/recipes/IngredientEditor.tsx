@@ -247,10 +247,6 @@ export function IngredientEditor({ ingredients, onChange }: IngredientEditorProp
       return;
     }
 
-    // Log for debugging
-    console.log('[IngredientEditor] Parsed ingredients from paste:', parsed.length, 'items');
-    console.log('[IngredientEditor] First ingredient:', parsed[0]);
-
     // Replace empty ingredients or add to existing
     const hasContent = ingredients.some(i => i.item.trim());
     if (hasContent) {

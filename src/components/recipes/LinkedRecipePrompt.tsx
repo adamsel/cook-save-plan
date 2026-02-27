@@ -36,17 +36,6 @@ export function LinkedRecipePrompt({
   const { linkedRecipes, isLoading, hasLoaded } = useRecipeLinks(recipe?.id);
   const [selectedLinkedIds, setSelectedLinkedIds] = useState<Set<string>>(new Set());
 
-  // Debug logging
-  console.log('[LinkedRecipePrompt] State:', {
-    open,
-    recipeId: recipe?.id,
-    recipeTitle: recipe?.title,
-    hasLoaded,
-    isLoading,
-    linkedRecipesCount: linkedRecipes.length,
-    linkedRecipes: linkedRecipes.map(lr => lr.recipe.title),
-  });
-
   // Pre-select all linked recipes when they load
   useEffect(() => {
     if (linkedRecipes.length > 0) {
@@ -65,7 +54,6 @@ export function LinkedRecipePrompt({
   // This effect MUST be before any early returns to satisfy React hooks rules
   useEffect(() => {
     if (open && hasLoaded && !isLoading && linkedRecipes.length === 0 && recipe && day && slot) {
-      console.log('[LinkedRecipePrompt] Auto-confirming (no linked recipes)');
       onConfirm(recipe, [], day, slot);
       onOpenChange(false);
     }

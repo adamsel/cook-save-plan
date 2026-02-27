@@ -248,13 +248,6 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     
     setImportMethod(recipe.importMethod);
     
-    // Debug log
-    console.log('[AddRecipeDialog] Loaded parsed recipe:', {
-      title: recipe.title,
-      ingredientCount: newIngredients.length,
-      firstIngredient: newIngredients[0],
-      instructionCount: newInstructions.length,
-    });
     
     // Check if parsed recipe has nutrition
     if (recipe.nutrition) {
@@ -463,39 +456,9 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       return;
     }
 
-    if (!category) {
-      toast({
-        title: "Category required",
-        description: "Please select a category for this recipe.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Filter out empty ingredients and instructions
     const finalIngredients = ingredients.filter(i => i.item.trim());
     const finalInstructions = instructions.filter(i => i.text.trim()).map(i => i.text);
-
-    // Debug logging for regression detection
-    console.log('[AddRecipeDialog] Saving recipe:', {
-      title: title.trim(),
-      ingredientsBefore: ingredients.length,
-      ingredientsAfter: finalIngredients.length,
-      firstIngredientBefore: ingredients[0],
-      firstIngredientAfter: finalIngredients[0],
-      instructionsBefore: instructions.length,
-      instructionsAfter: finalInstructions.length,
-    });
-
-    // Warn if first ingredient was unexpectedly removed
-    if (ingredients.length > 0 && ingredients[0].item.trim() && finalIngredients.length > 0) {
-      if (finalIngredients[0].item !== ingredients[0].item) {
-        console.warn('[AddRecipeDialog] WARNING: First ingredient may have changed unexpectedly!', {
-          expected: ingredients[0].item,
-          got: finalIngredients[0].item,
-        });
-      }
-    }
 
     const recipeData = {
       title: title.trim(),
@@ -856,7 +819,7 @@ Instructions:
         {/* Category (required) */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label>Category *</Label>
+            <Label>Dish Type</Label>
             {suggestedCategory && category === suggestedCategory && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <Sparkles className="h-3 w-3" />
@@ -865,8 +828,8 @@ Instructions:
             )}
           </div>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className={cn(!category && "border-destructive")}>
-              <SelectValue placeholder="Select category (required)" />
+            <SelectTrigger>
+              <SelectValue placeholder="Select dish type" />
             </SelectTrigger>
             <SelectContent>
               {categories.map(cat => (
@@ -1011,7 +974,7 @@ Instructions:
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSubmit} disabled={!category}>
+            <Button type="button" onClick={handleSubmit} disabled={!title.trim()}>
               Save Recipe
             </Button>
           </div>
@@ -1074,10 +1037,10 @@ Instructions:
         </div>
 
         <div className="space-y-2">
-          <Label>Category *</Label>
+          <Label>Dish Type</Label>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className={cn(!category && "border-destructive")}>
-              <SelectValue placeholder="Select category" />
+            <SelectTrigger>
+              <SelectValue placeholder="Select dish type" />
             </SelectTrigger>
             <SelectContent>
               {categories.map(cat => (
@@ -1184,7 +1147,7 @@ Instructions:
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={!category}>
+          <Button type="button" onClick={handleSubmit} disabled={!title.trim()}>
             {editingRecipe ? 'Update Recipe' : 'Save Recipe'}
           </Button>
         </div>

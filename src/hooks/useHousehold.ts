@@ -324,7 +324,6 @@ export function useHousehold() {
         .single();
 
       // Send invitation email
-      console.log('Invoking send-household-invitation function for:', normalizedEmail);
       try {
         const { data: emailData, error: emailError } = await supabase.functions.invoke('send-household-invitation', {
           body: {
@@ -334,13 +333,10 @@ export function useHousehold() {
             role: role === 'owner' ? 'member' : role,
           },
         });
-        console.log('Email function response:', { data: emailData, error: emailError });
         if (emailError) {
           console.error('Email function error:', emailError);
         } else if (emailData?.success === false) {
-          console.error('Email sending failed - Resend error:', emailData?.error || 'Unknown error');
-        } else {
-          console.log('Email sent successfully');
+          console.error('Email sending failed:', emailData?.error || 'Unknown error');
         }
       } catch (err) {
         console.error('Failed to invoke email function:', err);
@@ -598,7 +594,6 @@ export function useHousehold() {
       .single();
 
     try {
-      console.log('Resending invitation to:', invite.email);
       const { data: emailData, error: emailError } = await supabase.functions.invoke('send-household-invitation', {
         body: {
           email: invite.email,
@@ -607,7 +602,6 @@ export function useHousehold() {
           role: invite.role,
         },
       });
-      console.log('Resend email function response:', { data: emailData, error: emailError });
 
       if (emailError) {
         console.error('Resend email function error:', emailError);

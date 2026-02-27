@@ -6,10 +6,8 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Appetizer': ['appetizer', 'starter', 'dip', 'spread', 'bruschetta', 'crostini', 'bite', 'finger food'],
   'Salad': ['salad', 'slaw', 'greens', 'vinaigrette'],
   'Soup': ['soup', 'stew', 'chowder', 'bisque', 'broth', 'chili'],
-  'Breakfast': ['breakfast', 'brunch', 'eggs', 'pancake', 'waffle', 'oatmeal', 'omelet', 'french toast', 'muffin', 'smoothie', 'granola'],
   'Dessert': ['dessert', 'cake', 'cookie', 'brownie', 'pie', 'tart', 'ice cream', 'pudding', 'chocolate', 'sweet', 'cheesecake', 'cupcake', 'pastry'],
   'Beverage': ['drink', 'beverage', 'cocktail', 'smoothie', 'juice', 'tea', 'coffee', 'lemonade', 'mocktail'],
-  'Snack': ['snack', 'popcorn', 'chips', 'nuts', 'trail mix', 'energy bar', 'crackers'],
 };
 
 // Keywords that suggest certain tags

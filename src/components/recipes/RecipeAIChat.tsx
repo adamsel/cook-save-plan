@@ -334,7 +334,7 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
       cookTime: recipe.cookTime,
       totalTime: (recipe.prepTime || 0) + (recipe.cookTime || 0) || undefined,
       servings: recipe.servings || 4,
-      category: recipe.category || 'Other',
+      category: recipe.category || '',
       tags: recipe.tags || [],
       ingredients: recipe.ingredients.map(ing => ({
         id: ing.id || `ing-${generateId()}`,

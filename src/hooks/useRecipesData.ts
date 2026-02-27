@@ -311,6 +311,12 @@ export function useRecipesData() {
     
     if (!error) {
       setRecipes(prev => prev.map(r => r.id === id ? { ...r, isFavorite: !r.isFavorite } : r));
+    } else {
+      toast({
+        title: 'Failed to update favorite',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -318,14 +324,20 @@ export function useRecipesData() {
   const toggleArchive = async (id: string) => {
     const recipe = recipes.find(r => r.id === id);
     if (!recipe) return;
-    
+
     const { error } = await supabase
       .from('recipes')
       .update({ is_archived: !recipe.isArchived })
       .eq('id', id);
-    
+
     if (!error) {
       setRecipes(prev => prev.map(r => r.id === id ? { ...r, isArchived: !r.isArchived } : r));
+    } else {
+      toast({
+        title: 'Failed to update archive status',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 

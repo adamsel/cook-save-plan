@@ -4,6 +4,7 @@ import {
   MEAL_SLOTS,
   DayOfWeek,
   MealSlot,
+  MealType,
   Recipe,
   MealPlanItem,
   DisplayMealItem,
@@ -46,7 +47,7 @@ import { LinkedRecipePrompt } from '@/components/recipes/LinkedRecipePrompt';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
-type FilterType = 'all' | 'favorites' | 'quick' | 'category';
+type FilterType = 'all' | 'favorites' | 'quick' | 'category' | 'mealType';
 type ViewMode = 'grid' | 'list';
 
 // Hook to detect mobile screens
@@ -88,6 +89,7 @@ export default function MealPlanPage() {
   const [selectedRecipeForView, setSelectedRecipeForView] = useState<Recipe | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<MealType | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useLocalStorage('mealPlanWeekOffset', 0);
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
@@ -315,7 +317,7 @@ export default function MealPlanPage() {
 
   const filteredRecipes = useMemo(() => {
     let filtered = recipes.filter(r => !r.isArchived);
-    
+
     switch (activeFilter) {
       case 'favorites':
         filtered = filtered.filter(r => r.isFavorite);
@@ -328,19 +330,25 @@ export default function MealPlanPage() {
           filtered = filtered.filter(r => r.category === selectedCategory);
         }
         break;
+      case 'mealType':
+        if (selectedMealType) {
+          filtered = filtered.filter(r => r.mealTypes?.includes(selectedMealType));
+        }
+        break;
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(r => 
+      filtered = filtered.filter(r =>
         r.title.toLowerCase().includes(query) ||
         r.category.toLowerCase().includes(query) ||
-        r.tags.some(t => t.toLowerCase().includes(query))
+        r.tags.some(t => t.toLowerCase().includes(query)) ||
+        r.mealTypes?.some(mt => mt.toLowerCase().includes(query))
       );
     }
-    
+
     return filtered;
-  }, [recipes, searchQuery, activeFilter, selectedCategory]);
+  }, [recipes, searchQuery, activeFilter, selectedCategory, selectedMealType]);
 
   const getDisplayItemsForSlot = (day: DayOfWeek, slot: MealSlot): DisplayMealItem[] => {
     return displayItemsMap.get(`${day}-${slot}`) || [];
@@ -657,24 +665,28 @@ export default function MealPlanPage() {
                 </div>
               )}
 
-              {/* Category Filter - Hidden on mobile to reduce clutter */}
-              {!isMobile && (
-                <div className="flex flex-wrap gap-1.5">
-                  {categories.slice(0, 6).map(category => (
-                    <Badge
-                      key={category}
-                      variant={selectedCategory === category ? 'default' : 'outline'}
-                      className="cursor-pointer text-xs"
-                      onClick={() => {
-                        setActiveFilter('category');
-                        setSelectedCategory(selectedCategory === category ? null : category);
-                      }}
-                    >
-                      {category}
-                    </Badge>
-                  ))}
-                </div>
-              )}
+              {/* Meal Type Filter Chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {(['Breakfast', 'Lunch', 'Dinner', 'Snack'] as MealType[]).map(mealType => (
+                  <Badge
+                    key={mealType}
+                    variant={activeFilter === 'mealType' && selectedMealType === mealType ? 'default' : 'outline'}
+                    className="cursor-pointer text-xs"
+                    onClick={() => {
+                      if (activeFilter === 'mealType' && selectedMealType === mealType) {
+                        setActiveFilter('all');
+                        setSelectedMealType(null);
+                      } else {
+                        setActiveFilter('mealType');
+                        setSelectedMealType(mealType);
+                        setSelectedCategory(null);
+                      }
+                    }}
+                  >
+                    {mealType}
+                  </Badge>
+                ))}
+              </div>
 
               {/* Recipe List */}
               <ScrollArea className="h-[calc(100vh-420px)]">
@@ -733,9 +745,11 @@ export default function MealPlanPage() {
                                 {recipe.servings}
                               </span>
                             </div>
-                            <Badge variant="secondary" className="text-[10px] mt-1 px-1.5 py-0">
-                              {recipe.category}
-                            </Badge>
+                            {(recipe.mealTypes?.[0] || recipe.category) && (
+                              <Badge variant="secondary" className="text-[10px] mt-1 px-1.5 py-0">
+                                {recipe.mealTypes?.[0] || recipe.category}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         {/* Mobile add button */}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, X, Heart, Clock, ChevronDown, SortAsc, AlertCircle, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, X, Heart, Clock, ChevronDown, SortAsc, AlertCircle, SlidersHorizontal, Tag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -273,7 +273,7 @@ export function RecipeFilters({
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Filter className="h-4 w-4" />
-                Category
+                Dish Type
                 {selectedCategories.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5">
                     {selectedCategories.length}
@@ -283,9 +283,9 @@ export function RecipeFilters({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Categories</DropdownMenuLabel>
+              <DropdownMenuLabel>Dish Type</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {categories.map(category => (
+              {[...categories].sort((a, b) => a.localeCompare(b)).map(category => (
                 <DropdownMenuCheckboxItem
                   key={category}
                   checked={selectedCategories.includes(category)}
@@ -337,6 +337,37 @@ export function RecipeFilters({
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Tags dropdown */}
+          {tags.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Tag className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tags</span>
+                  {selectedTags.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                      {selectedTags.length}
+                    </Badge>
+                  )}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 max-h-64 overflow-y-auto">
+                <DropdownMenuLabel>Tags</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {[...tags].sort((a, b) => a.localeCompare(b)).map(tag => (
+                  <DropdownMenuCheckboxItem
+                    key={tag}
+                    checked={selectedTags.includes(tag)}
+                    onCheckedChange={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Favorites toggle - only show for personal recipes */}
           {!hidePersonalFilters && (
             <Button
@@ -364,20 +395,6 @@ export function RecipeFilters({
             </Button>
           )}
         </div>
-      </div>
-
-      {/* Tags */}
-      <div className="flex flex-wrap gap-2">
-        {tags.map(tag => (
-          <Badge
-            key={tag}
-            variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-            className="cursor-pointer transition-colors"
-            onClick={() => toggleTag(tag)}
-          >
-            {tag}
-          </Badge>
-        ))}
       </div>
 
       {/* Active filters */}

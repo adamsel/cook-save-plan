@@ -17,7 +17,6 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 export function initSentry() {
   // Only initialize if DSN is configured
   if (!SENTRY_DSN) {
-    console.log("Sentry DSN not configured - error monitoring disabled");
     return;
   }
 
@@ -63,7 +62,6 @@ export function initSentry() {
     ],
   });
 
-  console.log("Sentry error monitoring initialized");
 }
 
 // Error boundary wrapper component

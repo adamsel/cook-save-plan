@@ -87,7 +87,6 @@ export function useRecipeLinks(recipeId?: string) {
       }
 
       if (!linksData || linksData.length === 0) {
-        console.log('[useRecipeLinks] No links found for fetchId:', fetchId);
         setLinkedRecipes([]);
         return;
       }
@@ -113,8 +112,6 @@ export function useRecipeLinks(recipeId?: string) {
         setLinkedRecipes([]);
         return;
       }
-
-      console.log('[useRecipeLinks] Fetch complete - linksData:', linksData?.length || 0, 'for fetchId:', fetchId);
 
       // Combine links with recipe data
       const combined: LinkedRecipeWithDetails[] = linksData.map(dbLink => {
@@ -165,8 +162,6 @@ export function useRecipeLinks(recipeId?: string) {
 
   // Single effect to handle recipeId changes - reset state and trigger fetch
   useEffect(() => {
-    console.log('[useRecipeLinks] Effect triggered - recipeId:', recipeId);
-
     // Update the ref to track current recipeId
     currentRecipeIdRef.current = recipeId;
 
@@ -176,12 +171,9 @@ export function useRecipeLinks(recipeId?: string) {
 
     if (recipeId) {
       setIsLoading(true);
-      // Directly call fetch with the new recipeId
-      console.log('[useRecipeLinks] Starting fetch for recipeId:', recipeId);
       fetchLinkedRecipes(recipeId);
     } else {
       setIsLoading(false);
-      console.log('[useRecipeLinks] No recipeId, skipping fetch');
     }
   }, [recipeId]); // Note: fetchLinkedRecipes intentionally not in deps to avoid loops
 

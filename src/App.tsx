@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,18 +10,29 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Navigation } from "@/components/layout/Navigation";
 import { AddRecipeDialog } from "@/components/recipes/AddRecipeDialog";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-import Dashboard from "@/pages/Dashboard";
-import RecipesPage from "@/pages/RecipesPage";
-import MealPlanPage from "@/pages/MealPlanPage";
-import ShoppingListPage from "@/pages/ShoppingListPage";
-import SettingsPage from "@/pages/SettingsPage";
+import { Loader2 } from 'lucide-react';
+
+// Static imports for lightweight public pages
 import AuthPage from "@/pages/AuthPage";
 import TermsPage from "@/pages/TermsPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
+// Lazy load heavy protected pages for code splitting
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const RecipesPage = lazy(() => import("@/pages/RecipesPage"));
+const MealPlanPage = lazy(() => import("@/pages/MealPlanPage"));
+const ShoppingListPage = lazy(() => import("@/pages/ShoppingListPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+
 const queryClient = new QueryClient();
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 const App = () => {
   const [showAddRecipe, setShowAddRecipe] = useState(false);
@@ -42,18 +53,20 @@ const App = () => {
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
 
-                  {/* Protected routes */}
+                  {/* Protected routes - lazy loaded */}
                   <Route path="/*" element={
                     <ProtectedRoute>
                       <Navigation onAddRecipe={() => setShowAddRecipe(true)} />
-                      <Routes>
-                        <Route path="/dashboard" element={<Dashboard onAddRecipe={() => setShowAddRecipe(true)} />} />
-                        <Route path="/recipes" element={<RecipesPage />} />
-                        <Route path="/meal-plan" element={<MealPlanPage />} />
-                        <Route path="/shopping-list" element={<ShoppingListPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          <Route path="/dashboard" element={<Dashboard onAddRecipe={() => setShowAddRecipe(true)} />} />
+                          <Route path="/recipes" element={<RecipesPage />} />
+                          <Route path="/meal-plan" element={<MealPlanPage />} />
+                          <Route path="/shopping-list" element={<ShoppingListPage />} />
+                          <Route path="/settings" element={<SettingsPage />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
                     </ProtectedRoute>
                   } />
                 </Routes>

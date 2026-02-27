@@ -173,9 +173,6 @@ export function InstructionEditor({ instructions, onChange }: InstructionEditorP
       return;
     }
 
-    console.log('[InstructionEditor] Parsed instructions from paste:', parsed.length, 'steps');
-    console.log('[InstructionEditor] First step:', parsed[0]);
-
     const hasContent = instructions.some(i => i.text.trim());
     if (hasContent) {
       onChange([...instructions.filter(i => i.text.trim()), ...parsed]);
