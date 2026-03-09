@@ -385,7 +385,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     let fat = 10;
     let fiber = 3;
     let sugar = 5;
-    let sodium = 400;
+    const sodium = 400;
     
     if (/chicken|turkey|beef|pork|lamb|fish|salmon|shrimp/.test(lower)) {
       protein += 20;
@@ -742,7 +742,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
         cookTime: recipeData.cookTime,
         totalTime: recipeData.totalTime,
         servings: recipeData.servings || 4,
-        ingredients: (recipeData.ingredients || []).map((ing: any, i: number) => ({
+        ingredients: (recipeData.ingredients || []).map((ing: Record<string, unknown>, i: number) => ({
           id: ing.id || `ing-${i + 1}`,
           item: ing.item || ing.name || '',
           quantity: ing.quantity ?? null,
@@ -766,7 +766,6 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
 
       toast({ title: 'Recipe extracted', description: 'Review the details below and save when ready.' });
     } catch (error) {
-      console.error('Photo extraction error:', error);
       toast({
         title: 'Extraction failed',
         description: error instanceof Error ? error.message : 'Could not extract recipe from image.',

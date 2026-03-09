@@ -88,7 +88,6 @@ export function useHousehold() {
         .maybeSingle();
 
       if (membershipError) {
-        console.error('Error fetching household membership:', membershipError);
         setIsLoading(false);
         return;
       }
@@ -121,7 +120,7 @@ export function useHousehold() {
         .eq('household_id', householdData.id);
 
       if (membersError) {
-        console.error('Error fetching household members:', membersError);
+        // ignored
       } else if (membersData && membersData.length > 0) {
         // Fetch profiles separately since there's no direct FK relationship
         const userIds = membersData.map(m => m.user_id);
@@ -131,7 +130,7 @@ export function useHousehold() {
           .in('user_id', userIds);
 
         if (profilesError) {
-          console.error('Error fetching member profiles:', profilesError);
+          // ignored
         }
 
         // Merge profiles into members
@@ -153,7 +152,7 @@ export function useHousehold() {
         .order('invited_at', { ascending: false });
 
       if (pendingError) {
-        console.error('Error fetching pending invites:', pendingError);
+        // ignored
       } else {
         setPendingInvites(pendingData as PendingHouseholdInvite[]);
       }
@@ -166,12 +165,12 @@ export function useHousehold() {
         .maybeSingle();
 
       if (settingsError) {
-        console.error('Error fetching household settings:', settingsError);
+        // ignored
       } else if (settingsData) {
         setSettings(settingsData as HouseholdSettings);
       }
     } catch (error) {
-      console.error('Error in fetchHousehold:', error);
+      // ignored
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +193,6 @@ export function useHousehold() {
         .single();
 
       if (householdError) {
-        console.error('Error creating household:', householdError);
         // Provide more specific error messages
         let errorMessage = 'Failed to create household';
         if (householdError.code === '42501') {
@@ -222,7 +220,6 @@ export function useHousehold() {
         });
 
       if (memberError) {
-        console.error('Error adding owner to household:', memberError);
         // Cleanup: delete the household
         await supabase.from('households').delete().eq('id', householdData.id);
         let errorMessage = 'Failed to add you as owner';
@@ -242,7 +239,6 @@ export function useHousehold() {
       await fetchHousehold();
       return householdData;
     } catch (error) {
-      console.error('Error in createHousehold:', error);
       toast({
         title: 'Error',
         description: 'Failed to create household',
@@ -269,7 +265,6 @@ export function useHousehold() {
       .maybeSingle();
 
     if (profileError) {
-      console.error('Error looking up user:', profileError);
       return { error: 'Failed to look up user' };
     }
 
@@ -299,7 +294,6 @@ export function useHousehold() {
         });
 
       if (pendingError) {
-        console.error('Error creating pending invite:', pendingError);
         if (pendingError.code === '23505') {
           toast({
             title: 'Already invited',
@@ -334,12 +328,12 @@ export function useHousehold() {
           },
         });
         if (emailError) {
-          console.error('Email function error:', emailError);
+          // ignored
         } else if (emailData?.success === false) {
-          console.error('Email sending failed:', emailData?.error || 'Unknown error');
+          // ignored
         }
       } catch (err) {
-        console.error('Failed to invoke email function:', err);
+        // ignored
       }
 
       await fetchHousehold();
@@ -367,7 +361,6 @@ export function useHousehold() {
       });
 
     if (insertError) {
-      console.error('Error adding member:', insertError);
       toast({
         title: 'Error',
         description: 'Failed to add member',
@@ -413,7 +406,6 @@ export function useHousehold() {
       .eq('id', memberId);
 
     if (error) {
-      console.error('Error removing member:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove member',
@@ -447,7 +439,6 @@ export function useHousehold() {
       .eq('id', settings.id);
 
     if (error) {
-      console.error('Error updating settings:', error);
       toast({
         title: 'Error',
         description: 'Failed to update settings',
@@ -481,7 +472,6 @@ export function useHousehold() {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Error leaving household:', error);
       toast({
         title: 'Error',
         description: 'Failed to leave household',
@@ -516,7 +506,6 @@ export function useHousehold() {
       .eq('id', household.id);
 
     if (error) {
-      console.error('Error deleting household:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete household',
@@ -551,7 +540,6 @@ export function useHousehold() {
       .eq('id', inviteId);
 
     if (error) {
-      console.error('Error canceling pending invite:', error);
       toast({
         title: 'Error',
         description: 'Failed to cancel invitation',
@@ -604,18 +592,15 @@ export function useHousehold() {
       });
 
       if (emailError) {
-        console.error('Resend email function error:', emailError);
         throw emailError;
       }
       if (emailData?.success === false) {
         const resendError = emailData?.error || 'Unknown error';
-        console.error('Resend email failed - Resend error:', resendError);
         throw new Error(`Email sending failed: ${resendError}`);
       }
 
       return true;
     } catch (error) {
-      console.error('Error resending invitation:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to resend invitation email',

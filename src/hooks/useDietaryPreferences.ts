@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useToast } from '@/hooks/use-toast';
 import type { DietaryRestriction, Allergen } from '@/lib/dietaryFlags';
 
 interface DietaryPreferences {
@@ -17,6 +18,7 @@ const DEFAULT_PREFERENCES: DietaryPreferences = {
 
 export function useDietaryPreferences() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { hasHousehold, settings: householdSettings, updateSettings: updateHouseholdSettings, isAdmin } = useHousehold();
 
   const [localPrefs, setLocalPrefs] = useLocalStorage<DietaryPreferences>(
@@ -42,7 +44,11 @@ export function useDietaryPreferences() {
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching dietary preferences:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load dietary preferences',
+        variant: 'destructive',
+      });
       setIsLoading(false);
       return;
     }
@@ -100,7 +106,11 @@ export function useDietaryPreferences() {
         });
 
       if (error) {
-        console.error('Error updating dietary preferences:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save dietary preferences',
+          variant: 'destructive',
+        });
         return;
       }
 

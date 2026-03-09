@@ -96,7 +96,6 @@ export function useCloneMealPlan() {
           .single();
 
         if (recipeError || !newRecipe) {
-          console.error('Failed to clone recipe:', sourceRecipe.title, recipeError);
           continue;
         }
 

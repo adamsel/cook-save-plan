@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 export default function PrivacyPage() {
   const lastUpdated = "January 27, 2026";
   const appName = "Recipe Stash";
-  const companyName = "[Your Company Name]"; // TODO: Replace with your company name
-  const contactEmail = "[privacy@example.com]"; // TODO: Replace with your email
+  const companyName = "Recipe Stash";
+  const contactEmail = "elizaadams720@gmail.com";
 
   return (
     <div className="min-h-screen bg-background">

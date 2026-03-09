@@ -81,7 +81,6 @@ export function useRecipeLinks(recipeId?: string) {
       }
 
       if (linksError) {
-        console.error('Error fetching recipe links:', linksError);
         setLinkedRecipes([]);
         return;
       }
@@ -108,7 +107,6 @@ export function useRecipeLinks(recipeId?: string) {
       }
 
       if (recipesError) {
-        console.error('Error fetching linked recipe details:', recipesError);
         setLinkedRecipes([]);
         return;
       }
@@ -145,7 +143,6 @@ export function useRecipeLinks(recipeId?: string) {
 
       setLinkedRecipes(combined);
     } catch (error) {
-      console.error('Error in fetchLinkedRecipes:', error);
       // Only clear if this is still the current recipe
       if (currentRecipeIdRef.current === fetchId) {
         setLinkedRecipes([]);
@@ -230,7 +227,6 @@ export function useRecipeLinks(recipeId?: string) {
       await fetchLinkedRecipes();
       return data.id;
     } catch (error) {
-      console.error('Error adding recipe link:', error);
       toast({
         title: 'Error',
         description: 'Failed to link recipes',
@@ -263,7 +259,6 @@ export function useRecipeLinks(recipeId?: string) {
       await fetchLinkedRecipes();
       return true;
     } catch (error) {
-      console.error('Error removing recipe link:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove link',
@@ -279,7 +274,6 @@ export function useRecipeLinks(recipeId?: string) {
     replacements: IngredientReplacement[] | null
   ) => {
     if (!user) {
-      console.error('[updateReplacements] No user logged in');
       return false;
     }
 
@@ -302,7 +296,6 @@ export function useRecipeLinks(recipeId?: string) {
       await fetchLinkedRecipes();
       return true;
     } catch (error) {
-      console.error('Error updating replacements:', error);
       toast({
         title: 'Error',
         description: 'Failed to update ingredient replacements',
@@ -370,7 +363,6 @@ export function useUnplannedLinkedRecipes(
         if (isCancelled) return;
 
         if (error) {
-          console.error('Error fetching links for meal plan:', error);
           setUnplannedLinks([]);
           return;
         }
@@ -421,7 +413,6 @@ export function useUnplannedLinkedRecipes(
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-        console.error('Error checking unplanned links:', error);
         setUnplannedLinks([]);
       } finally {
         if (!isCancelled) {
@@ -501,7 +492,6 @@ export function useActiveReplacements(
         if (isCancelled) return;
 
         if (error) {
-          console.error('Error fetching active replacements:', error);
           setReplacementsMap(new Map());
           setReplacementDetails([]);
           return;
@@ -575,7 +565,6 @@ export function useActiveReplacements(
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-        console.error('Error fetching active replacements:', error);
         setReplacementsMap(new Map());
         setReplacementDetails([]);
       } finally {

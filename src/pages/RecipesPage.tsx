@@ -48,7 +48,7 @@ function CompactCreatorCard({ creator }: { creator: DiscoverCreator }) {
       navigate('/auth?redirect=/recipes');
       return;
     }
-    isFollowing ? unfollow() : follow();
+    if (isFollowing) { unfollow(); } else { follow(); }
   };
 
   return (
@@ -189,7 +189,7 @@ export default function RecipesPage() {
   );
 
   const filteredRecipes = useMemo(() => {
-    let result = sourceRecipes.filter(recipe => {
+    const result = sourceRecipes.filter(recipe => {
       // Exclude archived unless toggled (only for personal recipes)
       if (activeTab === 'personal' && !showArchived && recipe.isArchived) return false;
 

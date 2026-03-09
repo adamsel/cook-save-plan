@@ -82,7 +82,7 @@ function extractRecipeFromText(text: string): ParsedRecipeData | null {
       return parsed as ParsedRecipeData;
     }
   } catch (e) {
-    console.error('Failed to parse recipe JSON:', e);
+    // ignored
   }
   return null;
 }
@@ -346,7 +346,6 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
         ));
       }
     } catch (error) {
-      console.error('Chat error:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to get response',

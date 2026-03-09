@@ -100,7 +100,6 @@ export function MealPlanAIInsights({
       const data = await response.json();
       setAnalysis(data);
     } catch (err) {
-      console.error('Analysis error:', err);
       setError(err instanceof Error ? err.message : 'Failed to analyze meal plan');
       toast({
         title: "Analysis failed",

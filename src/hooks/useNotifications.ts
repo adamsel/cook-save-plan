@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Notification {
   id: string;
@@ -12,6 +13,7 @@ export interface Notification {
 
 export function useNotifications() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const queryKey = ['notifications', user?.id];
 
@@ -27,7 +29,11 @@ export function useNotifications() {
         .limit(20);
 
       if (error) {
-        console.error('Failed to fetch notifications:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load notifications',
+          variant: 'destructive',
+        });
         return [];
       }
 
@@ -74,6 +80,11 @@ export function useNotifications() {
       if (context?.prev) {
         queryClient.setQueryData(queryKey, context.prev);
       }
+      toast({
+        title: 'Error',
+        description: 'Failed to mark notifications as read',
+        variant: 'destructive',
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });

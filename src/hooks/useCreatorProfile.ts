@@ -95,7 +95,7 @@ export function useCreatorProfile(username: string | undefined) {
         .in('meal_plan_id', planIds);
 
       const planImageMap = new Map<string, string>();
-      (recipeImageData || []).forEach((item: any) => {
+      (recipeImageData || []).forEach((item: { meal_plan_id: string; recipes: { image_url: string | null } | null }) => {
         if (!planImageMap.has(item.meal_plan_id) && item.recipes?.image_url) {
           planImageMap.set(item.meal_plan_id, item.recipes.image_url);
         }

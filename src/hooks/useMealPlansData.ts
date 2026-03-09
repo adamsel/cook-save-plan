@@ -83,7 +83,11 @@ export function useMealPlansData() {
     const { data: plans, error: plansError } = await query;
 
     if (plansError) {
-      console.error('Error fetching meal plans:', plansError);
+      toast({
+        title: 'Error',
+        description: 'Failed to load meal plans',
+        variant: 'destructive',
+      });
       return [];
     }
 
@@ -96,7 +100,11 @@ export function useMealPlansData() {
       .in('meal_plan_id', plans.map(p => p.id));
 
     if (itemsError) {
-      console.error('Error fetching meal plan items:', itemsError);
+      toast({
+        title: 'Error',
+        description: 'Failed to load meal plan items',
+        variant: 'destructive',
+      });
       return [];
     }
 
@@ -179,7 +187,11 @@ export function useMealPlansData() {
       .single();
 
     if (createError) {
-      console.error('Error creating meal plan:', createError);
+      toast({
+        title: 'Error',
+        description: 'Failed to create meal plan',
+        variant: 'destructive',
+      });
       return null;
     }
 
@@ -403,7 +415,11 @@ export function useMealPlansData() {
       .eq('id', itemId);
 
     if (error) {
-      console.error('Error deleting leftover position:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update leftover position',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -478,7 +494,14 @@ export function useMealPlansData() {
       .eq('id', planId)
       .single();
 
-    if (error) return null;
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load sharing info',
+        variant: 'destructive',
+      });
+      return null;
+    }
     return {
       isShared: data.is_shared,
       shareSlug: data.share_slug,

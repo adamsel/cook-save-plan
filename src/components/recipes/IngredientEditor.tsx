@@ -28,7 +28,7 @@ const parseIngredientText = (text: string, id: string): Ingredient => {
   }
 
   // Pattern: quantity unit item (notes)
-  const quantityPattern = /^([\d\/\.\,\s]+(?:[\-–][\d\/\.\,\s]+)?)\s*([a-zA-Z]+\.?)?\s+(.+)$/;
+  const quantityPattern = /^([\d/.,\s]+(?:[-–][\d/.,\s]+)?)\s*([a-zA-Z]+\.?)?\s+(.+)$/;
   const match = trimmed.match(quantityPattern);
 
   if (match) {

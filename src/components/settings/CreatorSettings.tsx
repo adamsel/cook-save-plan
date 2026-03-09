@@ -135,7 +135,7 @@ export function CreatorSettings() {
     }
 
     // Sync local state
-    await updateProfile({ avatar_url: urlWithCacheBust } as any);
+    await updateProfile({ avatar_url: urlWithCacheBust });
 
     toast({ title: 'Profile photo updated' });
     setIsUploadingAvatar(false);
@@ -183,7 +183,7 @@ export function CreatorSettings() {
       return;
     }
 
-    await updateProfile({ cover_image_url: urlWithCacheBust } as any);
+    await updateProfile({ cover_image_url: urlWithCacheBust });
 
     toast({ title: 'Cover photo updated' });
     setIsUploadingCover(false);
@@ -192,7 +192,7 @@ export function CreatorSettings() {
   };
 
   const handleRemoveCover = async () => {
-    await updateProfile({ cover_image_url: null } as any);
+    await updateProfile({ cover_image_url: null });
     toast({ title: 'Cover photo removed' });
   };
 
@@ -227,7 +227,7 @@ export function CreatorSettings() {
       updates.username = username;
     }
 
-    await updateProfile(updates as any);
+    await updateProfile(updates);
 
     toast({
       title: 'Creator settings saved',

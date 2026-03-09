@@ -83,7 +83,7 @@ export function ShareRecipeDialog({
       setShares(result.shares);
       setPendingShares(result.pendingShares);
     } catch (error) {
-      console.error('Failed to load shares:', error);
+      // ignored
     } finally {
       setIsLoadingShares(false);
     }

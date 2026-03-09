@@ -129,7 +129,6 @@ export function useRecipesData() {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Error fetching personal recipes:', error);
       return [];
     }
     
@@ -151,7 +150,6 @@ export function useRecipesData() {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Error fetching library recipes:', error);
       return [];
     }
     
@@ -180,7 +178,6 @@ export function useRecipesData() {
       .in('id', recipeIds);
     
     if (error) {
-      console.error('Error fetching shared recipes:', error);
       return [];
     }
     
@@ -205,7 +202,6 @@ export function useRecipesData() {
         setSharedRecipes(shared);
       } catch (err) {
         setError('Failed to load recipes');
-        console.error(err);
       } finally {
         setIsLoading(false);
       }
@@ -294,7 +290,6 @@ export function useRecipesData() {
       .eq('id', recipe.id);
     
     if (error) {
-      console.error('[useRecipesData] Error updating recipe:', error);
       toast({
         title: 'Error updating recipe',
         description: error.message,
@@ -438,7 +433,6 @@ export function useRecipesData() {
       .maybeSingle();
 
     if (profileError) {
-      console.error('Error looking up user:', profileError);
       return { error: 'Failed to look up user', shared: false, pending: false };
     }
 
@@ -457,7 +451,6 @@ export function useRecipesData() {
         if (shareError.code === '23505') { // Unique violation
           return { error: 'Recipe already shared with this user', shared: false, pending: false };
         }
-        console.error('Error sharing recipe:', shareError);
         return { error: 'Failed to share recipe', shared: false, pending: false };
       }
 
@@ -477,7 +470,6 @@ export function useRecipesData() {
         if (pendingError.code === '23505') { // Unique violation
           return { error: 'Invitation already sent to this email', shared: false, pending: false };
         }
-        console.error('Error creating pending share:', pendingError);
         return { error: 'Failed to send invitation', shared: false, pending: false };
       }
 
@@ -495,7 +487,7 @@ export function useRecipesData() {
           recipeTitle: recipe?.title || 'a recipe',
           sharerName: profile?.display_name || 'Someone',
         },
-      }).catch(err => console.error('Failed to send invitation email:', err));
+      }).catch(() => {});
 
       return { error: null, shared: false, pending: true };
     }
@@ -519,7 +511,7 @@ export function useRecipesData() {
       .eq('shared_by_user_id', user.id);
 
     if (sharesError) {
-      console.error('Error fetching shares:', sharesError);
+      // ignored
     }
 
     // Get pending shares
@@ -530,7 +522,7 @@ export function useRecipesData() {
       .eq('shared_by_user_id', user.id);
 
     if (pendingError) {
-      console.error('Error fetching pending shares:', pendingError);
+      // ignored
     }
 
     return {
@@ -550,7 +542,6 @@ export function useRecipesData() {
       .eq('shared_by_user_id', user.id);
 
     if (error) {
-      console.error('Error revoking share:', error);
       toast({
         title: 'Error',
         description: 'Failed to revoke share',
@@ -573,7 +564,6 @@ export function useRecipesData() {
       .eq('shared_by_user_id', user.id);
 
     if (error) {
-      console.error('Error revoking pending share:', error);
       toast({
         title: 'Error',
         description: 'Failed to revoke invitation',

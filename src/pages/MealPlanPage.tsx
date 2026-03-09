@@ -48,23 +48,10 @@ import { LinkedRecipePrompt } from '@/components/recipes/LinkedRecipePrompt';
 import { ShareMealPlanDialog } from '@/components/recipes/ShareMealPlanDialog';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type FilterType = 'all' | 'favorites' | 'quick' | 'category' | 'mealType';
 type ViewMode = 'grid' | 'list';
-
-// Hook to detect mobile screens
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  return isMobile;
-}
 
 export default function MealPlanPage() {
   const {
@@ -386,7 +373,6 @@ export default function MealPlanPage() {
       try {
         await updateLeftoverPosition(sourceItemId, leftoverIndex, day, slot);
       } catch (err) {
-        console.error('Failed to update leftover position:', err);
         toast({
           title: "Error moving leftover",
           description: "Please try again",

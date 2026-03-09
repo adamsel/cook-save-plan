@@ -100,7 +100,7 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
         }
       }
     } catch (e) {
-      console.error('Failed to load nutrition goals:', e);
+      // ignored
     }
   }, []);
 
@@ -144,7 +144,7 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
           }
         }
       } catch (e) {
-        console.error('Failed to read insights cache:', e);
+        // ignored
       }
     }
 
@@ -179,7 +179,6 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
       });
 
       if (error) {
-        console.error('AI insights error:', error);
         const errorMessage = error.message || 'Unable to connect to AI service';
         setInsightsError(errorMessage.includes('rate') ? 'Rate limit reached. Try again later.' : 'AI insights temporarily unavailable');
         return;
@@ -196,10 +195,9 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
             timestamp: Date.now(),
           }));
         } catch (e) {
-          console.error('Failed to cache insights:', e);
+          // ignored
         }
       } else if (data?.error) {
-        console.error('AI insights API error:', data.error);
         if (data.error.includes('429') || data.error.includes('rate')) {
           setInsightsError('AI rate limit reached. Please try again in a few minutes.');
         } else {
@@ -207,7 +205,6 @@ export function WeeklySummary({ recipes, mealPlanItems, pantryStaples, household
         }
       }
     } catch (e) {
-      console.error('AI insights fetch failed:', e);
       setInsightsError('AI insights temporarily unavailable');
     } finally {
       setIsLoadingInsights(false);

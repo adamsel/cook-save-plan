@@ -49,7 +49,7 @@ export function parseIngredientLine(line: string, index: number): Ingredient {
   const trimmed = line.trim();
   
   // Common patterns: "2 cups flour", "1/2 tsp salt", "200g chicken"
-  const quantityPattern = /^([\d\/\.\,\s]+(?:[\-–][\d\/\.\,\s]+)?)\s*([a-zA-Z]+\.?)?\s+(.+)$/;
+  const quantityPattern = /^([\d/.,\s]+(?:[-–][\d/.,\s]+)?)\s*([a-zA-Z]+\.?)?\s+(.+)$/;
   const match = trimmed.match(quantityPattern);
   
   if (match) {
@@ -93,19 +93,19 @@ function filterValidIngredients(ingredients: Ingredient[]): Ingredient[] {
 }
 
 // Parse instruction step from various formats
-function parseInstructionStep(step: any): string {
+function parseInstructionStep(step: string | Record<string, unknown>): string {
   if (typeof step === 'string') {
     return step.trim();
   }
   // Handle HowToStep objects from schema.org
   if (step && typeof step === 'object') {
-    return step.text || step.name || '';
+    return (step.text as string) || (step.name as string) || '';
   }
   return '';
 }
 
 // Extract JSON-LD Recipe schema from HTML
-function extractJsonLdRecipe(html: string): any | null {
+function extractJsonLdRecipe(html: string): Record<string, unknown> | null {
   const scriptMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
   
   if (!scriptMatches) return null;
@@ -141,7 +141,7 @@ function extractJsonLdRecipe(html: string): any | null {
 }
 
 // Parse recipe from JSON-LD schema
-function parseFromSchema(schemaData: any, sourceUrl: string): ParsedRecipe | null {
+function parseFromSchema(schemaData: Record<string, unknown>, sourceUrl: string): ParsedRecipe | null {
   if (!schemaData) return null;
   
   const ingredients: Ingredient[] = [];
@@ -160,10 +160,10 @@ function parseFromSchema(schemaData: any, sourceUrl: string): ParsedRecipe | nul
   // Parse instructions
   const recipeInstructions = schemaData.recipeInstructions || [];
   if (Array.isArray(recipeInstructions)) {
-    recipeInstructions.forEach((step: any) => {
-      if (step['@type'] === 'HowToSection' && Array.isArray(step.itemListElement)) {
+    recipeInstructions.forEach((step: string | Record<string, unknown>) => {
+      if (typeof step === 'object' && step['@type'] === 'HowToSection' && Array.isArray(step.itemListElement)) {
         // Handle sectioned instructions
-        step.itemListElement.forEach((subStep: any) => {
+        (step.itemListElement as Array<string | Record<string, unknown>>).forEach((subStep) => {
           const parsed = parseInstructionStep(subStep);
           if (parsed) instructions.push(parsed);
         });
@@ -386,7 +386,7 @@ export function parseFromText(text: string): ParsedRecipe {
     
     // Heuristics for unknown section
     // Ingredient-like: starts with quantity or contains measurement words
-    const isIngredientLike = /^[\d\/\.\,]/.test(line) || 
+    const isIngredientLike = /^[\d/.,]/.test(line) ||
       /\b(cups?|tbsp?|tsp?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|kg|ml|liters?|cloves?|pieces?|pinch)\b/i.test(line);
     
     // Instruction-like: starts with number, or contains action verbs

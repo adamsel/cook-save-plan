@@ -198,7 +198,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       const plan = mealPlansData.mealPlans.find(mp => mp.weekStartDate === weekStart);
       if (plan) return plan;
     } else {
-      let plan = localMealPlans.find(mp => mp.weekStartDate === weekStart);
+      const plan = localMealPlans.find(mp => mp.weekStartDate === weekStart);
       if (plan) return plan;
     }
     

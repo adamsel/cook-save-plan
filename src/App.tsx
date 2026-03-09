@@ -10,7 +10,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Navigation } from "@/components/layout/Navigation";
 import { AddRecipeDialog } from "@/components/recipes/AddRecipeDialog";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-import { Loader2 } from 'lucide-react';
+import { SentryErrorBoundary } from "@/lib/sentry";
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 // Static imports for lightweight public pages
 import AuthPage from "@/pages/AuthPage";
@@ -40,10 +41,27 @@ const PageLoader = () => (
   </div>
 );
 
+const ErrorFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+    <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+    <h1 className="text-xl font-semibold mb-2">Something went wrong</h1>
+    <p className="text-muted-foreground mb-6 max-w-md">
+      An unexpected error occurred. Please reload the page to try again.
+    </p>
+    <button
+      onClick={() => window.location.reload()}
+      className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+    >
+      Reload page
+    </button>
+  </div>
+);
+
 const App = () => {
   const [showAddRecipe, setShowAddRecipe] = useState(false);
 
   return (
+    <SentryErrorBoundary fallback={<ErrorFallback />}>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <RecipeProvider>
@@ -91,6 +109,7 @@ const App = () => {
         </RecipeProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </SentryErrorBoundary>
   );
 };
 

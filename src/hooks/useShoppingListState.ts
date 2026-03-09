@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { startOfWeek, format } from 'date-fns';
 import type { ShoppingListItem } from '@/types/recipe';
 
@@ -34,12 +35,13 @@ function setToLocalStorage<T>(key: string, value: T): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    console.error(`Error setting localStorage key "${key}":`, error);
+    // ignored
   }
 }
 
 export function useShoppingListState() {
   const { user, session } = useAuth();
+  const { toast } = useToast();
   const [checkedItems, setCheckedItemsState] = useState<Record<string, boolean>>(() =>
     getFromLocalStorage(STORAGE_KEY_CHECKED, {})
   );
@@ -70,7 +72,11 @@ export function useShoppingListState() {
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching shopping list state:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load shopping list',
+        variant: 'destructive',
+      });
       return null;
     }
 
@@ -98,9 +104,13 @@ export function useShoppingListState() {
       });
 
     if (error) {
-      console.error('Error saving shopping list state:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save shopping list',
+        variant: 'destructive',
+      });
     }
-  }, [user]);
+  }, [user, toast]);
 
   // Debounced save
   const debouncedSave = useCallback((
