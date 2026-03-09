@@ -71,51 +71,114 @@ export type Database = {
       meal_plans: {
         Row: {
           created_at: string
+          description: string | null
           id: string
+          is_shared: boolean
+          share_slug: string | null
+          title: string | null
           updated_at: string
           user_id: string
           week_start_date: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
+          is_shared?: boolean
+          share_slug?: string | null
+          title?: string | null
           updated_at?: string
           user_id: string
           week_start_date: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
+          is_shared?: boolean
+          share_slug?: string | null
+          title?: string | null
           updated_at?: string
           user_id?: string
           week_start_date?: string
         }
         Relationships: []
       }
+      creator_follows: {
+        Row: {
+          id: string
+          follower_id: string
+          following_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          follower_id: string
+          following_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          follower_id?: string
+          following_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_follows_follower_id_fkey"
+            columns: ["follower_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "creator_follows_following_id_fkey"
+            columns: ["following_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
+          cover_image_url: string | null
+          cover_image_position: number
           created_at: string
           display_name: string | null
           id: string
+          is_creator: boolean
           updated_at: string
           user_id: string
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
+          cover_image_url?: string | null
+          cover_image_position?: number
           created_at?: string
           display_name?: string | null
           id?: string
+          is_creator?: boolean
           updated_at?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
+          cover_image_url?: string | null
+          cover_image_position?: number
           created_at?: string
           display_name?: string | null
           id?: string
+          is_creator?: boolean
           updated_at?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: []
       }

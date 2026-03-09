@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 export default function AuthPage() {
   const { user, isLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -22,7 +24,7 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   if (user && !isLoading) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -42,7 +44,7 @@ export default function AuthPage() {
         title: 'Welcome back!',
         description: 'You have been logged in successfully.',
       });
-      navigate('/dashboard');
+      navigate(redirectTo);
     }
     
     setIsSubmitting(false);
@@ -65,7 +67,7 @@ export default function AuthPage() {
         title: 'Account created!',
         description: 'Welcome to Recipe Stash. Start adding your recipes!',
       });
-      navigate('/dashboard');
+      navigate(redirectTo);
     }
     
     setIsSubmitting(false);

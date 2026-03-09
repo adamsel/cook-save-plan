@@ -63,6 +63,12 @@ interface RecipeContextType {
   removeFromMealPlan: (itemId: string) => Promise<void>;
   updateMealPlanItem: (itemId: string, updates: Partial<MealPlanItem>) => Promise<void>;
   updateLeftoverPosition: (itemId: string, leftoverIndex: number, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
+
+  // Meal Plan Sharing
+  shareMealPlan: (planId: string, title?: string, description?: string) => Promise<{ shareSlug: string } | null>;
+  unshareMealPlan: (planId: string) => Promise<boolean>;
+  getMealPlanShareInfo: (planId: string) => Promise<{ isShared: boolean; shareSlug: string | null; title: string | null; description: string | null } | null>;
+  makeRecipesPublicBatch: (recipeIds: string[]) => Promise<boolean>;
   
   // Settings Actions
   addCategory: (category: string) => void;
@@ -369,6 +375,26 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
     });
   }, [user, isLoading, recipes]);
 
+  // Meal plan sharing functions
+  const shareMealPlan = async (planId: string, title?: string, description?: string) => {
+    if (!user) return null;
+    return await mealPlansData.shareMealPlan(planId, title, description);
+  };
+
+  const unshareMealPlan = async (planId: string) => {
+    if (!user) return false;
+    return await mealPlansData.unshareMealPlan(planId);
+  };
+
+  const getMealPlanShareInfo = async (planId: string) => {
+    return await mealPlansData.getMealPlanShareInfo(planId);
+  };
+
+  const makeRecipesPublicBatch = async (recipeIds: string[]) => {
+    if (!user) return false;
+    return await recipesData.makeRecipesPublicBatch(recipeIds);
+  };
+
   // Sharing functions - only available when authenticated
   const shareRecipe = async (recipeId: string, email: string, canEdit: boolean = false) => {
     if (!user) return { error: 'Not authenticated', shared: false, pending: false };
@@ -419,6 +445,10 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       removeFromMealPlan,
       updateMealPlanItem,
       updateLeftoverPosition,
+      shareMealPlan,
+      unshareMealPlan,
+      getMealPlanShareInfo,
+      makeRecipesPublicBatch,
       addCategory,
       addTag,
       updatePantryStaples,

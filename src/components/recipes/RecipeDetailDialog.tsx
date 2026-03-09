@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Recipe, RecipeShare, PendingShare, IngredientReplacement } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library, Share2, Link2, X, Loader2, Settings } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, Calendar, Pencil, Archive, Trash2, ChefHat, Flame, Copy, Library, Share2, Link2, X, Loader2, Settings, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -246,44 +246,51 @@ export function RecipeDetailDialog({
                     </Badge>
                   )}
                 </h3>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
-                  {nutrition.calories !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.calories}</p>
-                      <p className="text-xs text-muted-foreground">kcal</p>
-                    </div>
-                  )}
-                  {nutrition.protein !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.protein}g</p>
-                      <p className="text-xs text-muted-foreground">protein</p>
-                    </div>
-                  )}
-                  {nutrition.carbs !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.carbs}g</p>
-                      <p className="text-xs text-muted-foreground">carbs</p>
-                    </div>
-                  )}
-                  {nutrition.fat !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.fat}g</p>
-                      <p className="text-xs text-muted-foreground">fat</p>
-                    </div>
-                  )}
-                  {nutrition.fiber !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.fiber}g</p>
-                      <p className="text-xs text-muted-foreground">fiber</p>
-                    </div>
-                  )}
-                  {nutrition.sugar !== undefined && (
-                    <div>
-                      <p className="text-lg font-semibold">{nutrition.sugar}g</p>
-                      <p className="text-xs text-muted-foreground">sugar</p>
-                    </div>
-                  )}
-                </div>
+                {recipe.nutrition?.verified === false ? (
+                  <p className="text-sm text-amber-600 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Nutrition data may be inaccurate — tap to review and edit this recipe.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
+                    {nutrition.calories !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.calories}</p>
+                        <p className="text-xs text-muted-foreground">kcal</p>
+                      </div>
+                    )}
+                    {nutrition.protein !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.protein}g</p>
+                        <p className="text-xs text-muted-foreground">protein</p>
+                      </div>
+                    )}
+                    {nutrition.carbs !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.carbs}g</p>
+                        <p className="text-xs text-muted-foreground">carbs</p>
+                      </div>
+                    )}
+                    {nutrition.fat !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.fat}g</p>
+                        <p className="text-xs text-muted-foreground">fat</p>
+                      </div>
+                    )}
+                    {nutrition.fiber !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.fiber}g</p>
+                        <p className="text-xs text-muted-foreground">fiber</p>
+                      </div>
+                    )}
+                    {nutrition.sugar !== undefined && (
+                      <div>
+                        <p className="text-lg font-semibold">{nutrition.sugar}g</p>
+                        <p className="text-xs text-muted-foreground">sugar</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {recipe.nutrition?.notes && (
                   <p className="text-xs text-muted-foreground mt-3 italic">{recipe.nutrition.notes}</p>
                 )}

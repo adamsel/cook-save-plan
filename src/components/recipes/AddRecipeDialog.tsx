@@ -31,6 +31,7 @@ import {
   Sparkles, Clipboard, Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface AddRecipeDialogProps {
@@ -52,6 +53,7 @@ const generateId = (): string => {
 export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipeDialogProps) {
   const { addRecipe, updateRecipe, categories, tags: availableTags, addTag } = useRecipes();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('url');
   const [isLoading, setIsLoading] = useState(false);
@@ -484,7 +486,17 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     if (editingRecipe) {
       await updateRecipe({ ...editingRecipe, ...recipeData });
     } else {
-      await addRecipe(recipeData);
+      const result = await addRecipe(recipeData);
+      if (result?.isFirstRecipe) {
+        toast({
+          title: 'Recipe saved to your stash!',
+          description: 'Now add it to your meal plan.',
+        });
+        resetForm();
+        onOpenChange(false);
+        navigate('/meal-plan');
+        return;
+      }
     }
 
     resetForm();

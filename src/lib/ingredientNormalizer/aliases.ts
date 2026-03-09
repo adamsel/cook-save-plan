@@ -107,8 +107,11 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'parmesan cheese': 'parmesan',
   'parmigiano reggiano': 'parmesan',
   'parmigiano-reggiano': 'parmesan',
+  'parmigiano': 'parmesan',
+  'parm': 'parmesan',
   'grated parmesan': 'parmesan',
   'shredded parmesan': 'parmesan',
+  'freshly grated parmesan': 'parmesan',
   'pecorino romano': 'pecorino',
   
   'cheddar cheese': 'cheddar',
@@ -1066,6 +1069,10 @@ export const INGREDIENT_ALIASES: Record<string, string> = {
   'sushi rice': 'sushi rice',
   'short grain japanese rice': 'sushi rice',
   'calrose rice': 'sushi rice',
+
+  // Bakery items that contain descriptor words
+  'english muffin': 'english muffin',
+  'english muffins': 'english muffin',
 };
 
 // Words to strip from ingredient names (don't affect shopping)

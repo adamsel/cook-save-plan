@@ -8,6 +8,11 @@ interface Profile {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
+  cover_image_url: string | null;
+  cover_image_position: number;
+  username: string | null;
+  bio: string | null;
+  is_creator: boolean;
 }
 
 interface AuthContextType {
@@ -76,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: import.meta.env.VITE_SITE_URL || window.location.origin,
         data: {
           full_name: displayName,
         },

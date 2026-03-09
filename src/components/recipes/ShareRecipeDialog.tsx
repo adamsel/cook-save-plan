@@ -91,7 +91,7 @@ export function ShareRecipeDialog({
 
   if (!recipe) return null;
 
-  const shareUrl = `${window.location.origin}/recipes?id=${recipe.id}`;
+  const shareUrl = `${window.location.origin}/recipe/${recipe.id}`;
 
   const handleTogglePublic = async () => {
     setIsUpdating(true);

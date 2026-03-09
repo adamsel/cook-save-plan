@@ -467,8 +467,8 @@ function categorizeIngredient(ingredient: string): string {
     return 'Beverages';
   }
 
-  // Spices & Seasonings
-  if (/\b(seasoning|spice|powder|paprika|cumin|cinnamon|nutmeg|oregano|thyme|basil|rosemary)\b/.test(lower)) {
+  // Spices & Seasonings (dried spices only — fresh herbs go to Produce below)
+  if (/\b(seasoning|spice|powder|paprika|cumin|cinnamon|nutmeg|turmeric|cardamom|clove|cayenne|chili powder|curry powder|garam masala|allspice|saffron)\b/.test(lower)) {
     return 'Spices & Seasonings';
   }
 

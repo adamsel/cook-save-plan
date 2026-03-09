@@ -5,6 +5,7 @@ import { useHousehold } from '@/hooks/useHousehold';
 import { MealPlan, MealPlanItem, LeftoverPositionEntry } from '@/types/recipe';
 import { format, startOfWeek } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { nanoid } from 'nanoid';
 
 interface DbMealPlan {
   id: string;
@@ -414,6 +415,78 @@ export function useMealPlansData() {
     })));
   };
 
+  // Share a meal plan publicly
+  const shareMealPlan = async (
+    planId: string,
+    title?: string,
+    description?: string
+  ): Promise<{ shareSlug: string } | null> => {
+    if (!user) return null;
+
+    const slug = nanoid(10);
+
+    const updates: Record<string, unknown> = {
+      is_shared: true,
+      share_slug: slug,
+    };
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+
+    const { error } = await supabase
+      .from('meal_plans')
+      .update(updates)
+      .eq('id', planId);
+
+    if (error) {
+      toast({
+        title: 'Error sharing meal plan',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    return { shareSlug: slug };
+  };
+
+  // Unshare a meal plan
+  const unshareMealPlan = async (planId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('meal_plans')
+      .update({ is_shared: false })
+      .eq('id', planId);
+
+    if (error) {
+      toast({
+        title: 'Error unsharing meal plan',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  // Get sharing info for a meal plan
+  const getMealPlanShareInfo = async (planId: string): Promise<{ isShared: boolean; shareSlug: string | null; title: string | null; description: string | null } | null> => {
+    const { data, error } = await supabase
+      .from('meal_plans')
+      .select('is_shared, share_slug, title, description')
+      .eq('id', planId)
+      .single();
+
+    if (error) return null;
+    return {
+      isShared: data.is_shared,
+      shareSlug: data.share_slug,
+      title: data.title,
+      description: data.description,
+    };
+  };
+
   return {
     mealPlans,
     isLoading,
@@ -424,6 +497,9 @@ export function useMealPlansData() {
     updateMealPlanItem,
     updateLeftoverPosition,
     deleteLeftoverPosition,
+    shareMealPlan,
+    unshareMealPlan,
+    getMealPlanShareInfo,
     refresh: fetchMealPlans,
   };
 }

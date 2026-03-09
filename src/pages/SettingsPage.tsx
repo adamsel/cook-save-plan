@@ -3,6 +3,7 @@ import { useRecipes } from '@/context/RecipeContext';
 import { useHouseholdSettings, type NutritionGoal } from '@/hooks/useHouseholdSettings';
 import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
 import { HouseholdManagement } from '@/components/settings/HouseholdManagement';
+import { CreatorSettings } from '@/components/settings/CreatorSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ import {
   AlertTriangle,
   Target,
   ChevronDown,
+  ChefHat,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +102,20 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6 md:space-y-8">
+        {/* Creator Profile */}
+        <section className="space-y-3 md:space-y-4">
+          <div className="flex items-center gap-2">
+            <ChefHat className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Creator profile</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Share your meal plans publicly so others can clone them and generate shopping lists.
+          </p>
+          <CreatorSettings />
+        </section>
+
+        <Separator />
+
         {/* Household Management */}
         <section className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
@@ -107,7 +123,7 @@ export default function SettingsPage() {
             <h2 className="font-serif text-lg md:text-xl font-semibold">Share the load</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Planning alone works great. If you want help, invite someone to plan with you.
+            Invite your partner or a family member to plan meals together. You'll share one meal plan and one shopping list.
           </p>
           <HouseholdManagement />
         </section>
@@ -322,7 +338,7 @@ export default function SettingsPage() {
             <h2 className="font-serif text-lg md:text-xl font-semibold">Pantry Staples</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            These items can be excluded from your shopping list. Common items you always have on hand.
+            Items you always have at home — these will be hidden from your shopping list automatically.
           </p>
           <div className="flex flex-wrap gap-1.5 md:gap-2">
             {localStaples.map(staple => (
@@ -386,7 +402,7 @@ export default function SettingsPage() {
               )} />
             </CollapsibleTrigger>
             <p className="text-sm text-muted-foreground">
-              Most people skip this. Your meal plan works great without it.
+              Set daily calorie and macro goals to see how your meal plan stacks up each week. Most people skip this at first.
             </p>
 
             <CollapsibleContent className="space-y-3 md:space-y-4">
@@ -497,6 +513,7 @@ export default function SettingsPage() {
             </CollapsibleContent>
           </section>
         </Collapsible>
+
       </div>
     </div>
   );

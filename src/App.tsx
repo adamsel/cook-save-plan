@@ -26,6 +26,12 @@ const MealPlanPage = lazy(() => import("@/pages/MealPlanPage"));
 const ShoppingListPage = lazy(() => import("@/pages/ShoppingListPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 
+// Lazy load public sharing pages
+const SharedMealPlanPage = lazy(() => import("@/pages/SharedMealPlanPage"));
+const CreatorProfilePage = lazy(() => import("@/pages/CreatorProfilePage"));
+const DiscoverPage = lazy(() => import("@/pages/DiscoverPage"));
+const PublicRecipePage = lazy(() => import("@/pages/PublicRecipePage"));
+
 const queryClient = new QueryClient();
 
 const PageLoader = () => (
@@ -52,6 +58,9 @@ const App = () => {
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/plan/:shareSlug" element={<Suspense fallback={<PageLoader />}><SharedMealPlanPage /></Suspense>} />
+                  <Route path="/creator/:username" element={<Suspense fallback={<PageLoader />}><CreatorProfilePage /></Suspense>} />
+                  <Route path="/recipe/:id" element={<Suspense fallback={<PageLoader />}><PublicRecipePage /></Suspense>} />
 
                   {/* Protected routes - lazy loaded */}
                   <Route path="/*" element={
@@ -64,6 +73,7 @@ const App = () => {
                           <Route path="/meal-plan" element={<MealPlanPage />} />
                           <Route path="/shopping-list" element={<ShoppingListPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
+                          <Route path="/discover" element={<DiscoverPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </Suspense>

@@ -31,7 +31,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   LayoutGrid,
-  List
+  List,
+  Share2
 } from 'lucide-react';
 import { DayListView } from '@/components/recipes/DayListView';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ import { MealCard } from '@/components/recipes/MealCard';
 import { MealEditSheet } from '@/components/recipes/MealEditSheet';
 import { MealPlanEmptyState } from '@/components/recipes/MealPlanEmptyState';
 import { LinkedRecipePrompt } from '@/components/recipes/LinkedRecipePrompt';
+import { ShareMealPlanDialog } from '@/components/recipes/ShareMealPlanDialog';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -77,7 +79,11 @@ export default function MealPlanPage() {
     pantryStaples,
     toggleFavorite,
     toggleArchive,
-    deleteRecipe
+    deleteRecipe,
+    shareMealPlan,
+    unshareMealPlan,
+    getMealPlanShareInfo,
+    makeRecipesPublicBatch,
   } = useRecipes();
   const { toast } = useToast();
   const { householdSize, nutritionGoals } = useHouseholdSettings();
@@ -93,6 +99,7 @@ export default function MealPlanPage() {
   const [selectedWeekOffset, setSelectedWeekOffset] = useLocalStorage('mealPlanWeekOffset', 0);
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // View mode (auto-detect mobile)
   const isMobile = useIsMobile();
@@ -620,6 +627,18 @@ export default function MealPlanPage() {
                 Today
               </Button>
             )}
+
+            {selectedWeekPlan.id && selectedWeekPlan.items.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShareDialogOpen(true)}
+                className="shrink-0"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1068,6 +1087,17 @@ export default function MealPlanPage() {
 
             setPendingRecipeAdd(null);
           }}
+        />
+
+        <ShareMealPlanDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          mealPlan={selectedWeekPlan.id ? selectedWeekPlan : null}
+          recipes={recipes}
+          onShare={shareMealPlan}
+          onUnshare={unshareMealPlan}
+          onGetShareInfo={getMealPlanShareInfo}
+          onMakeRecipesPublic={makeRecipesPublicBatch}
         />
 
       </div>

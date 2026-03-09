@@ -463,6 +463,18 @@ export default function ShoppingListPage() {
         )}
       </div>
 
+      {/* Group by aisle toggle — sticky on mobile, above day selector */}
+      <div className="sticky top-16 z-10 bg-background py-2 -mx-4 px-4 md:static md:mx-0 md:px-0 md:py-0 mb-4">
+        <label className="flex items-center gap-3 py-2 cursor-pointer">
+          <Switch
+            id="group-by-aisle"
+            checked={groupByAisle}
+            onCheckedChange={setGroupByAisle}
+          />
+          <span className="text-sm">Group by aisle</span>
+        </label>
+      </div>
+
       {/* Day Selection - only shown for single week */}
       {weekCount === 1 && (
         <div className="mb-6 p-4 bg-card rounded-xl border border-border/50">
@@ -495,19 +507,6 @@ export default function ShoppingListPage() {
           </div>
         </div>
       )}
-
-      {/* Controls - Toggle switches */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6 mb-4 md:mb-6">
-        <label className="flex items-center gap-3 py-2 cursor-pointer">
-          <Switch
-            id="group-by-aisle"
-            checked={groupByAisle}
-            onCheckedChange={setGroupByAisle}
-          />
-          <span className="text-sm">Group by aisle</span>
-        </label>
-
-      </div>
 
       {/* Desktop action buttons - hidden on mobile */}
       <div className="hidden md:flex flex-wrap items-center gap-2 mb-6">

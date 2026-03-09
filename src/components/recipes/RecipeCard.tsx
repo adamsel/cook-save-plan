@@ -1,5 +1,5 @@
 import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -89,6 +89,19 @@ export function RecipeCard({
               isMobile ? "h-3.5 w-3.5" : "h-4 w-4"
             )} />
           </button>
+        )}
+
+        {/* Data quality warning */}
+        {recipe.dataQualityWarning && !isLibraryRecipe && (
+          <div
+            className={cn(
+              "absolute bg-amber-500/90 text-white rounded-full backdrop-blur-sm",
+              isMobile ? "bottom-2 left-2 p-1.5" : "bottom-3 left-3 p-2"
+            )}
+            title="Some data may be missing or inaccurate. Open recipe to review."
+          >
+            <AlertTriangle className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          </div>
         )}
 
         {/* Source link */}

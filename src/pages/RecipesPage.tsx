@@ -620,16 +620,58 @@ export default function RecipesPage() {
               )}
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
                 <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="font-serif text-xl font-semibold mb-2">No recipes found</h3>
-              <p className="text-muted-foreground max-w-md">
+              <h3 className="font-serif text-xl font-semibold mb-2">
+                {searchQuery || selectedCategories.length > 0 || selectedTags.length > 0
+                  ? "No recipes found"
+                  : "Your stash is empty"}
+              </h3>
+              <p className="text-muted-foreground max-w-md mb-6">
                 {searchQuery || selectedCategories.length > 0 || selectedTags.length > 0
                   ? "Try adjusting your filters or search terms."
-                  : "Start building your recipe collection by adding your first recipe."}
+                  : "Start by adding a recipe you love."}
               </p>
+              {!(searchQuery || selectedCategories.length > 0 || selectedTags.length > 0) && (
+                <>
+                  <Button
+                    className="gap-2 mb-8"
+                    onClick={() => {
+                      setEditingRecipe(null);
+                      setShowEditDialog(true);
+                    }}
+                  >
+                    <UtensilsCrossed className="h-4 w-4" />
+                    Add Recipe
+                  </Button>
+                  {/* Decorative placeholder cards */}
+                  <div className="grid grid-cols-3 gap-3 max-w-md w-full">
+                    {[
+                      { gradient: 'linear-gradient(135deg, #E76F51, #F4A261)', label: 'Hearty Dinner' },
+                      { gradient: 'linear-gradient(135deg, #264653, #2A9D8F)', label: 'Fresh Salad' },
+                      { gradient: 'linear-gradient(135deg, #6D597A, #B56576)', label: 'Quick Lunch' },
+                    ].map(({ gradient, label }) => (
+                      <div
+                        key={label}
+                        className="rounded-lg overflow-hidden h-[100px] relative cursor-pointer hover:scale-105 transition-transform"
+                        onClick={() => {
+                          setEditingRecipe(null);
+                          setShowEditDialog(true);
+                        }}
+                        style={{ background: gradient }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                          <p className="text-white text-xs font-medium">{label}</p>
+                          <p className="text-white/60 text-[10px]">Try the importer</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>

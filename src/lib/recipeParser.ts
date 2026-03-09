@@ -87,6 +87,11 @@ export function parseIngredientLine(line: string, index: number): Ingredient {
   };
 }
 
+// Filter out ingredients with empty names (parser sometimes produces blank items)
+function filterValidIngredients(ingredients: Ingredient[]): Ingredient[] {
+  return ingredients.filter(ing => ing.item && ing.item.trim().length > 0);
+}
+
 // Parse instruction step from various formats
 function parseInstructionStep(step: any): string {
   if (typeof step === 'string') {
@@ -197,7 +202,7 @@ function parseFromSchema(schemaData: any, sourceUrl: string): ParsedRecipe | nul
     cookTime: parseIsoDuration(schemaData.cookTime),
     totalTime: parseIsoDuration(schemaData.totalTime),
     servings: parseServings(schemaData.recipeYield || schemaData.yield),
-    ingredients,
+    ingredients: filterValidIngredients(ingredients),
     instructions,
     sourceUrl,
     importMethod: 'schema',
@@ -288,7 +293,7 @@ function parseFromDom(html: string, sourceUrl: string): ParsedRecipe | null {
     title,
     description: description || undefined,
     imageUrl,
-    ingredients,
+    ingredients: filterValidIngredients(ingredients),
     instructions,
     sourceUrl,
     importMethod: 'dom',
@@ -381,7 +386,7 @@ export function parseFromText(text: string): ParsedRecipe {
   return {
     title,
     description: description || undefined,
-    ingredients,
+    ingredients: filterValidIngredients(ingredients),
     instructions,
     importMethod: 'text',
     confidence,

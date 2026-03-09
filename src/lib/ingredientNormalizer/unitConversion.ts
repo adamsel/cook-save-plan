@@ -411,8 +411,9 @@ export function formatQuantity(
         const tbspValue = Math.ceil(baseValue / 14.787);
         return { value: tbspValue, unit: 'tbsp' };
       } else {
-        // For larger amounts, use bunch or handful
-        return { value: 1, unit: 'bunch' };
+        // For larger amounts, use bunch (scale: ~120ml per bunch)
+        const bunches = Math.ceil(baseValue / 120);
+        return { value: bunches, unit: bunches === 1 ? 'bunch' : 'bunches' };
       }
     }
 

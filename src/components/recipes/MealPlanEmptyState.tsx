@@ -1,7 +1,14 @@
-import { Calendar, ChefHat, Clock, ShoppingCart } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Calendar, Plus, Compass } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
-export function MealPlanEmptyState() {
+interface MealPlanEmptyStateProps {
+  onAddRecipe?: () => void;
+}
+
+export function MealPlanEmptyState({ onAddRecipe }: MealPlanEmptyStateProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-20 text-center px-4">
       {/* Animated icon container */}
@@ -23,42 +30,32 @@ export function MealPlanEmptyState() {
         Tap any empty slot to add a meal. Start with dinners—we'll handle the rest.
       </p>
 
-      {/* Feature highlights */}
-      <div className="flex flex-wrap justify-center gap-4 md:gap-6 mb-10 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-        <FeatureHighlight
-          icon={ChefHat}
-          label="Leftovers handled"
-          color="text-meal-breakfast"
-        />
-        <FeatureHighlight
-          icon={ShoppingCart}
-          label="Shopping list ready"
-          color="text-meal-lunch"
-        />
-        <FeatureHighlight
-          icon={Clock}
-          label="Less thinking"
-          color="text-meal-dinner"
-        />
+      {/* Action buttons */}
+      <div className="flex flex-col sm:flex-row gap-3 animate-fade-up" style={{ animationDelay: '0.3s' }}>
+        <Button
+          size="lg"
+          className="gap-2"
+          onClick={() => {
+            if (onAddRecipe) {
+              onAddRecipe();
+            } else {
+              navigate('/recipes');
+            }
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          Add a Recipe
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          className="gap-2"
+          onClick={() => navigate('/discover')}
+        >
+          <Compass className="h-4 w-4" />
+          Browse Creators
+        </Button>
       </div>
-
-    </div>
-  );
-}
-
-interface FeatureHighlightProps {
-  icon: React.ElementType;
-  label: string;
-  color: string;
-}
-
-function FeatureHighlight({ icon: Icon, label, color }: FeatureHighlightProps) {
-  return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <div className={cn("p-1.5 rounded-full bg-muted/50", color)}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <span>{label}</span>
     </div>
   );
 }

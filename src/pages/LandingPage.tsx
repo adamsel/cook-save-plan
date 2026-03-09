@@ -7,7 +7,9 @@ import {
   ShoppingCart,
   ArrowRight,
   UtensilsCrossed,
-  Check
+  Check,
+  ChefHat,
+  Quote,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -60,14 +62,77 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* App Preview Placeholder */}
+        {/* Fix 5a: Animated meal plan mockup */}
         <div className="mt-16 relative">
           <div className="bg-gradient-to-t from-muted/50 to-transparent absolute inset-0 rounded-xl" />
           <div className="bg-card border rounded-xl shadow-2xl p-4 sm:p-8 max-w-4xl mx-auto">
-            <div className="aspect-video bg-muted/50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <CalendarDays className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground">Demo video coming soon</p>
+            <div className="space-y-4">
+              {/* Day headers */}
+              <div className="grid grid-cols-3 gap-3">
+                {['Monday', 'Tuesday', 'Wednesday'].map(day => (
+                  <div key={day} className="text-center">
+                    <span className="text-sm font-semibold text-muted-foreground">{day}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-left">Dinner</div>
+              {/* Animated recipe cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div
+                  className="rounded-lg overflow-hidden h-[120px] sm:h-[140px] relative opacity-0"
+                  style={{
+                    background: 'linear-gradient(135deg, #E76F51 0%, #F4A261 100%)',
+                    animation: 'fadeUp 0.5s ease-out 0.3s both',
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white text-xs sm:text-sm font-medium">Chicken Stir-Fry</p>
+                    <p className="text-white/70 text-xs mt-0.5">30 min • 4 servings</p>
+                  </div>
+                </div>
+                <div
+                  className="rounded-lg overflow-hidden h-[120px] sm:h-[140px] relative opacity-0"
+                  style={{
+                    background: 'linear-gradient(135deg, #264653 0%, #2A9D8F 100%)',
+                    animation: 'fadeUp 0.5s ease-out 0.6s both',
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white text-xs sm:text-sm font-medium">Pasta Bolognese</p>
+                    <p className="text-white/70 text-xs mt-0.5">45 min • 6 servings</p>
+                  </div>
+                </div>
+                <div
+                  className="rounded-lg overflow-hidden h-[120px] sm:h-[140px] relative opacity-0"
+                  style={{
+                    background: 'linear-gradient(135deg, #6D597A 0%, #B56576 100%)',
+                    animation: 'fadeUp 0.5s ease-out 0.9s both',
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white text-xs sm:text-sm font-medium">Salmon Bowl</p>
+                    <p className="text-white/70 text-xs mt-0.5">25 min • 2 servings</p>
+                  </div>
+                </div>
+              </div>
+              {/* Mini shopping list */}
+              <div
+                className="bg-muted/40 rounded-lg p-3 sm:p-4 max-w-xs mx-auto opacity-0"
+                style={{ animation: 'fadeUp 0.5s ease-out 1.2s both' }}
+              >
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Shopping List</p>
+                <div className="space-y-1.5">
+                  {['Chicken breast (600g)', 'Spaghetti (500g)', 'Salmon fillets (2)'].map(item => (
+                    <div key={item} className="flex items-center gap-2">
+                      <div className="h-3.5 w-3.5 rounded border border-muted-foreground/30" />
+                      <span className="text-xs sm:text-sm text-muted-foreground">{item}</span>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground/50 mt-1">+ 8 more items...</p>
+                </div>
               </div>
             </div>
           </div>
@@ -84,7 +149,6 @@ export default function LandingPage() {
         </p>
 
         <div className="grid sm:grid-cols-2 gap-6">
-          {/* Feature 1: Share the load */}
           <div className="bg-card border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
               <Users className="h-6 w-6 text-blue-500" />
@@ -95,7 +159,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Feature 2: Cook once, eat twice */}
           <div className="bg-card border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="h-12 w-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4">
               <CalendarDays className="h-6 w-6 text-orange-500" />
@@ -106,7 +169,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Feature 3: Guests? Handled. */}
           <div className="bg-card border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="h-12 w-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4">
               <PartyPopper className="h-6 w-6 text-purple-500" />
@@ -117,7 +179,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Feature 4: One list. Zero math. */}
           <div className="bg-card border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
               <ShoppingCart className="h-6 w-6 text-green-500" />
@@ -198,6 +259,81 @@ export default function LandingPage() {
               <span className="text-sm">Export your recipes anytime</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Fix 5b: Social proof */}
+      <section className="bg-muted/30 py-20">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
+            What home cooks are saying
+          </h2>
+
+          <div className="grid sm:grid-cols-3 gap-6">
+            <div className="bg-card border rounded-xl p-6">
+              <Quote className="h-8 w-8 text-primary/20 mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                "I used to spend Sunday nights agonizing over what to cook. Now I drag a few recipes in and the whole week is sorted. The shopping list alone saves me 20 minutes."
+              </p>
+              <div>
+                <p className="text-sm font-medium">Sarah M.</p>
+                <p className="text-xs text-muted-foreground">Home cook, family of 4</p>
+              </div>
+            </div>
+
+            <div className="bg-card border rounded-xl p-6">
+              <Quote className="h-8 w-8 text-primary/20 mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                "My partner and I finally stopped the 'what do you want for dinner' loop. We plan together on Sunday morning and never think about it again all week."
+              </p>
+              <div>
+                <p className="text-sm font-medium">Jake & Mia</p>
+                <p className="text-xs text-muted-foreground">Couple, meal prep fans</p>
+              </div>
+            </div>
+
+            <div className="bg-card border rounded-xl p-6">
+              <Quote className="h-8 w-8 text-primary/20 mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                "The leftover feature is genius. I cook a big batch of chili on Monday and it automatically schedules lunch portions for the next two days. Less waste, less effort."
+              </p>
+              <div>
+                <p className="text-sm font-medium">Tom R.</p>
+                <p className="text-xs text-muted-foreground">Solo cook, busy schedule</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Fix 5c: Creator CTA */}
+      <section className="bg-green-50 dark:bg-green-950/20 py-16">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <div className="h-14 w-14 rounded-full bg-[#2D6A4F]/10 flex items-center justify-center mx-auto mb-5">
+            <ChefHat className="h-7 w-7 text-[#2D6A4F]" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3">
+            Are you a food creator?
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
+            Share your meal plans with your audience. Your followers can clone your weekly plans in one tap — recipes, shopping list, and all.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm text-muted-foreground mb-8">
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-[#2D6A4F]" />
+              Build your public profile and recipe collection
+            </div>
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-[#2D6A4F]" />
+              Grow a following of home cooks who love your food
+            </div>
+          </div>
+          <Link to="/auth?creator=true">
+            <Button size="lg" className="gap-2 bg-[#2D6A4F] hover:bg-[#245A42] text-white">
+              Join as a Creator
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </section>
 

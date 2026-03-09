@@ -1,13 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="8" fill="#16a34a"/>
-  <g transform="translate(6, 6)" stroke="#fff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <!-- Fork going diagonal (top-left to bottom-right) -->
-    <path d="M2 2l16 16"/>
-    <path d="M2 2v4l2 2"/>
-    <path d="M4 2v2"/>
-    <path d="M6 2v4l-2 2"/>
-    <!-- Knife going diagonal (top-right to bottom-left) -->
-    <path d="M18 2L2 18"/>
-    <path d="M18 2c0 0 0 4-2 6l-4 4"/>
+  <!-- Crossed utensils, centered, using filled shapes for small-size readability -->
+  <g transform="translate(16,16)">
+    <!-- Fork (top-left to bottom-right) -->
+    <g transform="rotate(45)">
+      <!-- Handle -->
+      <rect x="-1.2" y="1" width="2.4" height="11" rx="1.2" fill="#fff"/>
+      <!-- Neck -->
+      <rect x="-1.2" y="-2" width="2.4" height="4" rx="0.6" fill="#fff"/>
+      <!-- Left tine -->
+      <rect x="-4" y="-12" width="2" height="10.5" rx="1" fill="#fff"/>
+      <!-- Center tine -->
+      <rect x="-1" y="-12" width="2" height="10.5" rx="1" fill="#fff"/>
+      <!-- Right tine -->
+      <rect x="2" y="-12" width="2" height="10.5" rx="1" fill="#fff"/>
+    </g>
+    <!-- Knife (top-right to bottom-left) -->
+    <g transform="rotate(-45)">
+      <!-- Handle -->
+      <rect x="-1.2" y="1" width="2.4" height="11" rx="1.2" fill="#fff"/>
+      <!-- Bolster -->
+      <rect x="-2" y="-1" width="4" height="3" rx="0.5" fill="#fff"/>
+      <!-- Blade -->
+      <path d="M-2,-1 L-2,-11 C-2,-12.5 0,-12.5 0,-12.5 L2,-1 Z" fill="#fff"/>
+    </g>
   </g>
 </svg>

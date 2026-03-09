@@ -38,6 +38,15 @@ interface DbRecipe {
 
 // Convert DB recipe to app Recipe type
 function dbToRecipe(db: DbRecipe): Recipe {
+  const ingredients = db.ingredients || [];
+  const nutrition = db.nutrition || undefined;
+
+  // Compute data quality warning: >25% empty ingredients or suspicious calories
+  const emptyIngredients = ingredients.filter(ing => !ing.item || !ing.item.trim()).length;
+  const hasEmptyIngredientIssue = ingredients.length > 0 && emptyIngredients / ingredients.length > 0.25;
+  const hasSuspiciousCalories = nutrition?.perServing?.calories ? nutrition.perServing.calories > 1500 : false;
+  const dataQualityWarning = hasEmptyIngredientIssue || hasSuspiciousCalories;
+
   return {
     id: db.id,
     title: db.title,
@@ -50,7 +59,7 @@ function dbToRecipe(db: DbRecipe): Recipe {
     cookTime: db.cook_time || undefined,
     totalTime: db.total_time || undefined,
     servings: db.servings,
-    ingredients: db.ingredients || [],
+    ingredients,
     instructions: db.instructions || [],
     isFavorite: db.is_favorite,
     isArchived: db.is_archived,
@@ -58,11 +67,12 @@ function dbToRecipe(db: DbRecipe): Recipe {
     dietary: db.dietary || [],
     mealTypes: (db.meal_types || []) as MealType[],
     author: db.author || undefined,
-    nutrition: db.nutrition || undefined,
+    nutrition,
     importMethod: db.import_method as ImportMethod || undefined,
     rawImportSnapshot: db.raw_import_snapshot || undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
+    dataQualityWarning: dataQualityWarning || undefined,
   };
 }
 
@@ -215,8 +225,23 @@ export function useRecipesData() {
       return null;
     }
     
-    const dbRecipe = recipeToDb(recipe, user.id);
-    
+    // Clean up ingredients: filter out any with empty names
+    const cleanedIngredients = recipe.ingredients.filter(ing => ing.item && ing.item.trim().length > 0);
+
+    // Nutrition sanity check: flag suspicious calorie counts
+    let cleanedNutrition = recipe.nutrition;
+    if (cleanedNutrition?.perServing?.calories && cleanedNutrition.perServing.calories > 1500) {
+      cleanedNutrition = { ...cleanedNutrition, verified: false };
+    }
+
+    const cleanedRecipe = {
+      ...recipe,
+      ingredients: cleanedIngredients,
+      nutrition: cleanedNutrition,
+    };
+
+    const dbRecipe = recipeToDb(cleanedRecipe, user.id);
+
     const { data, error } = await supabase
       .from('recipes')
       .insert([dbRecipe])
@@ -232,10 +257,11 @@ export function useRecipesData() {
       return null;
     }
     
+    const isFirstRecipe = recipes.length === 0;
     const newRecipe = dbToRecipe(data as unknown as DbRecipe);
     setRecipes(prev => [newRecipe, ...prev]);
-    
-    return newRecipe;
+
+    return { recipe: newRecipe, isFirstRecipe };
   };
 
   // Update recipe
@@ -364,6 +390,32 @@ export function useRecipesData() {
     const library = await fetchLibraryRecipes();
     setLibraryRecipes(library);
     
+    return true;
+  };
+
+  // Make multiple recipes public at once (used when sharing a meal plan)
+  const makeRecipesPublicBatch = async (recipeIds: string[]): Promise<boolean> => {
+    if (recipeIds.length === 0) return true;
+
+    const { error } = await supabase
+      .from('recipes')
+      .update({ is_public: true })
+      .in('id', recipeIds);
+
+    if (error) {
+      toast({
+        title: 'Error publishing recipes',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // Update local state
+    setRecipes(prev => prev.map(r =>
+      recipeIds.includes(r.id) ? { ...r, isPublic: true } : r
+    ));
+
     return true;
   };
 
@@ -626,6 +678,7 @@ export function useRecipesData() {
     toggleFavorite,
     toggleArchive,
     makeRecipePublic,
+    makeRecipesPublicBatch,
     shareRecipe,
     getRecipeShares,
     revokeShare,

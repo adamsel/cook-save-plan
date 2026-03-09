@@ -29,6 +29,7 @@ export interface RecipeNutrition {
   source: NutritionSource;
   confidence: NutritionConfidence;
   notes?: string;
+  verified?: boolean; // false if calories > 1500/serving (likely inaccurate)
 }
 
 export interface Recipe {
@@ -59,6 +60,8 @@ export interface Recipe {
   author?: string;
   // Nutrition
   nutrition?: RecipeNutrition;
+  // Computed: true if data quality issues detected
+  dataQualityWarning?: boolean;
 }
 
 // Recipe sharing types

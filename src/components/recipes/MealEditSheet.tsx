@@ -175,7 +175,7 @@ export function MealEditSheet({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 md:h-8 md:w-8"
+                  className="h-11 w-11 md:h-8 md:w-8"
                   onClick={() => handleServingsChange(-1)}
                   disabled={plannedServings <= 1}
                 >
@@ -187,7 +187,7 @@ export function MealEditSheet({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 md:h-8 md:w-8"
+                  className="h-11 w-11 md:h-8 md:w-8"
                   onClick={() => handleServingsChange(1)}
                   disabled={plannedServings >= recipe.servings * 6}
                 >
@@ -259,7 +259,7 @@ export function MealEditSheet({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 md:h-8 md:w-8"
+                    className="h-11 w-11 md:h-8 md:w-8"
                     onClick={() => handleLeftoversChange(Math.max(0, item.leftoverMeals - 1))}
                     disabled={item.leftoverMeals <= 0 || !!item.eventType}
                   >
@@ -271,7 +271,7 @@ export function MealEditSheet({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 md:h-8 md:w-8"
+                    className="h-11 w-11 md:h-8 md:w-8"
                     onClick={() => handleLeftoversChange(item.leftoverMeals + 1)}
                     disabled={item.leftoverMeals >= 6 || !!item.eventType}
                   >
@@ -354,7 +354,7 @@ export function MealEditSheet({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-10 w-10 md:h-7 md:w-7"
+                      className="h-11 w-11 md:h-7 md:w-7"
                       onClick={() => onUpdateEvent(item.id, item.eventType!, Math.max(2, (item.guestCount || 6) - 1), item.eventNote || null)}
                     >
                       <Minus className="h-4 w-4 md:h-3.5 md:w-3.5" />
@@ -365,7 +365,7 @@ export function MealEditSheet({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-10 w-10 md:h-7 md:w-7"
+                      className="h-11 w-11 md:h-7 md:w-7"
                       onClick={() => onUpdateEvent(item.id, item.eventType!, Math.min(50, (item.guestCount || 6) + 1), item.eventNote || null)}
                     >
                       <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" />
