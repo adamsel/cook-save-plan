@@ -154,5 +154,17 @@ export function useCreatorProfile(username: string | undefined) {
     setIsLoading(false);
   };
 
-  return { profile, sharedMealPlans, publicRecipes, isLoading, error };
+  const refetch = () => {
+    if (username) fetchCreatorProfile(username);
+  };
+
+  const removeMealPlan = (planId: string) => {
+    setSharedMealPlans(prev => prev.filter(p => p.id !== planId));
+  };
+
+  const removeRecipe = (recipeId: string) => {
+    setPublicRecipes(prev => prev.filter(r => r.id !== recipeId));
+  };
+
+  return { profile, sharedMealPlans, publicRecipes, isLoading, error, refetch, removeMealPlan, removeRecipe };
 }

@@ -106,9 +106,10 @@ export default function RecipesPage() {
     revokeShare,
     revokePendingShare,
   } = useRecipes();
+  const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  
+
   // Spoonacular integration
   const {
     searchResults: spoonacularResults,
@@ -688,6 +689,14 @@ export default function RecipesPage() {
                         setShowDetailDialog(true);
                       }}
                       isLibraryRecipe={false}
+                      userId={user?.id}
+                      onImageUpload={async (recipeId, newImageUrl) => {
+                        const r = recipes.find(r => r.id === recipeId);
+                        if (r) {
+                          await updateRecipe({ ...r, imageUrl: newImageUrl });
+                          toast({ title: 'Photo added' });
+                        }
+                      }}
                     />
                   </div>
                 ))}

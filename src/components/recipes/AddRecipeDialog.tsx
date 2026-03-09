@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Recipe, Ingredient, ImportMethod, ParsingConfidence, MealType, RecipeNutrition, NutritionInfo } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { parseRecipeFromUrl, parseFromText, ParsedRecipe } from '@/lib/recipeParser';
 import { suggestCategorization } from '@/lib/recipeSuggestions';
+import { uploadRecipeImage } from '@/lib/uploadRecipeImage';
+import { useAuth } from '@/context/AuthContext';
 import { IngredientEditor, parseMultipleIngredients } from './IngredientEditor';
 import { InstructionEditor, InstructionStep, parseMultipleInstructions } from './InstructionEditor';
 import { RecipeAIChat } from './RecipeAIChat';
@@ -53,8 +55,11 @@ const generateId = (): string => {
 
 export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipeDialogProps) {
   const { addRecipe, updateRecipe, categories, tags: availableTags, addTag } = useRecipes();
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   const [activeTab, setActiveTab] = useState('url');
   const [isLoading, setIsLoading] = useState(false);
@@ -452,6 +457,27 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       },
       source: nutrition.source === 'provided_by_site' ? 'manual' : nutrition.source,
     });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Image too large', description: 'Maximum 5MB', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const recipeId = editingRecipe?.id || `temp-${Date.now()}`;
+    const url = await uploadRecipeImage(user.id, recipeId, file);
+    if (url) {
+      setImageUrl(url);
+    } else {
+      toast({ title: 'Upload failed', description: 'Could not upload image', variant: 'destructive' });
+    }
+    setIsUploadingImage(false);
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   // Submit recipe
@@ -1277,13 +1303,33 @@ Instructions:
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="imageUrl">Image URL</Label>
-          <Input
-            id="imageUrl"
-            placeholder="https://example.com/image.jpg"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-          />
+          <Label htmlFor="imageUrl">Recipe Image</Label>
+          <div className="flex gap-2">
+            <Input
+              id="imageUrl"
+              placeholder="https://example.com/image.jpg or upload"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isUploadingImage}
+              title="Upload photo"
+            >
+              {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </Button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">

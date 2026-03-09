@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy, AlertTriangle } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy, AlertTriangle, Camera } from 'lucide-react';
+import { uploadRecipeImage } from '@/lib/uploadRecipeImage';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -23,6 +25,8 @@ interface RecipeCardProps {
   isDragging?: boolean;
   isLibraryRecipe?: boolean;
   onCopyToPersonal?: (recipe: Recipe) => void;
+  userId?: string;
+  onImageUpload?: (recipeId: string, imageUrl: string) => void;
 }
 
 export function RecipeCard({
@@ -36,8 +40,22 @@ export function RecipeCard({
   isDragging = false,
   isLibraryRecipe = false,
   onCopyToPersonal,
+  userId,
+  onImageUpload,
 }: RecipeCardProps) {
   const isMobile = useIsMobile();
+  const cardImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCardImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const file = e.target.files?.[0];
+    if (!file || !onImageUpload || !userId) return;
+    if (file.size > 5 * 1024 * 1024) return;
+
+    const url = await uploadRecipeImage(userId, recipe.id, file);
+    if (url) onImageUpload(recipe.id, url);
+    if (cardImageInputRef.current) cardImageInputRef.current.value = '';
+  };
 
   return (
     <div
@@ -64,8 +82,32 @@ export function RecipeCard({
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-secondary">
+          <div className="w-full h-full flex items-center justify-center bg-secondary relative">
             <span className={cn(isMobile ? "text-2xl" : "text-4xl")}>🍳</span>
+            {!isLibraryRecipe && onImageUpload && userId && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    cardImageInputRef.current?.click();
+                  }}
+                  className={cn(
+                    "absolute rounded-full bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground backdrop-blur-sm transition-all",
+                    isMobile ? "bottom-2 right-2 p-1.5" : "bottom-3 right-3 p-2"
+                  )}
+                  title="Add photo"
+                >
+                  <Camera className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                </button>
+                <input
+                  ref={cardImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleCardImageUpload}
+                />
+              </>
+            )}
           </div>
         )}
 

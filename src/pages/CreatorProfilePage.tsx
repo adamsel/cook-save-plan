@@ -9,7 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, ImagePlus, Eye, Copy } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, ImagePlus, Eye, Copy, MoreVertical, EyeOff } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useMealPlansData } from '@/hooks/useMealPlansData';
+import { useRecipesData } from '@/hooks/useRecipesData';
+import { useToast } from '@/hooks/use-toast';
 import { PublicNav } from '@/components/layout/PublicNav';
 import { format, parseISO } from 'date-fns';
 
@@ -17,13 +22,18 @@ export default function CreatorProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profile, sharedMealPlans, publicRecipes, isLoading, error } = useCreatorProfile(username);
+  const { profile, sharedMealPlans, publicRecipes, isLoading, error, removeMealPlan, removeRecipe } = useCreatorProfile(username);
   const { isFollowing, followerCount, isAuthenticated, follow, unfollow, isLoading: followLoading } = useFollowCreator(profile?.userId);
 
   const [unfollowHover, setUnfollowHover] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ views: number; clones: number } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'meal-plan' | 'recipe'; id: string; title: string } | null>(null);
+
+  const { unshareMealPlan } = useMealPlansData();
+  const { makeRecipePublic } = useRecipesData();
+  const { toast } = useToast();
 
   const isOwnProfile = user?.id === profile?.userId;
 
@@ -71,6 +81,25 @@ export default function CreatorProfilePage() {
     } else {
       follow();
     }
+  };
+
+  const handleMakePrivate = async () => {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === 'meal-plan') {
+      const success = await unshareMealPlan(confirmAction.id);
+      if (success !== false) {
+        removeMealPlan(confirmAction.id);
+        toast({ title: 'Meal plan is now private' });
+      }
+    } else {
+      const success = await makeRecipePublic(confirmAction.id, false);
+      if (success !== false) {
+        removeRecipe(confirmAction.id);
+        toast({ title: 'Recipe is now private' });
+      }
+    }
+    setConfirmAction(null);
   };
 
   if (isLoading) {
@@ -258,32 +287,52 @@ export default function CreatorProfilePage() {
             </h2>
             <div className="flex overflow-x-auto gap-4 pb-2 snap-x sm:grid sm:grid-cols-2 sm:overflow-visible">
               {sharedMealPlans.map(plan => (
-                <Link key={plan.id} to={`/plan/${plan.shareSlug}`} className="snap-start shrink-0 w-[280px] sm:w-auto">
-                  <div
-                    className="relative h-[160px] rounded-lg overflow-hidden hover:scale-[1.02] transition-transform"
-                    style={plan.previewImageUrl
-                      ? { backgroundImage: `url(${plan.previewImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                      : { backgroundColor: '#2D6A4F' }
-                    }
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                    <div className="absolute inset-0 p-4 flex flex-col justify-end">
-                      <h3 className="font-semibold text-white line-clamp-1">
-                        {plan.title || `Week of ${format(parseISO(plan.weekStartDate), 'MMMM d, yyyy')}`}
-                      </h3>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
-                          <Calendar className="h-3 w-3" />
-                          {format(parseISO(plan.weekStartDate), 'MMM d')}
-                        </Badge>
-                        <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
-                          <UtensilsCrossed className="h-3 w-3" />
-                          {plan.itemCount} meal{plan.itemCount !== 1 ? 's' : ''}
-                        </Badge>
+                <div key={plan.id} className="relative snap-start shrink-0 w-[280px] sm:w-auto">
+                  <Link to={`/plan/${plan.shareSlug}`}>
+                    <div
+                      className="relative h-[160px] rounded-lg overflow-hidden hover:scale-[1.02] transition-transform"
+                      style={plan.previewImageUrl
+                        ? { backgroundImage: `url(${plan.previewImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                        : { backgroundColor: '#2D6A4F' }
+                      }
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                      <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                        <h3 className="font-semibold text-white line-clamp-1">
+                          {plan.title || `Week of ${format(parseISO(plan.weekStartDate), 'MMMM d, yyyy')}`}
+                        </h3>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
+                            <Calendar className="h-3 w-3" />
+                            {format(parseISO(plan.weekStartDate), 'MMM d')}
+                          </Badge>
+                          <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
+                            <UtensilsCrossed className="h-3 w-3" />
+                            {plan.itemCount} meal{plan.itemCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  {isOwnProfile && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          onClick={(e) => e.preventDefault()}
+                          className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setConfirmAction({ type: 'meal-plan', id: plan.id, title: plan.title || 'this meal plan' })}>
+                          <EyeOff className="h-4 w-4 mr-2" />
+                          Make Private
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               ))}
             </div>
           </section>
@@ -317,7 +366,7 @@ export default function CreatorProfilePage() {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {visibleRecipes.map(recipe => (
-                  <Card key={recipe.id} className="overflow-hidden">
+                  <Card key={recipe.id} className="overflow-hidden relative">
                     {recipe.imageUrl && (
                       <div className="aspect-video overflow-hidden">
                         <img
@@ -342,6 +391,21 @@ export default function CreatorProfilePage() {
                         </span>
                       </div>
                     </CardContent>
+                    {isOwnProfile && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setConfirmAction({ type: 'recipe', id: recipe.id, title: recipe.title })}>
+                            <EyeOff className="h-4 w-4 mr-2" />
+                            Make Private
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </Card>
                 ))}
                 {blurredRecipes.length > 0 && (
@@ -413,6 +477,23 @@ export default function CreatorProfilePage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make {confirmAction?.type === 'meal-plan' ? 'meal plan' : 'recipe'} private?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.type === 'meal-plan'
+                ? 'This will remove the meal plan from your public profile. Followers won\'t be able to see or clone it anymore.'
+                : 'This will remove the recipe from your public profile. It will still be in your personal collection.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMakePrivate}>Make Private</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Fix 3d: Auth dialog for unauthenticated follow */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>

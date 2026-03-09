@@ -54,53 +54,58 @@ export function useCloneMealPlan() {
       const recipeIdMap = new Map<string, string>(); // sourceId -> newId
       let recipesCloned = 0;
 
-      for (const sourceRecipe of sourceRecipes) {
-        if (!sourceRecipeIds.includes(sourceRecipe.id)) continue;
+      // If cloning own plan, reuse existing recipe IDs directly (no duplication)
+      if (sourcePlan?.creatorUserId === user.id) {
+        sourceRecipeIds.forEach(id => recipeIdMap.set(id, id));
+      } else {
+        for (const sourceRecipe of sourceRecipes) {
+          if (!sourceRecipeIds.includes(sourceRecipe.id)) continue;
 
-        // Already have this recipe?
-        const existingId = existingMap.get(sourceRecipe.id);
-        if (existingId) {
-          recipeIdMap.set(sourceRecipe.id, existingId);
-          continue;
+          // Already have this recipe?
+          const existingId = existingMap.get(sourceRecipe.id);
+          if (existingId) {
+            recipeIdMap.set(sourceRecipe.id, existingId);
+            continue;
+          }
+
+          // Clone it
+          const { data: newRecipe, error: recipeError } = await supabase
+            .from('recipes')
+            .insert({
+              user_id: user.id,
+              title: sourceRecipe.title,
+              source_url: sourceRecipe.sourceUrl || null,
+              image_url: sourceRecipe.imageUrl || null,
+              description: sourceRecipe.description || null,
+              category: sourceRecipe.category || '',
+              tags: sourceRecipe.tags || [],
+              prep_time: sourceRecipe.prepTime || null,
+              cook_time: sourceRecipe.cookTime || null,
+              total_time: sourceRecipe.totalTime || null,
+              servings: sourceRecipe.servings,
+              ingredients: sourceRecipe.ingredients as unknown as Record<string, unknown>[],
+              instructions: sourceRecipe.instructions,
+              is_favorite: false,
+              is_archived: false,
+              is_public: false,
+              cuisine: sourceRecipe.cuisine || null,
+              dietary: sourceRecipe.dietary || [],
+              meal_types: sourceRecipe.mealTypes || [],
+              author: sourceRecipe.author || null,
+              nutrition: sourceRecipe.nutrition as unknown as Record<string, unknown> | null,
+              import_method: sourceRecipe.importMethod || null,
+              original_recipe_id: sourceRecipe.id,
+            })
+            .select('id')
+            .single();
+
+          if (recipeError || !newRecipe) {
+            continue;
+          }
+
+          recipeIdMap.set(sourceRecipe.id, newRecipe.id);
+          recipesCloned++;
         }
-
-        // Clone it
-        const { data: newRecipe, error: recipeError } = await supabase
-          .from('recipes')
-          .insert({
-            user_id: user.id,
-            title: sourceRecipe.title,
-            source_url: sourceRecipe.sourceUrl || null,
-            image_url: sourceRecipe.imageUrl || null,
-            description: sourceRecipe.description || null,
-            category: sourceRecipe.category || '',
-            tags: sourceRecipe.tags || [],
-            prep_time: sourceRecipe.prepTime || null,
-            cook_time: sourceRecipe.cookTime || null,
-            total_time: sourceRecipe.totalTime || null,
-            servings: sourceRecipe.servings,
-            ingredients: sourceRecipe.ingredients as unknown as Record<string, unknown>[],
-            instructions: sourceRecipe.instructions,
-            is_favorite: false,
-            is_archived: false,
-            is_public: false,
-            cuisine: sourceRecipe.cuisine || null,
-            dietary: sourceRecipe.dietary || [],
-            meal_types: sourceRecipe.mealTypes || [],
-            author: sourceRecipe.author || null,
-            nutrition: sourceRecipe.nutrition as unknown as Record<string, unknown> | null,
-            import_method: sourceRecipe.importMethod || null,
-            original_recipe_id: sourceRecipe.id,
-          })
-          .select('id')
-          .single();
-
-        if (recipeError || !newRecipe) {
-          continue;
-        }
-
-        recipeIdMap.set(sourceRecipe.id, newRecipe.id);
-        recipesCloned++;
       }
 
       // 3. Get or create the target meal plan

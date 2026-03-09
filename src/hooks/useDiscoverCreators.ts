@@ -9,6 +9,7 @@ export interface DiscoverCreator {
   bio: string | null;
   followerCount: number;
   planCount: number;
+  recipeImages: string[];
 }
 
 export function useDiscoverCreators() {
@@ -60,8 +61,33 @@ export function useDiscoverCreators() {
           bio: p.bio,
           followerCount: followerCounts.get(p.user_id) || 0,
           planCount: planCounts.get(p.user_id) || 0,
+          recipeImages: [],
         }))
         .sort((a, b) => b.followerCount - a.followerCount);
+
+      // Get top recipe images for each creator
+      const filteredUserIds = result.map(c => c.userId);
+      const { data: recipeImageData } = await supabase
+        .from('recipes')
+        .select('user_id, image_url')
+        .in('user_id', filteredUserIds)
+        .eq('is_public', true)
+        .eq('is_archived', false)
+        .not('image_url', 'is', null)
+        .order('created_at', { ascending: false });
+
+      const recipeImagesMap = new Map<string, string[]>();
+      (recipeImageData || []).forEach(r => {
+        const existing = recipeImagesMap.get(r.user_id) || [];
+        if (existing.length < 3) {
+          existing.push(r.image_url!);
+          recipeImagesMap.set(r.user_id, existing);
+        }
+      });
+
+      result.forEach(c => {
+        c.recipeImages = recipeImagesMap.get(c.userId) || [];
+      });
 
       return result;
     },

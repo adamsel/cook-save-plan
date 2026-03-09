@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Compass, Search, UserPlus, UserCheck, Loader2, ChefHat } from 'lucide-react';
+import { Compass, Search, UserPlus, UserCheck, Loader2, ChefHat, UtensilsCrossed } from 'lucide-react';
 
 function CreatorCard({ creator }: { creator: DiscoverCreator }) {
   const navigate = useNavigate();
@@ -56,6 +56,28 @@ function CreatorCard({ creator }: { creator: DiscoverCreator }) {
             <p className="text-sm text-muted-foreground mt-3 line-clamp-2">
               {creator.bio}
             </p>
+          )}
+
+          {/* Recipe preview images */}
+          {creator.recipeImages.length > 0 && (
+            <div className="flex gap-1 mt-3">
+              {[0, 1, 2].map(i => (
+                creator.recipeImages[i] ? (
+                  <div key={i} className="flex-1 aspect-square rounded-md overflow-hidden">
+                    <img
+                      src={creator.recipeImages[i]}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div key={i} className="flex-1 aspect-square rounded-md bg-muted flex items-center justify-center">
+                    <UtensilsCrossed className="h-4 w-4 text-muted-foreground/40" />
+                  </div>
+                )
+              ))}
+            </div>
           )}
 
           <div className="flex items-center justify-between mt-auto pt-4">
