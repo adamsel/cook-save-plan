@@ -193,6 +193,42 @@ function parseFromSchema(schemaData: any, sourceUrl: string): ParsedRecipe | nul
     }
   }
   
+  // Extract nutrition from schema.org NutritionInformation
+  let nutrition: RecipeNutrition | undefined;
+  if (schemaData.nutrition) {
+    const n = schemaData.nutrition;
+    const parseNutrientValue = (val: string | number | undefined): number | undefined => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === 'number') return val;
+      const match = String(val).match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : undefined;
+    };
+
+    const calories = parseNutrientValue(n.calories);
+    const protein = parseNutrientValue(n.proteinContent);
+    const carbs = parseNutrientValue(n.carbohydrateContent);
+    const fat = parseNutrientValue(n.fatContent);
+
+    if (calories !== undefined || protein !== undefined) {
+      nutrition = {
+        perServing: {
+          calories: Math.round(calories || 0),
+          protein: Math.round(protein || 0),
+          carbs: Math.round(carbs || 0),
+          fat: Math.round(fat || 0),
+          fiber: parseNutrientValue(n.fiberContent) !== undefined ? Math.round(parseNutrientValue(n.fiberContent)!) : undefined,
+          sugar: parseNutrientValue(n.sugarContent) !== undefined ? Math.round(parseNutrientValue(n.sugarContent)!) : undefined,
+          sodium: parseNutrientValue(n.sodiumContent) !== undefined ? Math.round(parseNutrientValue(n.sodiumContent)!) : undefined,
+          saturatedFat: parseNutrientValue(n.saturatedFatContent) !== undefined ? Math.round(parseNutrientValue(n.saturatedFatContent)!) : undefined,
+          cholesterol: parseNutrientValue(n.cholesterolContent) !== undefined ? Math.round(parseNutrientValue(n.cholesterolContent)!) : undefined,
+        },
+        source: 'provided_by_site',
+        confidence: 'High',
+        notes: 'Nutrition data from recipe website.',
+      };
+    }
+  }
+
   return {
     title: schemaData.name || 'Untitled Recipe',
     description: schemaData.description,
@@ -207,6 +243,7 @@ function parseFromSchema(schemaData: any, sourceUrl: string): ParsedRecipe | nul
     sourceUrl,
     importMethod: 'schema',
     confidence: 'high',
+    nutrition,
   };
 }
 

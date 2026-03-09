@@ -11,6 +11,7 @@ import {
   BookmarkPlus, ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { PublicNav } from '@/components/layout/PublicNav';
 
 export default function PublicRecipePage() {
   const { id } = useParams<{ id: string }>();
@@ -125,6 +126,7 @@ export default function PublicRecipePage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <PublicNav />
       {/* Hero image */}
       {recipe.imageUrl && (
         <div className="w-full h-[200px] sm:h-[300px] overflow-hidden bg-muted">

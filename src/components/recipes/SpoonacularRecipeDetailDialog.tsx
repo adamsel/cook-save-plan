@@ -131,6 +131,31 @@ export function SpoonacularRecipeDetailDialog({
                   </div>
                 )}
 
+                {/* Nutrition */}
+                {recipe.nutrition && (
+                  <div className="bg-secondary/50 rounded-xl p-4 mb-6">
+                    <h3 className="font-serif text-sm font-semibold mb-3">Nutrition per serving</h3>
+                    <div className="grid grid-cols-4 gap-3 text-center">
+                      <div>
+                        <p className="text-lg font-semibold">{recipe.nutrition.calories}</p>
+                        <p className="text-xs text-muted-foreground">kcal</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">{recipe.nutrition.protein}g</p>
+                        <p className="text-xs text-muted-foreground">protein</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">{recipe.nutrition.carbs}g</p>
+                        <p className="text-xs text-muted-foreground">carbs</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">{recipe.nutrition.fat}g</p>
+                        <p className="text-xs text-muted-foreground">fat</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-[1fr_1.5fr] gap-6">
                   {/* Ingredients */}
                   <div>

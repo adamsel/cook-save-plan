@@ -57,7 +57,8 @@ You can:
 1. Extract recipes from URLs - when a user shares a URL, I'll scrape the webpage and you parse the recipe
 2. Parse pasted recipe text into structured data
 3. Help users create recipes from scratch through conversation
-4. Estimate nutrition information based on ingredients
+4. Extract recipes from photos — cookbook pages, handwritten cards, Instagram screenshots, etc. Read all visible recipe text and output the structured JSON
+5. Estimate nutrition information based on ingredients
 
 When you identify or create a recipe, respond with a JSON object in the following format wrapped in \`\`\`json code blocks:
 
@@ -181,7 +182,31 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { messages, url } = body;
+    const { messages, url, image } = body;
+
+    // Validate image if provided
+    if (image) {
+      if (!image.base64 || typeof image.base64 !== 'string') {
+        return new Response(
+          JSON.stringify({ error: "Invalid image: base64 data required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const validMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validMimeTypes.includes(image.mimeType)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid image type: must be JPEG, PNG, or WebP" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // ~4MB base64 ≈ ~3MB raw image
+      if (image.base64.length > 4 * 1024 * 1024) {
+        return new Response(
+          JSON.stringify({ error: "Image too large: maximum 3MB" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     // Validate messages array
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -310,7 +335,26 @@ serve(async (req) => {
       conversationParts.push(scrapedContent);
     }
 
+    // If image provided, add extraction instructions
+    if (image) {
+      conversationParts.push("\n[The user has uploaded an image. Extract all recipe information visible in the image including title, ingredients with quantities, and instructions. If the image is a screenshot of social media, extract the recipe from the caption/text. Output the complete recipe JSON.]");
+    }
+
     conversationParts.push("\nAssistant:");
+
+    // Build request parts — text-only or multimodal
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+      { text: conversationParts.join("\n") },
+    ];
+
+    if (image) {
+      parts.push({
+        inlineData: {
+          mimeType: image.mimeType,
+          data: image.base64,
+        },
+      });
+    }
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_AI_API_KEY}`,
@@ -318,7 +362,7 @@ serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: conversationParts.join("\n") }] }],
+          contents: [{ parts }],
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 8192,

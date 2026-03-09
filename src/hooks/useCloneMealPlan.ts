@@ -20,6 +20,7 @@ export function useCloneMealPlan() {
     sourceItems: MealPlanItem[],
     sourceRecipes: Recipe[],
     targetWeekDate: string,
+    sourcePlan?: { id: string; creatorUserId: string; title?: string | null },
   ): Promise<CloneResult | null> => {
     if (!user) {
       toast({
@@ -162,6 +163,35 @@ export function useCloneMealPlan() {
           });
           setIsCloning(false);
           return null;
+        }
+      }
+
+      // Record clone event + notify creator (fire-and-forget)
+      if (sourcePlan) {
+        supabase
+          .from('plan_engagement')
+          .insert({
+            meal_plan_id: sourcePlan.id,
+            user_id: user.id,
+            event_type: 'clone',
+          })
+          .then(() => {});
+
+        // Notify the creator (only if cloning someone else's plan)
+        if (sourcePlan.creatorUserId !== user.id) {
+          const displayName = user.user_metadata?.display_name || user.email || 'Someone';
+          supabase
+            .from('notifications')
+            .insert({
+              user_id: sourcePlan.creatorUserId,
+              type: 'plan_cloned',
+              data: {
+                cloner_name: displayName,
+                plan_title: sourcePlan.title || 'your meal plan',
+                meal_plan_id: sourcePlan.id,
+              },
+            })
+            .then(() => {});
         }
       }
 

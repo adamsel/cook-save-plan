@@ -47,6 +47,21 @@ export function useFollowCreator(creatorUserId: string | undefined) {
         .from('creator_follows')
         .insert({ follower_id: currentUserId, following_id: creatorUserId });
       if (error) throw error;
+
+      // Notify the creator (fire-and-forget)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const followerName = currentUser?.user_metadata?.display_name || currentUser?.email || 'Someone';
+      supabase
+        .from('notifications')
+        .insert({
+          user_id: creatorUserId,
+          type: 'new_follower',
+          data: {
+            follower_name: followerName,
+            follower_id: currentUserId,
+          },
+        })
+        .then(() => {});
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: followQueryKey });

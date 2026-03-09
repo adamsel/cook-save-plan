@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCreatorProfile } from '@/hooks/useCreatorProfile';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, ImagePlus } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, ImagePlus, Eye, Copy } from 'lucide-react';
+import { PublicNav } from '@/components/layout/PublicNav';
 import { format, parseISO } from 'date-fns';
 
 export default function CreatorProfilePage() {
@@ -21,8 +23,33 @@ export default function CreatorProfilePage() {
   const [unfollowHover, setUnfollowHover] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [engagementStats, setEngagementStats] = useState<{ views: number; clones: number } | null>(null);
 
   const isOwnProfile = user?.id === profile?.userId;
+
+  // Fetch engagement stats for own profile
+  useEffect(() => {
+    if (!isOwnProfile || !profile || sharedMealPlans.length === 0) return;
+
+    const planIds = sharedMealPlans.map(p => p.id);
+    Promise.all([
+      supabase
+        .from('plan_engagement')
+        .select('*', { count: 'exact', head: true })
+        .in('meal_plan_id', planIds)
+        .eq('event_type', 'view'),
+      supabase
+        .from('plan_engagement')
+        .select('*', { count: 'exact', head: true })
+        .in('meal_plan_id', planIds)
+        .eq('event_type', 'clone'),
+    ]).then(([viewRes, cloneRes]) => {
+      setEngagementStats({
+        views: viewRes.count ?? 0,
+        clones: cloneRes.count ?? 0,
+      });
+    });
+  }, [isOwnProfile, profile?.userId, sharedMealPlans.length]);
 
   const getInitials = () => {
     if (profile?.displayName) {
@@ -75,6 +102,7 @@ export default function CreatorProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PublicNav />
       {/* Cover photo banner */}
       <div className="relative w-full h-[140px] sm:h-[200px] overflow-hidden">
         {profile.coverImageUrl ? (
@@ -199,6 +227,22 @@ export default function CreatorProfilePage() {
               <span className="text-base font-bold text-foreground">{publicRecipes.length}</span>{' '}
               <span className="text-sm">{publicRecipes.length === 1 ? 'Recipe' : 'Recipes'}</span>
             </span>
+            {isOwnProfile && engagementStats && (
+              <>
+                <span className="hidden sm:inline text-muted-foreground/40">·</span>
+                <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground flex items-center gap-1">
+                  <Eye className="h-3.5 w-3.5" />
+                  <span className="text-base font-bold text-foreground">{engagementStats.views}</span>{' '}
+                  <span className="text-sm">Views</span>
+                </span>
+                <span className="hidden sm:inline text-muted-foreground/40">·</span>
+                <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground flex items-center gap-1">
+                  <Copy className="h-3.5 w-3.5" />
+                  <span className="text-base font-bold text-foreground">{engagementStats.clones}</span>{' '}
+                  <span className="text-sm">Saves</span>
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

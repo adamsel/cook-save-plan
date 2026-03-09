@@ -25,14 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  Link, FileText, PenLine, Plus, X, Loader2, 
+import {
+  Link, FileText, PenLine, Plus, X, Loader2,
   AlertCircle, CheckCircle, AlertTriangle, ArrowLeft,
-  Sparkles, Clipboard, Zap
+  Sparkles, Clipboard, Zap, Camera, Upload
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddRecipeDialogProps {
   open: boolean;
@@ -87,7 +88,13 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   const [importMethod, setImportMethod] = useState<ImportMethod>('manual');
   const [nutrition, setNutrition] = useState<RecipeNutrition | null>(null);
   const [isEstimatingNutrition, setIsEstimatingNutrition] = useState(false);
-  
+
+  // Photo import
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isExtractingFromPhoto, setIsExtractingFromPhoto] = useState(false);
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+
   // Suggested categorization
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
@@ -171,6 +178,10 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setSuggestedCategory(null);
     setSuggestedTags([]);
     setActiveTab('url');
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setIsExtractingFromPhoto(false);
+    setIsDraggingPhoto(false);
   }, [createEmptyIngredient, createEmptyInstruction]);
 
   // Attempt to parse recipe from URL
@@ -358,8 +369,8 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       setNutrition(estimatedNutrition);
       setIsEstimatingNutrition(false);
       toast({
-        title: "Nutrition estimated",
-        description: "Values are estimates based on typical ingredient nutrition. Please verify.",
+        title: "Rough estimate generated",
+        description: "These values are approximate. Edit manually for accuracy, or import a recipe with nutrition data.",
       });
     }, 1500);
   };
@@ -410,16 +421,11 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       notes.push("Some ingredient quantities were assumed based on typical recipe amounts.");
     }
     
-    let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
-    if (hasAmbiguousQuantities && hasMissingQuantities) {
-      confidence = 'Low';
-    } else if (!hasAmbiguousQuantities && !hasMissingQuantities) {
-      confidence = 'Medium';
-    }
-    
+    const roundedCalories = Math.round(calories);
+
     return {
       perServing: {
-        calories: Math.round(calories),
+        calories: roundedCalories,
         protein: Math.round(protein),
         carbs: Math.round(carbs),
         fat: Math.round(fat),
@@ -428,8 +434,9 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
         sodium: Math.round(sodium),
       },
       source: 'ai_estimate',
-      confidence,
-      notes: notes.length > 0 ? notes.join(' ') : 'Estimated using typical ingredient values.',
+      confidence: 'Low',
+      verified: roundedCalories <= 1500,
+      notes: 'Rough estimate based on ingredient types. Does not account for actual quantities.',
     };
   };
 
@@ -645,6 +652,131 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     </div>
   );
 
+  // Photo import handlers
+  const handlePhotoSelect = (file: File) => {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please use JPEG, PNG, or WebP images.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast({ title: 'Image too large', description: 'Please use an image under 3MB.', variant: 'destructive' });
+      return;
+    }
+    setPhotoFile(file);
+    const url = URL.createObjectURL(file);
+    setPhotoPreview(url);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleExtractFromPhoto = async () => {
+    if (!photoFile) return;
+
+    setIsExtractingFromPhoto(true);
+    try {
+      const base64 = await fileToBase64(photoFile);
+      const session = (await supabase.auth.getSession()).data.session;
+      const chatUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recipe-chat`;
+
+      const response = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Extract the recipe from this image.' }],
+          image: { base64, mimeType: photoFile.type },
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to analyze image (${response.status})`);
+      }
+
+      // Parse SSE response
+      const text = await response.text();
+      let aiContent = '';
+      for (const line of text.split('\n')) {
+        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            aiContent += parsed.choices?.[0]?.delta?.content || '';
+          } catch { /* skip */ }
+        }
+      }
+
+      // Extract recipe JSON from AI response
+      const jsonMatch = aiContent.match(/```json\s*([\s\S]*?)\s*```/);
+      if (!jsonMatch) {
+        throw new Error('Could not extract a recipe from this image. Try a clearer photo or paste the recipe text instead.');
+      }
+
+      const parsed = JSON.parse(jsonMatch[1]);
+      const recipeData = parsed.type === 'recipe' && parsed.data ? parsed.data : parsed;
+
+      if (!recipeData.title || !recipeData.ingredients) {
+        throw new Error('The extracted data is incomplete. Try a clearer photo.');
+      }
+
+      // Load into form via the same path as AI chat
+      handleAIRecipeReady({
+        title: recipeData.title || '',
+        description: recipeData.description || '',
+        category: recipeData.category || '',
+        tags: recipeData.tags || [],
+        prepTime: recipeData.prepTime,
+        cookTime: recipeData.cookTime,
+        totalTime: recipeData.totalTime,
+        servings: recipeData.servings || 4,
+        ingredients: (recipeData.ingredients || []).map((ing: any, i: number) => ({
+          id: ing.id || `ing-${i + 1}`,
+          item: ing.item || ing.name || '',
+          quantity: ing.quantity ?? null,
+          unit: ing.unit || '',
+          notes: ing.notes,
+        })),
+        instructions: recipeData.instructions || [],
+        isFavorite: false,
+        isArchived: false,
+        importMethod: 'photo' as ImportMethod,
+        mealTypes: [],
+        nutrition: recipeData.nutrition ? {
+          perServing: recipeData.nutrition.perServing,
+          source: 'ai_estimate' as const,
+          confidence: recipeData.nutrition.confidence || 'Medium',
+          notes: recipeData.nutrition.notes || 'Estimated from photo by AI',
+        } : undefined,
+        createdAt: '',
+        updatedAt: '',
+      });
+
+      toast({ title: 'Recipe extracted', description: 'Review the details below and save when ready.' });
+    } catch (error) {
+      console.error('Photo extraction error:', error);
+      toast({
+        title: 'Extraction failed',
+        description: error instanceof Error ? error.message : 'Could not extract recipe from image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExtractingFromPhoto(false);
+    }
+  };
+
   // Handle recipe from AI chat
   const handleAIRecipeReady = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => {
     // Load the AI-generated recipe into the edit form for final review
@@ -687,16 +819,20 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   // Input step content - defined as JSX to avoid remounting on state changes
   const inputStepContent = (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="url" className="gap-2">
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="url" className="gap-1.5 text-xs sm:text-sm">
           <Link className="h-4 w-4" />
-          From URL
+          <span className="hidden sm:inline">From</span> URL
         </TabsTrigger>
-        <TabsTrigger value="paste" className="gap-2">
+        <TabsTrigger value="paste" className="gap-1.5 text-xs sm:text-sm">
           <FileText className="h-4 w-4" />
-          Paste Text
+          <span className="hidden sm:inline">Paste</span> Text
         </TabsTrigger>
-        <TabsTrigger value="manual" className="gap-2">
+        <TabsTrigger value="photo" className="gap-1.5 text-xs sm:text-sm">
+          <Camera className="h-4 w-4" />
+          Photo
+        </TabsTrigger>
+        <TabsTrigger value="manual" className="gap-1.5 text-xs sm:text-sm">
           <PenLine className="h-4 w-4" />
           Manual
         </TabsTrigger>
@@ -781,6 +917,119 @@ Instructions:
             Parse Text
           </Button>
         </div>
+      </TabsContent>
+
+      <TabsContent value="photo" className="space-y-4 mt-4">
+        {!photoPreview ? (
+          <div
+            className={cn(
+              "border-2 border-dashed rounded-xl p-8 text-center transition-colors",
+              isDraggingPhoto ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+            )}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingPhoto(true); }}
+            onDragLeave={() => setIsDraggingPhoto(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingPhoto(false);
+              const file = e.dataTransfer.files[0];
+              if (file) handlePhotoSelect(file);
+            }}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Camera className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Upload a photo</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Cookbook page, recipe card, or Instagram screenshot
+                </p>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/jpeg,image/png,image/webp';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) handlePhotoSelect(file);
+                    };
+                    input.click();
+                  }}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose File
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.capture = 'environment';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) handlePhotoSelect(file);
+                    };
+                    input.click();
+                  }}
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Take Photo
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                or drop an image here
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="relative rounded-xl overflow-hidden bg-secondary">
+              <img
+                src={photoPreview}
+                alt="Recipe photo"
+                className="w-full max-h-64 object-contain"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7"
+                onClick={() => {
+                  setPhotoFile(null);
+                  setPhotoPreview(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              type="button"
+              onClick={handleExtractFromPhoto}
+              disabled={isExtractingFromPhoto}
+              className="w-full"
+            >
+              {isExtractingFromPhoto ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing image...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Extract Recipe
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </TabsContent>
 
       <TabsContent value="manual" className="mt-4">

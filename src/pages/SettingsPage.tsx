@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRecipes } from '@/context/RecipeContext';
 import { useHouseholdSettings, type NutritionGoal } from '@/hooks/useHouseholdSettings';
 import { useDietaryPreferences } from '@/hooks/useDietaryPreferences';
@@ -50,9 +51,19 @@ export default function SettingsPage() {
   } = useDietaryPreferences();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
+  const creatorSectionRef = useRef<HTMLElement>(null);
+  const isCreatorSetup = searchParams.get('setup') === 'creator';
 
   const allRestrictions = getAllDietaryRestrictions();
   const allAllergens = getAllAllergens();
+
+  // Auto-scroll to creator section when arriving from creator signup
+  useEffect(() => {
+    if (isCreatorSetup && creatorSectionRef.current) {
+      creatorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isCreatorSetup]);
 
   const [newCategory, setNewCategory] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -103,11 +114,16 @@ export default function SettingsPage() {
 
       <div className="space-y-6 md:space-y-8">
         {/* Creator Profile */}
-        <section className="space-y-3 md:space-y-4">
+        <section ref={creatorSectionRef} className="space-y-3 md:space-y-4">
           <div className="flex items-center gap-2">
             <ChefHat className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             <h2 className="font-serif text-lg md:text-xl font-semibold">Creator profile</h2>
           </div>
+          {isCreatorSetup && (
+            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary">
+              Set up your creator profile below to start sharing meal plans with your audience.
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Share your meal plans publicly so others can clone them and generate shopping lists.
           </p>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Recipe, MealType } from '@/types/recipe';
+import { Recipe, MealType, ImportMethod } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { RecipeCard } from '@/components/recipes/RecipeCard';
 import { RecipeFilters, SortOption } from '@/components/recipes/RecipeFilters';
@@ -10,10 +10,16 @@ import { SpoonacularRecipeCard } from '@/components/recipes/SpoonacularRecipeCar
 import { SpoonacularRecipeDetailDialog } from '@/components/recipes/SpoonacularRecipeDetailDialog';
 import { SpoonacularSearchForm } from '@/components/recipes/SpoonacularSearchForm';
 import { useSpoonacularRecipes, SpoonacularRecipeSearchResult, SpoonacularRecipeDetails } from '@/hooks/useSpoonacularRecipes';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock } from 'lucide-react';
+import { useDiscoverCreators, type DiscoverCreator } from '@/hooks/useDiscoverCreators';
+import { useFollowCreator } from '@/hooks/useFollowCreator';
+import { useAuth } from '@/context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -24,6 +30,63 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+
+function CompactCreatorCard({ creator }: { creator: DiscoverCreator }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isFollowing, follow, unfollow, isLoading } = useFollowCreator(creator.userId);
+  const isOwnProfile = user?.id === creator.userId;
+
+  const initials = creator.displayName
+    ? creator.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : creator.username[0].toUpperCase();
+
+  const handleFollow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      navigate('/auth?redirect=/recipes');
+      return;
+    }
+    isFollowing ? unfollow() : follow();
+  };
+
+  return (
+    <Link
+      to={`/creator/${creator.username}`}
+      className="flex flex-col items-center gap-2 p-3 rounded-xl border bg-card hover:shadow-md transition-shadow min-w-[140px] w-[140px] shrink-0"
+    >
+      <Avatar className="h-10 w-10">
+        <AvatarImage src={creator.avatarUrl || undefined} alt={creator.displayName || creator.username} />
+        <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+      <div className="text-center min-w-0 w-full">
+        <p className="text-sm font-medium truncate">{creator.displayName || creator.username}</p>
+        <p className="text-xs text-muted-foreground">@{creator.username}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {creator.followerCount} {creator.followerCount === 1 ? 'follower' : 'followers'}
+        </p>
+      </div>
+      {!isOwnProfile && (
+        <Button
+          variant={isFollowing ? 'outline' : 'default'}
+          size="sm"
+          className={cn("w-full h-7 text-xs", !isFollowing && "bg-[#2D6A4F] hover:bg-[#245A42] text-white")}
+          onClick={handleFollow}
+          disabled={isLoading}
+        >
+          {isFollowing ? (
+            <><UserCheck className="h-3 w-3 mr-1" />Following</>
+          ) : (
+            <><UserPlus className="h-3 w-3 mr-1" />Follow</>
+          )}
+        </Button>
+      )}
+    </Link>
+  );
+}
 
 type RecipeTab = 'personal' | 'discover';
 
@@ -61,6 +124,9 @@ export default function RecipesPage() {
     loadPopularRecipes,
     hasLoadedInitial,
   } = useSpoonacularRecipes();
+
+  // Creator discovery
+  const { creators: featuredCreators } = useDiscoverCreators();
 
   const [activeTab, setActiveTab] = useState<RecipeTab>('personal');
 
@@ -316,7 +382,23 @@ export default function RecipesPage() {
       isFavorite: false,
       isArchived: false,
       sourceUrl: spoonacularRecipe.sourceUrl || undefined,
-      importMethod: 'manual' as const,
+      importMethod: 'spoonacular' as ImportMethod,
+      nutrition: spoonacularRecipe.nutrition ? {
+        perServing: {
+          calories: spoonacularRecipe.nutrition.calories,
+          protein: spoonacularRecipe.nutrition.protein,
+          carbs: spoonacularRecipe.nutrition.carbs,
+          fat: spoonacularRecipe.nutrition.fat,
+          fiber: spoonacularRecipe.nutrition.fiber,
+          sugar: spoonacularRecipe.nutrition.sugar,
+          sodium: spoonacularRecipe.nutrition.sodium,
+          saturatedFat: spoonacularRecipe.nutrition.saturatedFat,
+          cholesterol: spoonacularRecipe.nutrition.cholesterol,
+        },
+        source: 'provided_by_site' as const,
+        confidence: 'High' as const,
+        notes: 'Nutrition data from Spoonacular.',
+      } : undefined,
     };
 
     const added = await addRecipe(newRecipe);
@@ -441,10 +523,31 @@ export default function RecipesPage() {
       {/* Show different content based on active tab */}
       {activeTab === 'discover' ? (
         <>
+          {/* Featured Creators */}
+          {featuredCreators.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-serif text-lg font-semibold">Featured Creators</h2>
+                <Button variant="ghost" size="sm" asChild className="text-primary gap-1">
+                  <Link to="/discover">
+                    See all
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+                {featuredCreators.slice(0, 6).map(creator => (
+                  <CompactCreatorCard key={creator.userId} creator={creator} />
+                ))}
+              </div>
+              <Separator className="my-5" />
+            </>
+          )}
+
           {/* Spoonacular Search */}
-          <SpoonacularSearchForm 
-            onSearch={handleSpoonacularSearch} 
-            isSearching={isSpoonacularSearching} 
+          <SpoonacularSearchForm
+            onSearch={handleSpoonacularSearch}
+            isSearching={isSpoonacularSearching}
           />
           
           {spoonacularError && (

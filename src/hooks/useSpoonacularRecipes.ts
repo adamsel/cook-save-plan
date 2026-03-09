@@ -39,6 +39,17 @@ export interface SpoonacularRecipeDetails {
   dishTypes: string[];
   prepTime: number | null;
   cookTime: number | null;
+  nutrition?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+    sugar?: number;
+    sodium?: number;
+    saturatedFat?: number;
+    cholesterol?: number;
+  };
 }
 
 export interface SearchParams {

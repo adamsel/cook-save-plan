@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Send, Loader2, Bot, User, Link as LinkIcon,
   ChefHat, Clock, Users, Check, Edit2,
-  Sparkles
+  Sparkles, Camera, X, Image as ImageIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -178,12 +178,13 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
     {
       id: 'welcome',
       role: 'assistant',
-      content: "Hi! I'm your recipe assistant. 🍳\n\nShare a recipe URL and I'll extract it for you, or paste recipe text and I'll organize it. You can also describe a dish and I'll help you create a recipe from scratch!\n\nWhat would you like to add to your collection?"
+      content: "Hi! I'm your recipe assistant. 🍳\n\nPaste a URL, type or paste recipe text, or attach a photo of a recipe — I'll extract and organize it. You can also describe a dish and I'll help create one from scratch!\n\nWhat would you like to add to your collection?"
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [latestRecipe, setLatestRecipe] = useState<ParsedRecipeData | null>(null);
+  const [attachedImage, setAttachedImage] = useState<{ file: File; preview: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -199,18 +200,47 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
     return urlMatch ? urlMatch[0] : null;
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAttachImage = (file: File) => {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please use JPEG, PNG, or WebP images.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast({ title: 'Image too large', description: 'Please use an image under 3MB.', variant: 'destructive' });
+      return;
+    }
+    setAttachedImage({ file, preview: URL.createObjectURL(file) });
+  };
+
   const sendMessage = useCallback(async () => {
     const trimmedInput = input.trim();
-    if (!trimmedInput || isLoading) return;
+    const hasImage = !!attachedImage;
+    if ((!trimmedInput && !hasImage) || isLoading) return;
 
+    const messageContent = trimmedInput || (hasImage ? 'Extract the recipe from this image.' : '');
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
-      content: trimmedInput,
+      content: hasImage ? `📷 ${messageContent}` : messageContent,
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    const currentImage = attachedImage;
+    setAttachedImage(null);
     setIsLoading(true);
 
     // Detect URL in message
@@ -219,7 +249,7 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
     try {
       // Get the user's session token for authenticated requests
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !session) {
         toast({
           title: 'Authentication Required',
@@ -230,19 +260,31 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
         return;
       }
 
+      // Build request body
+      const requestBody: Record<string, unknown> = {
+        messages: messages.filter(m => m.id !== 'welcome').concat({
+          ...userMessage,
+          content: messageContent, // Send without the camera emoji prefix
+        }).map(m => ({
+          role: m.role,
+          content: m.content,
+        })),
+        url: detectedUrl,
+      };
+
+      // Attach image if present
+      if (currentImage) {
+        const base64 = await fileToBase64(currentImage.file);
+        requestBody.image = { base64, mimeType: currentImage.file.type };
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          messages: messages.filter(m => m.id !== 'welcome').concat(userMessage).map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-          url: detectedUrl,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!resp.ok) {
@@ -314,7 +356,7 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, messages, toast]);
+  }, [input, isLoading, messages, toast, attachedImage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -432,17 +474,56 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
       </ScrollArea>
 
       <div className="pt-3 border-t space-y-2">
+        {attachedImage && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="relative">
+              <img
+                src={attachedImage.preview}
+                alt="Attached"
+                className="h-14 w-14 rounded-lg object-cover border"
+              />
+              <button
+                type="button"
+                onClick={() => setAttachedImage(null)}
+                className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground">Image attached — send to extract recipe</span>
+          </div>
+        )}
         <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            disabled={isLoading}
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'image/jpeg,image/png,image/webp';
+              input.onchange = (e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (file) handleAttachImage(file);
+              };
+              input.click();
+            }}
+            title="Attach a photo (cookbook page, recipe card, or screenshot)"
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Paste a URL, recipe text, or describe what you want..."
+            placeholder={attachedImage ? "Add a note, or just hit send..." : "Paste a URL, recipe text, or describe what you want..."}
             disabled={isLoading}
             className="flex-1"
           />
-          <Button onClick={sendMessage} disabled={!input.trim() || isLoading}>
+          <Button onClick={sendMessage} disabled={(!input.trim() && !attachedImage) || isLoading}>
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -452,7 +533,7 @@ export function RecipeAIChat({ onRecipeReady, onCancel }: RecipeAIChatProps) {
         </div>
         <div className="flex gap-2 text-xs text-muted-foreground">
           <LinkIcon className="h-3 w-3" />
-          <span>Tip: Paste a recipe URL and I'll extract everything automatically</span>
+          <span>Tip: Paste a URL, or attach a photo of a recipe</span>
         </div>
       </div>
     </div>

@@ -78,6 +78,13 @@ interface SpoonacularRecipeDetails {
   dishTypes?: string[];
   preparationMinutes?: number;
   cookingMinutes?: number;
+  nutrition?: {
+    nutrients: Array<{
+      name: string;
+      amount: number;
+      unit: string;
+    }>;
+  };
 }
 
 interface NormalizedIngredient {
@@ -102,6 +109,17 @@ interface NormalizedRecipeDetails {
   dishTypes: string[];
   prepTime: number | null;
   cookTime: number | null;
+  nutrition?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+    sugar?: number;
+    sodium?: number;
+    saturatedFat?: number;
+    cholesterol?: number;
+  };
 }
 
 function stripHtml(html: string): string {
@@ -143,6 +161,33 @@ function normalizeRecipeDetails(recipe: SpoonacularRecipeDetails): NormalizedRec
     dishTypes: recipe.dishTypes || [],
     prepTime: recipe.preparationMinutes || null,
     cookTime: recipe.cookingMinutes || null,
+    nutrition: extractNutrition(recipe),
+  };
+}
+
+function extractNutrition(recipe: SpoonacularRecipeDetails): NormalizedRecipeDetails['nutrition'] {
+  if (!recipe.nutrition?.nutrients?.length) return undefined;
+
+  const find = (name: string) =>
+    recipe.nutrition!.nutrients.find(n => n.name.toLowerCase() === name.toLowerCase())?.amount;
+
+  const calories = find('Calories');
+  const protein = find('Protein');
+  const carbs = find('Carbohydrates');
+  const fat = find('Fat');
+
+  if (calories === undefined && protein === undefined) return undefined;
+
+  return {
+    calories: Math.round(calories || 0),
+    protein: Math.round(protein || 0),
+    carbs: Math.round(carbs || 0),
+    fat: Math.round(fat || 0),
+    fiber: find('Fiber') !== undefined ? Math.round(find('Fiber')!) : undefined,
+    sugar: find('Sugar') !== undefined ? Math.round(find('Sugar')!) : undefined,
+    sodium: find('Sodium') !== undefined ? Math.round(find('Sodium')!) : undefined,
+    saturatedFat: find('Saturated Fat') !== undefined ? Math.round(find('Saturated Fat')!) : undefined,
+    cholesterol: find('Cholesterol') !== undefined ? Math.round(find('Cholesterol')!) : undefined,
   };
 }
 
@@ -201,7 +246,7 @@ serve(async (req) => {
     }
 
     // Build Spoonacular API URL
-    const spoonacularUrl = `https://api.spoonacular.com/recipes/${id}/information?apiKey=${apiKey}`;
+    const spoonacularUrl = `https://api.spoonacular.com/recipes/${id}/information?apiKey=${apiKey}&includeNutrition=true`;
 
     console.log("Fetching recipe details from Spoonacular:", id);
 

@@ -4,12 +4,14 @@ import { useSharedMealPlan } from '@/hooks/useSharedMealPlan';
 import { useCloneMealPlan } from '@/hooks/useCloneMealPlan';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ReadOnlyMealPlanCalendar } from '@/components/recipes/ReadOnlyMealPlanCalendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock, UserPlus, UserCheck } from 'lucide-react';
+import { PublicNav } from '@/components/layout/PublicNav';
 import { format, parseISO } from 'date-fns';
 import { Recipe } from '@/types/recipe';
 
@@ -19,9 +21,26 @@ export default function SharedMealPlanPage() {
   const { user } = useAuth();
   const { mealPlan, recipes, creator, isLoading, error } = useSharedMealPlan(shareSlug);
   const { cloneMealPlan, isCloning, getDefaultTargetWeek } = useCloneMealPlan();
-  const { isFollowing } = useFollowCreator(creator?.userId);
+  const { isFollowing, follow, unfollow, isLoading: followLoading } = useFollowCreator(creator?.userId);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [cloneComplete, setCloneComplete] = useState(false);
+
+  // Record view (debounced per session to avoid duplicates)
+  useEffect(() => {
+    if (!mealPlan) return;
+    const viewKey = `plan_viewed_${mealPlan.id}`;
+    if (sessionStorage.getItem(viewKey)) return;
+    sessionStorage.setItem(viewKey, '1');
+
+    supabase
+      .from('plan_engagement')
+      .insert({
+        meal_plan_id: mealPlan.id,
+        user_id: user?.id || null,
+        event_type: 'view',
+      })
+      .then(() => {}); // fire-and-forget
+  }, [mealPlan?.id]);
 
   // Auto-clone if user just signed up/logged in and there's a pending clone
   useEffect(() => {
@@ -38,7 +57,11 @@ export default function SharedMealPlanPage() {
     if (!mealPlan) return;
 
     const targetWeek = getDefaultTargetWeek();
-    const result = await cloneMealPlan(mealPlan.items, recipes, targetWeek);
+    const result = await cloneMealPlan(mealPlan.items, recipes, targetWeek, {
+      id: mealPlan.id,
+      creatorUserId: creator?.userId || '',
+      title: mealPlan.title,
+    });
     if (result) {
       setCloneComplete(true);
       setTimeout(() => navigate('/meal-plan'), 1500);
@@ -111,6 +134,7 @@ export default function SharedMealPlanPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <PublicNav />
       {/* Fix 2a: Branded cover banner */}
       <div className="relative w-full h-[80px] sm:h-[110px] overflow-hidden">
         {creator?.coverImageUrl ? (
@@ -131,36 +155,73 @@ export default function SharedMealPlanPage() {
 
       {/* Fix 2b: Creator attribution + avatar */}
       <div className="max-w-6xl mx-auto px-4 sm:px-8">
-        <div className="flex items-end gap-3 sm:gap-4">
-          {/* Avatar overlapping banner */}
-          <Avatar className="h-16 w-16 sm:h-20 sm:w-20 -mt-8 sm:-mt-10 ring-[3px] ring-white shadow-lg shrink-0">
-            <AvatarImage src={creator?.avatarUrl || undefined} alt={creator?.displayName || 'Creator'} />
-            <AvatarFallback className="bg-primary/10 text-primary text-lg sm:text-xl font-semibold">
-              {getCreatorInitials()}
-            </AvatarFallback>
-          </Avatar>
+        <div className="flex items-end justify-between">
+          <div className="flex items-end gap-3 sm:gap-4">
+            {/* Avatar overlapping banner */}
+            <Avatar className="h-16 w-16 sm:h-20 sm:w-20 -mt-8 sm:-mt-10 ring-[3px] ring-white shadow-lg shrink-0">
+              <AvatarImage src={creator?.avatarUrl || undefined} alt={creator?.displayName || 'Creator'} />
+              <AvatarFallback className="bg-primary/10 text-primary text-lg sm:text-xl font-semibold">
+                {getCreatorInitials()}
+              </AvatarFallback>
+            </Avatar>
 
-          <div className="pt-2 pb-1 min-w-0">
-            {creator?.displayName && (
-              <p className="font-semibold text-sm sm:text-base truncate">
-                {creator.username ? (
-                  <Link to={`/creator/${creator.username}`} className="hover:underline">
-                    {creator.displayName}
-                  </Link>
-                ) : (
-                  creator.displayName
-                )}
-              </p>
-            )}
-            {creator?.username && (
-              <Link
-                to={`/creator/${creator.username}`}
-                className="text-xs sm:text-sm text-[#2D6A4F] hover:underline"
-              >
-                @{creator.username}
-              </Link>
-            )}
+            <div className="pt-2 pb-1 min-w-0">
+              {creator?.displayName && (
+                <p className="font-semibold text-sm sm:text-base truncate">
+                  {creator.username ? (
+                    <Link to={`/creator/${creator.username}`} className="hover:underline">
+                      {creator.displayName}
+                    </Link>
+                  ) : (
+                    creator.displayName
+                  )}
+                </p>
+              )}
+              {creator?.username && (
+                <Link
+                  to={`/creator/${creator.username}`}
+                  className="text-xs sm:text-sm text-[#2D6A4F] hover:underline"
+                >
+                  @{creator.username}
+                </Link>
+              )}
+            </div>
           </div>
+
+          {/* Follow button */}
+          {creator && user?.id !== creator.userId && (
+            <div className="pt-2">
+              {isFollowing ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => unfollow()}
+                  disabled={followLoading}
+                  className="gap-1.5"
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Following
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!user) {
+                      localStorage.setItem('pendingMealPlanClone', shareSlug || '');
+                      navigate(`/auth?redirect=/plan/${shareSlug}`);
+                      return;
+                    }
+                    follow();
+                  }}
+                  disabled={followLoading}
+                  className="gap-1.5 bg-[#2D6A4F] hover:bg-[#245A42] text-white"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Follow
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Fix 2c: Plan title and metadata */}

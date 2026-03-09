@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu } from 'lucide-react';
+import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu, Bell, UserPlus, Copy, CheckCheck, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,21 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 
+function formatTimeAgo(dateStr: string): string {
+  const now = Date.now();
+  const date = new Date(dateStr).getTime();
+  const seconds = Math.floor((now - date) / 1000);
+
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
 interface NavigationProps {
   onAddRecipe: () => void;
 }
@@ -29,12 +45,15 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const navItems = [
     { to: '/recipes', label: 'My Recipes', icon: UtensilsCrossed },
     { to: '/meal-plan', label: 'Meal Plan', icon: Calendar },
     { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
+    { to: '/discover', label: 'Discover', icon: Compass },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -126,6 +145,87 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add Recipe</span>
           </Button>
+
+          {/* Notification Bell */}
+          {user && (
+            <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-80" align="end" forceMount>
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        markAllAsRead();
+                      }}
+                      className="text-xs text-primary hover:underline font-normal flex items-center gap-1"
+                    >
+                      <CheckCheck className="h-3 w-3" />
+                      Mark all read
+                    </button>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {notifications.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    No notifications yet
+                  </div>
+                ) : (
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {notifications.map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className={cn(
+                          "flex items-start gap-3 p-3 cursor-pointer",
+                          !notification.read && "bg-primary/5"
+                        )}
+                        onClick={() => {
+                          if (!notification.read) markAsRead(notification.id);
+                          if (notification.type === 'new_follower' && notification.data.follower_id) {
+                            setNotificationsOpen(false);
+                          } else if (notification.type === 'plan_cloned' && notification.data.meal_plan_id) {
+                            setNotificationsOpen(false);
+                          }
+                        }}
+                      >
+                        <div className="shrink-0 mt-0.5">
+                          {notification.type === 'new_follower' ? (
+                            <UserPlus className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Copy className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm">
+                            {notification.type === 'new_follower'
+                              ? <><span className="font-medium">{notification.data.follower_name}</span> started following you</>
+                              : <><span className="font-medium">{notification.data.cloner_name}</span> saved your meal plan: {notification.data.plan_title}</>
+                            }
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatTimeAgo(notification.created_at)}
+                          </p>
+                        </div>
+                        {!notification.read && (
+                          <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {user ? (
             <DropdownMenu>

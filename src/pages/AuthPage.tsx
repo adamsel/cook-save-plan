@@ -14,9 +14,10 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
-  
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const isCreatorSignup = searchParams.get('creator') === 'true';
+  const redirectTo = searchParams.get('redirect') || (isCreatorSignup ? '/settings?setup=creator' : '/dashboard');
+
+  const [activeTab, setActiveTab] = useState<'login' | 'signup'>(isCreatorSignup ? 'signup' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -90,9 +91,13 @@ export default function AuthPage() {
               <UtensilsCrossed className="h-6 w-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="font-serif text-2xl">Recipe Stash</CardTitle>
+          <CardTitle className="font-serif text-2xl">
+            {isCreatorSignup ? 'Join as a Creator' : 'Recipe Stash'}
+          </CardTitle>
           <CardDescription>
-            Save recipes, plan meals, and share with friends
+            {isCreatorSignup
+              ? 'Build your profile and share your meal plans'
+              : 'Save recipes, plan meals, and share with friends'}
           </CardDescription>
         </CardHeader>
         
