@@ -6,8 +6,6 @@ interface CreatorProfile {
   userId: string;
   displayName: string | null;
   avatarUrl: string | null;
-  coverImageUrl: string | null;
-  coverImagePosition: number;
   username: string;
   bio: string | null;
 }
@@ -46,7 +44,7 @@ export function useCreatorProfile(username: string | undefined) {
     // 1. Fetch the creator's profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, display_name, avatar_url, cover_image_url, cover_image_position, username, bio, is_creator')
+      .select('user_id, display_name, avatar_url, username, bio, is_creator')
       .eq('username', uname)
       .eq('is_creator', true)
       .single();
@@ -61,8 +59,6 @@ export function useCreatorProfile(username: string | undefined) {
       userId: profileData.user_id,
       displayName: profileData.display_name,
       avatarUrl: profileData.avatar_url,
-      coverImageUrl: profileData.cover_image_url,
-      coverImagePosition: profileData.cover_image_position ?? 50,
       username: profileData.username!,
       bio: profileData.bio,
     });

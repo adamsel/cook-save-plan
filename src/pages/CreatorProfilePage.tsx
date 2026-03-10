@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, ImagePlus, Eye, Copy, MoreVertical, EyeOff } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, Eye, Copy, MoreVertical, EyeOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMealPlansData } from '@/hooks/useMealPlansData';
@@ -132,147 +132,117 @@ export default function CreatorProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       <PublicNav />
-      {/* Cover photo banner */}
-      <div className="relative w-full h-[140px] sm:h-[200px] overflow-hidden">
-        {profile.coverImageUrl ? (
-          <img
-            src={profile.coverImageUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            style={{ objectPosition: `center ${profile.coverImagePosition}%` }}
-          />
-        ) : (
-          <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, #2D6A4F 0%, #52B788 50%, #B7E4C7 100%)' }} />
-        )}
-        <div className="absolute inset-0 bg-black/10" />
-      </div>
 
-      {/* Fix 3e: Owner cover photo nudge */}
-      {isOwnProfile && !profile.coverImageUrl && (
-        <div className="bg-muted/60 border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-8 py-2.5 flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <ImagePlus className="h-4 w-4 shrink-0" />
-              Add a cover photo to make your profile stand out
-            </p>
-            <Button variant="outline" size="sm" onClick={() => navigate('/settings')} className="shrink-0">
-              Add Cover
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Profile info section */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-8">
-        {/* Avatar + action button row */}
-        <div className="flex items-end justify-between">
-          {/* Avatar overlapping banner */}
-          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 -mt-10 sm:-mt-12 ring-[3px] ring-white shadow-lg">
+      {/* Profile header */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-6">
+        {/* Avatar + name + action row */}
+        <div className="flex items-start gap-4">
+          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
             <AvatarImage src={profile.avatarUrl || undefined} alt={profile.displayName || profile.username} />
             <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
               {getInitials()}
             </AvatarFallback>
           </Avatar>
 
-          {/* Follow / Edit button */}
-          <div className="pt-3">
-            {isOwnProfile ? (
-              <Button variant="outline" onClick={() => navigate('/settings')} className="gap-2">
-                <Settings className="h-4 w-4" />
-                Edit Profile
-              </Button>
-            ) : isFollowing ? (
-              <Button
-                variant="outline"
-                onClick={handleFollowClick}
-                disabled={followLoading}
-                onMouseEnter={() => setUnfollowHover(true)}
-                onMouseLeave={() => setUnfollowHover(false)}
-                className={`gap-2 min-w-[120px] transition-colors ${unfollowHover ? 'border-red-400 text-red-400 hover:bg-red-50/50 hover:text-red-400' : ''}`}
-              >
-                {unfollowHover ? (
-                  <>
-                    <UserPlus className="h-4 w-4" />
-                    Unfollow
-                  </>
-                ) : (
-                  <>
-                    <UserCheck className="h-4 w-4" />
-                    Following
-                  </>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold leading-tight truncate">
+                  {profile.displayName || profile.username}
+                </h1>
+                <p className="text-sm text-muted-foreground">@{profile.username}</p>
+              </div>
+
+              {/* Follow / Edit button */}
+              {isOwnProfile ? (
+                <Button variant="outline" size="sm" onClick={() => navigate('/settings')} className="gap-1.5 shrink-0">
+                  <Settings className="h-3.5 w-3.5" />
+                  Edit Profile
+                </Button>
+              ) : isFollowing ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFollowClick}
+                  disabled={followLoading}
+                  onMouseEnter={() => setUnfollowHover(true)}
+                  onMouseLeave={() => setUnfollowHover(false)}
+                  className={`gap-1.5 min-w-[100px] shrink-0 transition-colors ${unfollowHover ? 'border-red-400 text-red-400 hover:bg-red-50/50 hover:text-red-400' : ''}`}
+                >
+                  {unfollowHover ? (
+                    <>
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Unfollow
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Following
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleFollowClick} disabled={followLoading} className="gap-1.5 shrink-0 bg-[#2D6A4F] hover:bg-[#245A42] text-white">
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Follow
+                </Button>
+              )}
+            </div>
+
+            {/* Bio */}
+            {profile.bio ? (
+              <div className="mt-2">
+                <p className={`text-sm text-muted-foreground ${!bioExpanded ? 'line-clamp-2' : ''}`}>
+                  {profile.bio}
+                </p>
+                {profile.bio.length > 100 && (
+                  <button
+                    onClick={() => setBioExpanded(!bioExpanded)}
+                    className="text-primary text-xs mt-0.5 hover:underline"
+                  >
+                    {bioExpanded ? 'Show less' : 'more'}
+                  </button>
                 )}
-              </Button>
-            ) : (
-              <Button onClick={handleFollowClick} disabled={followLoading} className="gap-2 bg-[#2D6A4F] hover:bg-[#245A42] text-white transition-transform hover:scale-105">
-                <UserPlus className="h-4 w-4" />
-                Follow
-              </Button>
-            )}
+              </div>
+            ) : isOwnProfile ? (
+              <p className="mt-2 text-sm text-muted-foreground italic">
+                No bio yet.{' '}
+                <Link to="/settings" className="text-primary hover:underline not-italic">
+                  Add one
+                </Link>
+              </p>
+            ) : null}
           </div>
         </div>
 
-        {/* Name, handle, bio */}
-        <div className="mt-3">
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            {profile.displayName || profile.username}
-          </h1>
-          <p className="text-muted-foreground">@{profile.username}</p>
-          {profile.bio ? (
-            <div className="mt-2 max-w-xl">
-              <p className={`text-muted-foreground ${!bioExpanded ? 'line-clamp-3' : ''}`}>
-                {profile.bio}
-              </p>
-              {profile.bio.length > 150 && (
-                <button
-                  onClick={() => setBioExpanded(!bioExpanded)}
-                  className="text-primary text-sm mt-0.5 hover:underline"
-                >
-                  {bioExpanded ? 'Show less' : 'Read more'}
-                </button>
-              )}
-            </div>
-          ) : isOwnProfile ? (
-            <p className="mt-2 text-muted-foreground italic">
-              No bio yet.{' '}
-              <Link to="/settings" className="text-primary hover:underline not-italic">
-                Add one in settings
-              </Link>
-            </p>
-          ) : null}
-
-          {/* Stats row */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-3">
-            <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground">
-              <span className="text-base font-bold text-foreground">{followerCount}</span>{' '}
-              <span className="text-sm">{followerCount === 1 ? 'Follower' : 'Followers'}</span>
-            </span>
-            <span className="hidden sm:inline text-muted-foreground/40">·</span>
-            <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground">
-              <span className="text-base font-bold text-foreground">{sharedMealPlans.length}</span>{' '}
-              <span className="text-sm">{sharedMealPlans.length === 1 ? 'Meal Plan' : 'Meal Plans'}</span>
-            </span>
-            <span className="hidden sm:inline text-muted-foreground/40">·</span>
-            <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground">
-              <span className="text-base font-bold text-foreground">{publicRecipes.length}</span>{' '}
-              <span className="text-sm">{publicRecipes.length === 1 ? 'Recipe' : 'Recipes'}</span>
-            </span>
-            {isOwnProfile && engagementStats && (
-              <>
-                <span className="hidden sm:inline text-muted-foreground/40">·</span>
-                <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground flex items-center gap-1">
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="text-base font-bold text-foreground">{engagementStats.views}</span>{' '}
-                  <span className="text-sm">Views</span>
-                </span>
-                <span className="hidden sm:inline text-muted-foreground/40">·</span>
-                <span className="group cursor-default transition-colors hover:text-foreground text-muted-foreground flex items-center gap-1">
-                  <Copy className="h-3.5 w-3.5" />
-                  <span className="text-base font-bold text-foreground">{engagementStats.clones}</span>{' '}
-                  <span className="text-sm">Saves</span>
-                </span>
-              </>
-            )}
-          </div>
+        {/* Stats row */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-4 pb-4 border-b text-sm">
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground">{publicRecipes.length}</span>{' '}
+            {publicRecipes.length === 1 ? 'Recipe' : 'Recipes'}
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground">{sharedMealPlans.length}</span>{' '}
+            {sharedMealPlans.length === 1 ? 'Plan' : 'Plans'}
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground">{followerCount}</span>{' '}
+            {followerCount === 1 ? 'Follower' : 'Followers'}
+          </span>
+          {isOwnProfile && engagementStats && (
+            <>
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                <span className="font-semibold text-foreground">{engagementStats.views}</span>{' '}
+                Views
+              </span>
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Copy className="h-3 w-3" />
+                <span className="font-semibold text-foreground">{engagementStats.clones}</span>{' '}
+                Saves
+              </span>
+            </>
+          )}
         </div>
       </div>
 

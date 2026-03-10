@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChefHat, ExternalLink, Loader2, Check, X, Camera, ImagePlus, Trash2 } from 'lucide-react';
+import { ChefHat, ExternalLink, Loader2, Check, X, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const RESERVED_USERNAMES = [
@@ -19,22 +19,18 @@ const RESERVED_USERNAMES = [
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
-const MAX_COVER_SIZE = 5 * 1024 * 1024; // 5MB
 
 export function CreatorSettings() {
   const { user, profile, updateProfile } = useAuth();
   const { toast } = useToast();
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [isCreator, setIsCreator] = useState(false);
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [coverPosition, setCoverPosition] = useState(50);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
 
   // Initialize from profile
@@ -43,7 +39,6 @@ export function CreatorSettings() {
       setIsCreator(profile.is_creator || false);
       setUsername(profile.username || '');
       setBio(profile.bio || '');
-      setCoverPosition(profile.cover_image_position ?? 50);
     }
   }, [profile]);
 
@@ -144,58 +139,6 @@ export function CreatorSettings() {
     if (avatarInputRef.current) avatarInputRef.current.value = '';
   };
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > MAX_COVER_SIZE) {
-      toast({ title: 'File too large', description: 'Cover photo must be under 5MB.', variant: 'destructive' });
-      return;
-    }
-
-    setIsUploadingCover(true);
-    const path = `${user.id}/cover.${file.name.split('.').pop()}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('covers')
-      .upload(path, file, { upsert: true });
-
-    if (uploadError) {
-      toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' });
-      setIsUploadingCover(false);
-      return;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('covers')
-      .getPublicUrl(path);
-
-    const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
-
-    const { error: dbError } = await supabase
-      .from('profiles')
-      .update({ cover_image_url: urlWithCacheBust })
-      .eq('user_id', user.id);
-
-    if (dbError) {
-      toast({ title: 'Failed to save', description: dbError.message, variant: 'destructive' });
-      setIsUploadingCover(false);
-      return;
-    }
-
-    await updateProfile({ cover_image_url: urlWithCacheBust });
-
-    toast({ title: 'Cover photo updated' });
-    setIsUploadingCover(false);
-
-    if (coverInputRef.current) coverInputRef.current.value = '';
-  };
-
-  const handleRemoveCover = async () => {
-    await updateProfile({ cover_image_url: null });
-    toast({ title: 'Cover photo removed' });
-  };
-
   const handleSave = async () => {
     if (isCreator && !validateUsername(username)) {
       toast({
@@ -220,7 +163,6 @@ export function CreatorSettings() {
     const updates: Record<string, unknown> = {
       is_creator: isCreator,
       bio: bio || null,
-      cover_image_position: coverPosition,
     };
 
     if (isCreator && username) {
@@ -300,72 +242,6 @@ export function CreatorSettings() {
                 className="hidden"
               />
             </div>
-          </div>
-
-          {/* Cover photo */}
-          <div className="space-y-2">
-            <Label>Cover photo</Label>
-            <div className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '3/1' }}>
-              {profile?.cover_image_url ? (
-                <img
-                  src={profile.cover_image_url}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: `center ${coverPosition}%` }}
-                />
-              ) : (
-                <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, #2D6A4F 0%, #52B788 50%, #B7E4C7 100%)' }} />
-              )}
-              {isUploadingCover && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                  <Loader2 className="h-5 w-5 animate-spin text-white" />
-                </div>
-              )}
-            </div>
-            {profile?.cover_image_url && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Reposition</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={coverPosition}
-                  onChange={e => setCoverPosition(Number(e.target.value))}
-                  className="flex-1 h-2 accent-primary cursor-pointer"
-                />
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => coverInputRef.current?.click()}
-                disabled={isUploadingCover}
-                className="gap-2"
-              >
-                <ImagePlus className="h-4 w-4" />
-                {profile?.cover_image_url ? 'Change cover' : 'Add cover photo'}
-              </Button>
-              {profile?.cover_image_url && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRemoveCover}
-                  className="gap-2 text-muted-foreground"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">JPG or PNG, max 5MB. Displayed as a banner on your profile.</p>
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={handleCoverUpload}
-              className="hidden"
-            />
           </div>
 
           {/* Username */}

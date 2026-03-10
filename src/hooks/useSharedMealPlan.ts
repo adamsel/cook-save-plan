@@ -15,8 +15,6 @@ interface CreatorInfo {
   displayName: string | null;
   avatarUrl: string | null;
   username: string | null;
-  coverImageUrl: string | null;
-  coverImagePosition: number;
 }
 
 export function useSharedMealPlan(shareSlug: string | undefined) {
@@ -119,7 +117,7 @@ export function useSharedMealPlan(shareSlug: string | undefined) {
     // 4. Fetch creator profile
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('user_id, display_name, avatar_url, username, cover_image_url, cover_image_position')
+      .select('user_id, display_name, avatar_url, username')
       .eq('user_id', planData.user_id)
       .single();
 
@@ -129,8 +127,6 @@ export function useSharedMealPlan(shareSlug: string | undefined) {
         displayName: profileData.display_name,
         avatarUrl: profileData.avatar_url,
         username: profileData.username,
-        coverImageUrl: profileData.cover_image_url,
-        coverImagePosition: profileData.cover_image_position ?? 50,
       });
     }
 

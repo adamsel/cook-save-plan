@@ -135,37 +135,19 @@ export default function SharedMealPlanPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <PublicNav />
-      {/* Fix 2a: Branded cover banner */}
-      <div className="relative w-full h-[80px] sm:h-[110px] overflow-hidden">
-        {creator?.coverImageUrl ? (
-          <img
-            src={creator.coverImageUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            style={{ objectPosition: `center ${creator.coverImagePosition}%` }}
-          />
-        ) : (
-          <div
-            className="w-full h-full"
-            style={{ background: 'linear-gradient(135deg, #2D6A4F 0%, #52B788 50%, #B7E4C7 100%)' }}
-          />
-        )}
-        <div className="absolute inset-0 bg-black/35" />
-      </div>
 
-      {/* Fix 2b: Creator attribution + avatar */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-8">
-        <div className="flex items-end justify-between">
-          <div className="flex items-end gap-3 sm:gap-4">
-            {/* Avatar overlapping banner */}
-            <Avatar className="h-16 w-16 sm:h-20 sm:w-20 -mt-8 sm:-mt-10 ring-[3px] ring-white shadow-lg shrink-0">
+      {/* Creator attribution */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 pt-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Avatar className="h-12 w-12 sm:h-14 sm:w-14 shrink-0">
               <AvatarImage src={creator?.avatarUrl || undefined} alt={creator?.displayName || 'Creator'} />
-              <AvatarFallback className="bg-primary/10 text-primary text-lg sm:text-xl font-semibold">
+              <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg font-semibold">
                 {getCreatorInitials()}
               </AvatarFallback>
             </Avatar>
 
-            <div className="pt-2 pb-1 min-w-0">
+            <div className="min-w-0">
               {creator?.displayName && (
                 <p className="font-semibold text-sm sm:text-base truncate">
                   {creator.username ? (
