@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Recipe } from '@/types/recipe';
-import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy, AlertTriangle, Camera } from 'lucide-react';
+import { Heart, Clock, Users, ExternalLink, MoreHorizontal, Calendar, Archive, Pencil, Trash2, Copy, AlertTriangle, Camera, Globe } from 'lucide-react';
 import { uploadRecipeImage } from '@/lib/uploadRecipeImage';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,7 @@ interface RecipeCardProps {
   onCopyToPersonal?: (recipe: Recipe) => void;
   userId?: string;
   onImageUpload?: (recipeId: string, imageUrl: string) => void;
+  onTogglePublic?: (id: string, isPublic: boolean) => Promise<boolean>;
 }
 
 export function RecipeCard({
@@ -42,6 +43,7 @@ export function RecipeCard({
   onCopyToPersonal,
   userId,
   onImageUpload,
+  onTogglePublic,
 }: RecipeCardProps) {
   const isMobile = useIsMobile();
   const cardImageInputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +111,17 @@ export function RecipeCard({
               </>
             )}
           </div>
+        )}
+
+        {/* Public/shared badge */}
+        {!isLibraryRecipe && recipe.isPublic && (
+          <Badge className={cn(
+            "absolute bg-primary/90 text-primary-foreground border-0 gap-1",
+            isMobile ? "top-2 left-2 text-[10px] px-1.5 py-0.5" : "top-3 left-3 text-xs"
+          )}>
+            <Globe className="h-3 w-3" />
+            Shared
+          </Badge>
         )}
 
         {/* Favorite button - only show for personal recipes */}
@@ -210,6 +223,15 @@ export function RecipeCard({
 
               {!isLibraryRecipe && (
                 <>
+                  {onTogglePublic && (
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      onTogglePublic(recipe.id, !recipe.isPublic);
+                    }}>
+                      <Globe className="h-4 w-4 mr-2" />
+                      {recipe.isPublic ? 'Remove from Profile' : 'Share to Profile'}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={(e) => {
                     e.stopPropagation();
                     onEdit(recipe);

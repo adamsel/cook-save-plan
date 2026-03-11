@@ -14,10 +14,11 @@ import { SpoonacularSearchForm } from '@/components/recipes/SpoonacularSearchFor
 import { useSpoonacularRecipes, SpoonacularRecipeSearchResult, SpoonacularRecipeDetails } from '@/hooks/useSpoonacularRecipes';
 import { useDiscoverCreators, type DiscoverCreator } from '@/hooks/useDiscoverCreators';
 import { usePopularRecipes, type PopularRecipe } from '@/hooks/usePopularRecipes';
+import { useFollowingFeed, type FeedItem } from '@/hooks/useFollowingFeed';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload, BookmarkPlus, Users } from 'lucide-react';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload, BookmarkPlus, Users, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,7 +92,7 @@ function CompactCreatorCard({ creator }: { creator: DiscoverCreator }) {
   );
 }
 
-type RecipeTab = 'personal' | 'discover';
+type RecipeTab = 'personal' | 'following' | 'discover';
 
 export default function RecipesPage() {
   const {
@@ -132,6 +133,7 @@ export default function RecipesPage() {
   // Creator discovery
   const { creators: featuredCreators } = useDiscoverCreators();
   const { data: popularRecipes = [] } = usePopularRecipes(8);
+  const { data: feedItems = [], isLoading: isFeedLoading } = useFollowingFeed();
 
   const [activeTab, setActiveTab] = useState<RecipeTab>('personal');
 
@@ -450,6 +452,10 @@ export default function RecipesPage() {
               <span className="hidden xs:inline">My</span> Recipes
               <Badge variant="secondary" className="ml-1 h-4 md:h-5 px-1 md:px-1.5 text-[10px] md:text-xs">{recipes.length}</Badge>
             </TabsTrigger>
+            <TabsTrigger value="following" className="gap-1.5 md:gap-2 text-xs md:text-sm px-2.5 md:px-3">
+              <UserCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              Following
+            </TabsTrigger>
             <TabsTrigger value="discover" className="gap-1.5 md:gap-2 text-xs md:text-sm px-2.5 md:px-3">
               <Globe className="h-3.5 w-3.5 md:h-4 md:w-4" />
               Discover
@@ -543,7 +549,91 @@ export default function RecipesPage() {
       )}
 
       {/* Show different content based on active tab */}
-      {activeTab === 'discover' ? (
+      {activeTab === 'following' ? (
+        <div className="space-y-4">
+          {isFeedLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : feedItems.length > 0 ? (
+            <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {feedItems.map((item: FeedItem) => (
+                <Link
+                  key={`${item.contentType}-${item.contentId}`}
+                  to={item.contentType === 'recipe' ? `/recipe/${item.contentId}` : `/plan/${item.contentId}`}
+                  className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={item.contentType === 'meal_plan' ? { backgroundColor: '#2D6A4F' } : undefined}>
+                        {item.contentType === 'meal_plan' ? (
+                          <Calendar className="h-8 w-8 text-white/60" />
+                        ) : (
+                          <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                    <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px] gap-1">
+                      {item.contentType === 'recipe' ? 'Recipe' : 'Meal Plan'}
+                    </Badge>
+                    {item.saveCount > 0 && (
+                      <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                        <BookmarkPlus className="h-3 w-3" />
+                        {item.saveCount}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-sm line-clamp-2 leading-snug">{item.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={item.creatorAvatarUrl || undefined} />
+                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                          {(item.creatorDisplayName || item.creatorUsername || 'C')[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {item.creatorDisplayName || `@${item.creatorUsername}`}
+                      </span>
+                    </div>
+                    {item.contentType === 'recipe' && (
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                        {item.totalTime && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {item.totalTime}m
+                          </span>
+                        )}
+                        {item.servings && (
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {item.servings}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <UserPlus className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-serif text-xl font-semibold mb-2">Follow creators to fill your feed</h3>
+              <p className="text-muted-foreground max-w-md mb-4">
+                When creators you follow share new recipes or meal plans, they'll show up here.
+              </p>
+              <Button variant="outline" onClick={() => setActiveTab('discover')}>
+                Discover Creators
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'discover' ? (
         <>
           {/* Featured Creators */}
           {featuredCreators.length > 0 && (
@@ -762,6 +852,7 @@ export default function RecipesPage() {
                       }}
                       isLibraryRecipe={false}
                       userId={user?.id}
+                      onTogglePublic={makeRecipePublic}
                       onImageUpload={async (recipeId, newImageUrl) => {
                         const r = recipes.find(r => r.id === recipeId);
                         if (r) {

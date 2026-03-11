@@ -71,6 +71,7 @@ function dbToRecipe(db: DbRecipe): Recipe {
     mealTypes: (db.meal_types || []) as MealType[],
     author: db.author || undefined,
     nutrition,
+    isPublic: db.is_public || undefined,
     videoUrl: db.video_url || undefined,
     videoPlatform: db.video_platform as VideoPlatform || undefined,
     originalRecipeId: db.original_recipe_id || undefined,
@@ -613,8 +614,8 @@ export function useRecipesData() {
     return true;
   };
 
-  // Copy library recipe to personal collection
-  const copyToPersonal = async (recipeId: string) => {
+  // Copy library/public recipe to personal collection
+  const copyToPersonal = async (recipeId: string, externalRecipe?: Recipe) => {
     if (!user) {
       toast({
         title: 'Please sign in',
@@ -623,8 +624,8 @@ export function useRecipesData() {
       });
       return null;
     }
-    
-    const sourceRecipe = libraryRecipes.find(r => r.id === recipeId) || sharedRecipes.find(r => r.id === recipeId);
+
+    const sourceRecipe = externalRecipe || libraryRecipes.find(r => r.id === recipeId) || sharedRecipes.find(r => r.id === recipeId);
     if (!sourceRecipe) return null;
     
     const { id, createdAt, updatedAt, ...recipeData } = sourceRecipe;

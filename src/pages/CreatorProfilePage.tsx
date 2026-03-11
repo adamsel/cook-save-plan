@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMealPlansData } from '@/hooks/useMealPlansData';
 import { useRecipesData } from '@/hooks/useRecipesData';
+import { useRecipes } from '@/context/RecipeContext';
 import { useToast } from '@/hooks/use-toast';
 import { PublicNav } from '@/components/layout/PublicNav';
 import { Navigation } from '@/components/layout/Navigation';
@@ -21,6 +22,7 @@ import { format, parseISO } from 'date-fns';
 import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog';
 import { Recipe } from '@/types/recipe';
 import { useCreatorRecipeStats } from '@/hooks/useCreatorRecipeStats';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // TikTok icon (not in lucide)
 function TikTokIcon({ className }: { className?: string }) {
@@ -55,6 +57,7 @@ export default function CreatorProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { unshareMealPlan } = useMealPlansData();
   const { makeRecipePublic } = useRecipesData();
+  const { copyToPersonal } = useRecipes();
   const { toast } = useToast();
 
   const isOwnProfile = user?.id === profile?.userId;
@@ -185,59 +188,12 @@ export default function CreatorProfilePage() {
     }
 
     setIsSavingRecipe(true);
-    const { error: insertError } = await supabase
-      .from('recipes')
-      .insert([{
-        user_id: user.id,
-        title: recipe.title,
-        source_url: recipe.sourceUrl || null,
-        image_url: recipe.imageUrl || null,
-        description: recipe.description || null,
-        category: recipe.category || '',
-        tags: recipe.tags || [],
-        prep_time: recipe.prepTime || null,
-        cook_time: recipe.cookTime || null,
-        total_time: recipe.totalTime || null,
-        servings: recipe.servings,
-        ingredients: JSON.parse(JSON.stringify(recipe.ingredients || [])),
-        instructions: recipe.instructions || [],
-        is_favorite: false,
-        is_archived: false,
-        cuisine: recipe.cuisine || null,
-        dietary: recipe.dietary || [],
-        meal_types: recipe.mealTypes || [],
-        author: recipe.author || null,
-        nutrition: recipe.nutrition ? JSON.parse(JSON.stringify(recipe.nutrition)) : null,
-        import_method: recipe.importMethod || null,
-        is_public: false,
-        is_library: false,
-        original_recipe_id: recipe.id,
-      }]);
-
-    if (insertError) {
-      toast({ title: 'Failed to save recipe', description: insertError.message, variant: 'destructive' });
-    } else {
+    const result = await copyToPersonal(recipe.id, recipe);
+    if (result) {
       setSavedRecipeIds(prev => new Set(prev).add(recipe.id));
       toast({ title: 'Recipe saved to your collection' });
-
-      // Record engagement event (fire-and-forget)
-      supabase.from('recipe_engagement').insert({
-        recipe_id: recipe.id,
-        user_id: user.id,
-        event_type: 'save',
-      }).then(() => {});
-
-      // Notify creator (fire-and-forget)
-      if (profile?.userId && profile.userId !== user.id) {
-        supabase.from('notifications').insert({
-          user_id: profile.userId,
-          type: 'recipe_saved',
-          data: {
-            recipe_id: recipe.id,
-            recipe_title: recipe.title,
-          },
-        }).then(() => {});
-      }
+    } else {
+      toast({ title: 'Failed to save recipe', variant: 'destructive' });
     }
     setIsSavingRecipe(false);
   };
@@ -442,233 +398,245 @@ export default function CreatorProfilePage() {
         </div>
       </div>
 
-      {/* Content sections */}
-      <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 space-y-10">
-        {/* Shared meal plans */}
-        {sharedMealPlans.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Meal Plans
-            </h2>
-            <div className="flex overflow-x-auto gap-4 pb-2 snap-x sm:grid sm:grid-cols-2 sm:overflow-visible">
-              {sharedMealPlans.map(plan => (
-                <div key={plan.id} className="relative snap-start shrink-0 w-[280px] sm:w-auto">
-                  <Link to={`/plan/${plan.shareSlug}`}>
-                    <div
-                      className="relative h-[180px] rounded-xl overflow-hidden hover:scale-[1.02] transition-transform"
-                      style={plan.previewImageUrl
-                        ? { backgroundImage: `url(${plan.previewImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                        : { backgroundColor: '#2D6A4F' }
-                      }
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                      <div className="absolute inset-0 p-4 flex flex-col justify-end">
-                        <h3 className="font-semibold text-white line-clamp-1">
-                          {plan.title || `Week of ${format(parseISO(plan.weekStartDate), 'MMMM d, yyyy')}`}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
-                            <Calendar className="h-3 w-3" />
-                            {format(parseISO(plan.weekStartDate), 'MMM d')}
-                          </Badge>
-                          <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
-                            <UtensilsCrossed className="h-3 w-3" />
-                            {plan.itemCount} meal{plan.itemCount !== 1 ? 's' : ''}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                  {isOwnProfile && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          onClick={(e) => e.preventDefault()}
-                          className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setConfirmAction({ type: 'meal-plan', id: plan.id, title: plan.title || 'this meal plan' })}>
-                          <EyeOff className="h-4 w-4 mr-2" />
-                          Make Private
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Empty meal plan state */}
-        {sharedMealPlans.length === 0 && isOwnProfile && (
-          <section>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Meal Plans
-            </h2>
-            <div className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground">
-              No plans shared yet — share a meal plan from your planner to show it here.
-            </div>
-          </section>
-        )}
-
-        {/* Public recipes */}
-        {publicRecipes.length > 0 && (() => {
-          const shouldBlur = !isOwnProfile && !isFollowing;
-          const visibleCount = shouldBlur ? Math.min(6, publicRecipes.length) : publicRecipes.length;
-          const visibleRecipes = publicRecipes.slice(0, visibleCount);
-          const blurredRecipes = shouldBlur ? publicRecipes.slice(visibleCount) : [];
-
-          return (
-            <section>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <UtensilsCrossed className="h-5 w-5" />
-                Recipes
-              </h2>
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                {visibleRecipes.map(recipe => (
-                  <Card key={recipe.id} className="overflow-hidden relative group cursor-pointer" onClick={() => setSelectedRecipe(recipe)}>
-                    {recipe.imageUrl ? (
-                      <div className="aspect-[4/3] overflow-hidden">
-                        <img
-                          src={recipe.imageUrl}
-                          alt={recipe.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                        <UtensilsCrossed className="h-8 w-8 text-muted-foreground/30" />
-                      </div>
-                    )}
-                    {recipe.sourceUrl && (
-                      <a
-                        href={recipe.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="absolute top-2 left-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                    {(recipeStats.get(recipe.id)?.saveCount ?? 0) > 0 && (
-                      <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
-                        <BookmarkPlus className="h-3 w-3" />
-                        {recipeStats.get(recipe.id)!.saveCount}
-                      </Badge>
-                    )}
-                    <CardContent className="p-3">
-                      <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{recipe.title}</h3>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
-                        {recipe.totalTime && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {recipe.totalTime}m
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {recipe.servings}
-                        </span>
-                      </div>
-                      {recipe.tags && recipe.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {recipe.tags.slice(0, 3).map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                    {isOwnProfile && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors">
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setConfirmAction({ type: 'recipe', id: recipe.id, title: recipe.title })}>
-                            <EyeOff className="h-4 w-4 mr-2" />
-                            Make Private
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </Card>
-                ))}
-                {blurredRecipes.length > 0 && (
-                  <div className="col-span-full bg-muted/40 rounded-lg p-3 flex items-center justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
-                      Follow @{profile.username} to see all {publicRecipes.length} recipes
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={handleFollowClick}
-                      className="gap-1.5 bg-[#2D6A4F] hover:bg-[#245A42] text-white shrink-0"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      Follow
-                    </Button>
-                  </div>
-                )}
-                {blurredRecipes.map(recipe => (
-                  <div key={recipe.id} className="relative">
-                    <Card className="overflow-hidden blur-[6px] pointer-events-none select-none">
-                      {recipe.imageUrl ? (
-                        <div className="aspect-[4/3] overflow-hidden">
-                          <img src={recipe.imageUrl} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ) : (
-                        <div className="aspect-[4/3] bg-muted" />
-                      )}
-                      <CardContent className="p-3">
-                        <h3 className="font-semibold text-sm line-clamp-2">{recipe.title}</h3>
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            --m
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            --
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
-                      <Lock className="h-5 w-5 text-muted-foreground mb-1" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {shouldBlur && blurredRecipes.length > 0 && (
-                <div className="flex justify-center mt-6">
-                  <Button
-                    onClick={handleFollowClick}
-                    className="gap-2 bg-[#2D6A4F] hover:bg-[#245A42] text-white transition-transform hover:scale-105"
-                  >
-                    <Lock className="h-4 w-4" />
-                    Follow to unlock all recipes
-                  </Button>
-                </div>
-              )}
-            </section>
-          );
-        })()}
-
-        {sharedMealPlans.length === 0 && publicRecipes.length === 0 && !isOwnProfile && (
+      {/* Content tabs */}
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-6">
+        {sharedMealPlans.length === 0 && publicRecipes.length === 0 && !isOwnProfile ? (
           <div className="text-center py-12 text-muted-foreground">
             <ChefHat className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>This creator hasn't shared any content yet.</p>
           </div>
+        ) : (
+          <Tabs defaultValue="recipes">
+            <TabsList className="mb-6">
+              <TabsTrigger value="recipes" className="gap-1.5">
+                <UtensilsCrossed className="h-4 w-4" />
+                Recipes
+                {publicRecipes.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{publicRecipes.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="meal-plans" className="gap-1.5">
+                <Calendar className="h-4 w-4" />
+                Meal Plans
+                {sharedMealPlans.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{sharedMealPlans.length}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Recipes tab */}
+            <TabsContent value="recipes">
+              {publicRecipes.length > 0 ? (() => {
+                const shouldBlur = !isOwnProfile && !isFollowing;
+                const visibleCount = shouldBlur ? Math.min(6, publicRecipes.length) : publicRecipes.length;
+                const visibleRecipes = publicRecipes.slice(0, visibleCount);
+                const blurredRecipes = shouldBlur ? publicRecipes.slice(visibleCount) : [];
+
+                return (
+                  <>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+                      {visibleRecipes.map(recipe => (
+                        <Card key={recipe.id} className="overflow-hidden relative group cursor-pointer" onClick={() => setSelectedRecipe(recipe)}>
+                          {recipe.imageUrl ? (
+                            <div className="aspect-[4/3] overflow-hidden">
+                              <img
+                                src={recipe.imageUrl}
+                                alt={recipe.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                              <UtensilsCrossed className="h-8 w-8 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          {recipe.sourceUrl && (
+                            <a
+                              href={recipe.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute top-2 left-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                          {(recipeStats.get(recipe.id)?.saveCount ?? 0) > 0 && (
+                            <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                              <BookmarkPlus className="h-3 w-3" />
+                              {recipeStats.get(recipe.id)!.saveCount}
+                            </Badge>
+                          )}
+                          <CardContent className="p-3">
+                            <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{recipe.title}</h3>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
+                              {recipe.totalTime && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {recipe.totalTime}m
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {recipe.servings}
+                              </span>
+                            </div>
+                            {recipe.tags && recipe.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {recipe.tags.slice(0, 3).map(tag => (
+                                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                          {isOwnProfile && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors">
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setConfirmAction({ type: 'recipe', id: recipe.id, title: recipe.title })}>
+                                  <EyeOff className="h-4 w-4 mr-2" />
+                                  Make Private
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </Card>
+                      ))}
+                      {blurredRecipes.length > 0 && (
+                        <div className="col-span-full bg-muted/40 rounded-lg p-3 flex items-center justify-between gap-3">
+                          <p className="text-sm text-muted-foreground">
+                            Follow @{profile.username} to see all {publicRecipes.length} recipes
+                          </p>
+                          <Button
+                            size="sm"
+                            onClick={handleFollowClick}
+                            className="gap-1.5 bg-[#2D6A4F] hover:bg-[#245A42] text-white shrink-0"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            Follow
+                          </Button>
+                        </div>
+                      )}
+                      {blurredRecipes.map(recipe => (
+                        <div key={recipe.id} className="relative">
+                          <Card className="overflow-hidden blur-[6px] pointer-events-none select-none">
+                            {recipe.imageUrl ? (
+                              <div className="aspect-[4/3] overflow-hidden">
+                                <img src={recipe.imageUrl} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="aspect-[4/3] bg-muted" />
+                            )}
+                            <CardContent className="p-3">
+                              <h3 className="font-semibold text-sm line-clamp-2">{recipe.title}</h3>
+                              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  --m
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  --
+                                </span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
+                            <Lock className="h-5 w-5 text-muted-foreground mb-1" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {shouldBlur && blurredRecipes.length > 0 && (
+                      <div className="flex justify-center mt-6">
+                        <Button
+                          onClick={handleFollowClick}
+                          className="gap-2 bg-[#2D6A4F] hover:bg-[#245A42] text-white transition-transform hover:scale-105"
+                        >
+                          <Lock className="h-4 w-4" />
+                          Follow to unlock all recipes
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (
+                <div className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground">
+                  {isOwnProfile
+                    ? 'No recipes shared yet — use "Share to Profile" from any recipe\'s menu to show it here.'
+                    : `@${profile.username} hasn't shared any recipes yet.`}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Meal Plans tab */}
+            <TabsContent value="meal-plans">
+              {sharedMealPlans.length > 0 ? (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {sharedMealPlans.map(plan => (
+                    <div key={plan.id} className="relative">
+                      <Link to={`/plan/${plan.shareSlug}`}>
+                        <div
+                          className="relative h-[180px] rounded-xl overflow-hidden hover:scale-[1.02] transition-transform"
+                          style={plan.previewImageUrl
+                            ? { backgroundImage: `url(${plan.previewImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                            : { backgroundColor: '#2D6A4F' }
+                          }
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                          <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                            <h3 className="font-semibold text-white line-clamp-1">
+                              {plan.title || `Week of ${format(parseISO(plan.weekStartDate), 'MMMM d, yyyy')}`}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
+                                <Calendar className="h-3 w-3" />
+                                {format(parseISO(plan.weekStartDate), 'MMM d')}
+                              </Badge>
+                              <Badge className="bg-white/20 text-white border-0 text-xs gap-1 backdrop-blur-sm">
+                                <UtensilsCrossed className="h-3 w-3" />
+                                {plan.itemCount} meal{plan.itemCount !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                      {isOwnProfile && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              onClick={(e) => e.preventDefault()}
+                              className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setConfirmAction({ type: 'meal-plan', id: plan.id, title: plan.title || 'this meal plan' })}>
+                              <EyeOff className="h-4 w-4 mr-2" />
+                              Make Private
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground">
+                  {isOwnProfile
+                    ? 'No plans shared yet — share a meal plan from your planner to show it here.'
+                    : `@${profile.username} hasn't shared any meal plans yet.`}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
       </div>
 

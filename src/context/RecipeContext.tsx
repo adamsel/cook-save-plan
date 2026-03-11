@@ -48,7 +48,7 @@ interface RecipeContextType {
   toggleFavorite: (id: string) => Promise<void>;
   toggleArchive: (id: string) => Promise<void>;
   makeRecipePublic: (id: string, isPublic: boolean) => Promise<boolean>;
-  copyToPersonal: (recipeId: string) => Promise<Recipe | null>;
+  copyToPersonal: (recipeId: string, externalRecipe?: Recipe) => Promise<Recipe | null>;
 
   // Sharing Actions
   shareRecipe: (recipeId: string, email: string, canEdit?: boolean) => Promise<{ error: string | null; shared: boolean; pending: boolean }>;
@@ -183,9 +183,9 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const copyToPersonal = async (recipeId: string) => {
+  const copyToPersonal = async (recipeId: string, externalRecipe?: Recipe) => {
     if (user) {
-      return await recipesData.copyToPersonal(recipeId);
+      return await recipesData.copyToPersonal(recipeId, externalRecipe);
     }
     return null;
   };

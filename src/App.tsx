@@ -32,6 +32,7 @@ const SharedMealPlanPage = lazy(() => import("@/pages/SharedMealPlanPage"));
 const CreatorProfilePage = lazy(() => import("@/pages/CreatorProfilePage"));
 const DiscoverPage = lazy(() => import("@/pages/DiscoverPage"));
 const PublicRecipePage = lazy(() => import("@/pages/PublicRecipePage"));
+const CreatorDashboardPage = lazy(() => import("@/pages/CreatorDashboardPage"));
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,7 @@ const App = () => {
                           <Route path="/meal-plan" element={<MealPlanPage />} />
                           <Route path="/shopping-list" element={<ShoppingListPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
+                          <Route path="/creator/dashboard" element={<CreatorDashboardPage />} />
                           <Route path="/discover" element={<DiscoverPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>

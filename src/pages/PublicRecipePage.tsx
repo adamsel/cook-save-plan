@@ -11,7 +11,9 @@ import {
   BookmarkPlus, ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useRecipes } from '@/context/RecipeContext';
 import { PublicNav } from '@/components/layout/PublicNav';
+import { ReviewSection } from '@/components/recipes/ReviewSection';
 
 export default function PublicRecipePage() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ export default function PublicRecipePage() {
   const { user } = useAuth();
   const { recipe, creator, isLoading, error } = usePublicRecipe(id);
   const { toast } = useToast();
+  const { copyToPersonal } = useRecipes();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -66,59 +69,12 @@ export default function PublicRecipePage() {
 
     setSaving(true);
     try {
-      // Import the hook dynamically to avoid provider issues on public page
-      const { supabase } = await import('@/integrations/supabase/client');
-
-      const { error: insertError } = await supabase
-        .from('recipes')
-        .insert({
-          user_id: user.id,
-          title: recipe.title,
-          source_url: recipe.sourceUrl || null,
-          image_url: recipe.imageUrl || null,
-          description: recipe.description || null,
-          category: recipe.category || 'Other',
-          tags: recipe.tags || [],
-          prep_time: recipe.prepTime || null,
-          cook_time: recipe.cookTime || null,
-          total_time: recipe.totalTime || null,
-          servings: recipe.servings,
-          ingredients: recipe.ingredients as unknown as Record<string, unknown>[],
-          instructions: recipe.instructions,
-          cuisine: recipe.cuisine || null,
-          dietary: recipe.dietary || [],
-          meal_types: recipe.mealTypes || [],
-          author: recipe.author || creator?.displayName || null,
-          nutrition: recipe.nutrition as unknown as Record<string, unknown> || null,
-          import_method: 'manual',
-          original_recipe_id: recipe.id,
-        });
-
-      if (insertError) {
-        toast({ title: 'Error', description: 'Could not save recipe. Please try again.', variant: 'destructive' });
-      } else {
+      const result = await copyToPersonal(recipe.id, recipe);
+      if (result) {
         setSaved(true);
         toast({ title: 'Recipe saved!', description: 'Added to your stash.' });
-
-        // Record engagement event (fire-and-forget)
-        supabase.from('recipe_engagement').insert({
-          recipe_id: recipe.id,
-          user_id: user.id,
-          event_type: 'save',
-        }).then(() => {});
-
-        // Notify original recipe creator (fire-and-forget)
-        if (creator?.userId && creator.userId !== user.id) {
-          supabase.from('notifications').insert({
-            user_id: creator.userId,
-            type: 'recipe_saved',
-            data: {
-              recipe_id: recipe.id,
-              recipe_title: recipe.title,
-              saver_name: 'A user',
-            },
-          }).then(() => {});
-        }
+      } else {
+        toast({ title: 'Error', description: 'Could not save recipe. Please try again.', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Something went wrong.', variant: 'destructive' });
@@ -301,6 +257,11 @@ export default function PublicRecipePage() {
             </div>
           </div>
         )}
+
+        {/* Reviews */}
+        <div className="mt-8">
+          <ReviewSection recipeId={recipe.id} recipeOwnerId={creator?.userId} />
+        </div>
 
         {/* Source link */}
         {recipe.sourceUrl && (

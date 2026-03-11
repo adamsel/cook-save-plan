@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu, Bell, UserPlus, Copy, CheckCheck, Compass, BookmarkPlus } from 'lucide-react';
+import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu, Bell, UserPlus, Copy, CheckCheck, Compass, BookmarkPlus, Star, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -191,12 +191,13 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                         )}
                         onClick={() => {
                           if (!notification.read) markAsRead(notification.id);
-                          if (notification.type === 'new_follower' && notification.data.follower_id) {
-                            setNotificationsOpen(false);
-                          } else if (notification.type === 'plan_cloned' && notification.data.meal_plan_id) {
-                            setNotificationsOpen(false);
-                          } else if (notification.type === 'recipe_saved') {
-                            setNotificationsOpen(false);
+                          setNotificationsOpen(false);
+                          if (notification.type === 'new_content' && notification.data.content_type === 'recipe') {
+                            navigate(`/recipe/${notification.data.content_id}`);
+                          } else if (notification.type === 'new_content' && notification.data.content_type === 'meal_plan') {
+                            // Could navigate to plan if we had a route
+                          } else if (notification.type === 'new_review' && notification.data.recipe_id) {
+                            navigate(`/recipe/${notification.data.recipe_id}`);
                           }
                         }}
                       >
@@ -205,6 +206,10 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                             <UserPlus className="h-4 w-4 text-primary" />
                           ) : notification.type === 'recipe_saved' ? (
                             <BookmarkPlus className="h-4 w-4 text-primary" />
+                          ) : notification.type === 'new_content' ? (
+                            <UtensilsCrossed className="h-4 w-4 text-primary" />
+                          ) : notification.type === 'new_review' ? (
+                            <Star className="h-4 w-4 text-amber-400" />
                           ) : (
                             <Copy className="h-4 w-4 text-primary" />
                           )}
@@ -215,6 +220,10 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                               ? <><span className="font-medium">{notification.data.follower_name}</span> started following you</>
                               : notification.type === 'recipe_saved'
                               ? <><span className="font-medium">{notification.data.saver_name || 'Someone'}</span> saved your recipe: {notification.data.recipe_title}</>
+                              : notification.type === 'new_content'
+                              ? <><span className="font-medium">{notification.data.creator_name}</span> shared a new {notification.data.content_type === 'meal_plan' ? 'meal plan' : 'recipe'}: {notification.data.content_title}</>
+                              : notification.type === 'new_review'
+                              ? <><span className="font-medium">{notification.data.reviewer_name}</span> rated your recipe {notification.data.rating} stars: {notification.data.recipe_title}</>
                               : <><span className="font-medium">{notification.data.cloner_name}</span> saved your meal plan: {notification.data.plan_title}</>
                             }
                           </p>
@@ -261,6 +270,12 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                   <UtensilsCrossed className="mr-2 h-4 w-4" />
                   My Recipes
                 </DropdownMenuItem>
+                {profile?.is_creator && (
+                  <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Creator Dashboard
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
