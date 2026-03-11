@@ -1,12 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useCreatorDashboard } from '@/hooks/useCreatorDashboard';
-import { Navigation } from '@/components/layout/Navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Loader2, Users, Eye, BookmarkPlus, Copy, UtensilsCrossed, Calendar,
-  TrendingUp, ArrowUpRight,
+  TrendingUp, ArrowUpRight, ChefHat, Settings,
 } from 'lucide-react';
 
 export default function CreatorDashboardPage() {
@@ -14,19 +14,31 @@ export default function CreatorDashboardPage() {
   const { user, profile } = useAuth();
   const { overview, recipeStats, planStats, isLoading } = useCreatorDashboard();
 
-  // Guard: redirect if not a creator
+  // Show setup prompt if not a creator
   if (!isLoading && profile && !profile.is_creator) {
-    navigate('/settings', { replace: true });
-    return null;
+    return (
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-16">
+        <div className="flex flex-col items-center text-center max-w-md mx-auto space-y-4">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <ChefHat className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">Become a Creator</h1>
+          <p className="text-muted-foreground">
+            Set up your creator profile to share recipes and meal plans with your followers, and track how your content performs.
+          </p>
+          <Button onClick={() => navigate('/settings')} className="gap-2">
+            <Settings className="h-4 w-4" />
+            Set Up Creator Profile
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (isLoading || !overview) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="flex items-center justify-center pt-24">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      <div className="flex items-center justify-center pt-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -40,8 +52,6 @@ export default function CreatorDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 space-y-8">
         <div>
           <h1 className="text-2xl font-bold">Creator Dashboard</h1>

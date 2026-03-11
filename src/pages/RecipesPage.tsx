@@ -575,9 +575,6 @@ export default function RecipesPage() {
                         )}
                       </div>
                     )}
-                    <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px] gap-1">
-                      {item.contentType === 'recipe' ? 'Recipe' : 'Meal Plan'}
-                    </Badge>
                     {item.saveCount > 0 && (
                       <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
                         <BookmarkPlus className="h-3 w-3" />
@@ -585,8 +582,8 @@ export default function RecipesPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="p-3">
-                    <p className="font-medium text-sm line-clamp-2 leading-snug">{item.title}</p>
+                  <div className="p-3 min-h-[110px] flex flex-col">
+                    <p className="font-medium text-sm line-clamp-2 leading-snug min-h-[2.5rem]">{item.title}</p>
                     <div className="flex items-center gap-2 mt-1.5">
                       <Avatar className="h-5 w-5">
                         <AvatarImage src={item.creatorAvatarUrl || undefined} />
@@ -598,22 +595,29 @@ export default function RecipesPage() {
                         {item.creatorDisplayName || `@${item.creatorUsername}`}
                       </span>
                     </div>
-                    {item.contentType === 'recipe' && (
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                        {item.totalTime && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {item.totalTime}m
-                          </span>
-                        )}
-                        {item.servings && (
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {item.servings}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 mt-auto pt-1.5 text-xs text-muted-foreground">
+                      {item.contentType === 'meal_plan' ? (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Meal Plan
+                        </span>
+                      ) : (
+                        <>
+                          {item.totalTime && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {item.totalTime}m
+                            </span>
+                          )}
+                          {item.servings && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {item.servings}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))}

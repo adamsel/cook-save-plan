@@ -187,15 +187,21 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                         key={notification.id}
                         className={cn(
                           "flex items-start gap-3 p-3 cursor-pointer",
-                          !notification.read && "bg-primary/5"
+                          !notification.read && "bg-muted"
                         )}
                         onClick={() => {
                           if (!notification.read) markAsRead(notification.id);
                           setNotificationsOpen(false);
-                          if (notification.type === 'new_content' && notification.data.content_type === 'recipe') {
+                          if (notification.type === 'new_follower' && notification.data.follower_username) {
+                            navigate(`/creator/${notification.data.follower_username}`);
+                          } else if (notification.type === 'recipe_saved') {
+                            navigate('/recipes');
+                          } else if (notification.type === 'plan_cloned') {
+                            navigate('/meal-plan');
+                          } else if (notification.type === 'new_content' && notification.data.content_type === 'recipe') {
                             navigate(`/recipe/${notification.data.content_id}`);
                           } else if (notification.type === 'new_content' && notification.data.content_type === 'meal_plan') {
-                            // Could navigate to plan if we had a route
+                            navigate('/meal-plan');
                           } else if (notification.type === 'new_review' && notification.data.recipe_id) {
                             navigate(`/recipe/${notification.data.recipe_id}`);
                           }
@@ -270,7 +276,7 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                   <UtensilsCrossed className="mr-2 h-4 w-4" />
                   My Recipes
                 </DropdownMenuItem>
-                {profile?.is_creator && (
+                {profile?.username && (
                   <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Creator Dashboard

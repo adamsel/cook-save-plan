@@ -49,8 +49,12 @@ export function useFollowCreator(creatorUserId: string | undefined) {
       if (error) throw error;
 
       // Notify the creator (fire-and-forget)
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const followerName = currentUser?.user_metadata?.display_name || currentUser?.email || 'Someone';
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('user_id', currentUserId)
+        .single();
+      const followerName = profileData?.display_name || profileData?.username || 'Someone';
       supabase
         .from('notifications')
         .insert({
@@ -59,6 +63,7 @@ export function useFollowCreator(creatorUserId: string | undefined) {
           data: {
             follower_name: followerName,
             follower_id: currentUserId,
+            follower_username: profileData?.username || '',
           },
         })
         .then(() => {});
