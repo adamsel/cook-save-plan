@@ -18,11 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock, UserPlus, UserCheck, BookmarkPlus } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock, UserPlus, UserCheck, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useRecipes } from '@/context/RecipeContext';
 import { Navigation } from '@/components/layout/Navigation';
 import { PublicNav } from '@/components/layout/PublicNav';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfWeek, addWeeks, addDays } from 'date-fns';
 import { Recipe } from '@/types/recipe';
 
 export default function SharedMealPlanPage() {
@@ -34,10 +35,13 @@ export default function SharedMealPlanPage() {
   const { cloneMealPlan, isCloning, getDefaultTargetWeek } = useCloneMealPlan();
   const { isFollowing, follow, unfollow, isLoading: followLoading } = useFollowCreator(creator?.userId);
   const { toast } = useToast();
+  const { refreshMealPlans } = useRecipes();
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [cloneComplete, setCloneComplete] = useState(false);
   const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
   const [isSavingRecipe, setIsSavingRecipe] = useState(false);
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const [cloneWeekOffset, setCloneWeekOffset] = useState(1); // default: next week
 
   // Record view (debounced per session to avoid duplicates)
   useEffect(() => {
@@ -63,14 +67,15 @@ export default function SharedMealPlanPage() {
     const pendingClone = localStorage.getItem('pendingMealPlanClone');
     if (pendingClone === shareSlug) {
       localStorage.removeItem('pendingMealPlanClone');
-      handleClone();
+      // Open week picker for the user to choose
+      setCloneWeekOffset(1);
+      setWeekPickerOpen(true);
     }
   }, [user, mealPlan]);
 
-  const handleClone = async () => {
+  const handleClone = async (targetWeek: string, weekOffset: number) => {
     if (!mealPlan) return;
 
-    const targetWeek = getDefaultTargetWeek();
     const result = await cloneMealPlan(mealPlan.items, recipes, targetWeek, {
       id: mealPlan.id,
       creatorUserId: creator?.userId || '',
@@ -78,18 +83,30 @@ export default function SharedMealPlanPage() {
     });
     if (result) {
       setCloneComplete(true);
+      // Set the week offset so MealPlanPage opens to the correct week
+      localStorage.setItem('mealPlanWeekOffset', JSON.stringify(weekOffset));
+      // Refresh meal plan data so it's available when we navigate
+      await refreshMealPlans();
       setTimeout(() => navigate('/meal-plan'), 1500);
     }
   };
 
   const handleGetPlan = () => {
     if (user) {
-      handleClone();
+      setCloneWeekOffset(1); // reset to next week
+      setWeekPickerOpen(true);
     } else {
       // Store pending action and redirect to auth
       localStorage.setItem('pendingMealPlanClone', shareSlug || '');
       navigate(`/auth?redirect=/plan/${shareSlug}`);
     }
+  };
+
+  const handleConfirmClone = () => {
+    const targetWeekStart = startOfWeek(addWeeks(new Date(), cloneWeekOffset), { weekStartsOn: 1 });
+    const targetWeek = format(targetWeekStart, 'yyyy-MM-dd');
+    setWeekPickerOpen(false);
+    handleClone(targetWeek, cloneWeekOffset);
   };
 
   const saveIndividualRecipe = async (recipe: Recipe) => {
@@ -406,6 +423,72 @@ export default function SharedMealPlanPage() {
           </Button>
         </div>
       </div>
+
+      {/* Week picker Dialog */}
+      <Dialog open={weekPickerOpen} onOpenChange={setWeekPickerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Choose a week
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Which week should this meal plan be added to?
+          </p>
+          <div className="flex items-center justify-center gap-3 py-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCloneWeekOffset(prev => Math.max(0, prev - 1))}
+              disabled={cloneWeekOffset === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-center min-w-[180px]">
+              {(() => {
+                const weekStart = startOfWeek(addWeeks(new Date(), cloneWeekOffset), { weekStartsOn: 1 });
+                return (
+                  <>
+                    <div className="text-sm font-medium">
+                      {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d')}
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] mt-1">
+                      {cloneWeekOffset === 0 ? 'This week' : cloneWeekOffset === 1 ? 'Next week' : `In ${cloneWeekOffset} weeks`}
+                    </Badge>
+                  </>
+                );
+              })()}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCloneWeekOffset(prev => prev + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            className="w-full gap-2"
+            onClick={handleConfirmClone}
+            disabled={isCloning}
+          >
+            {isCloning ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Adding to your plan...
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4" />
+                Add to this week
+              </>
+            )}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {/* Recipe detail Dialog */}
       <Dialog open={!!selectedRecipe} onOpenChange={(open) => !open && setSelectedRecipe(null)}>

@@ -542,6 +542,9 @@ export function useMealPlansData() {
     shareMealPlan,
     unshareMealPlan,
     getMealPlanShareInfo,
-    refresh: fetchMealPlans,
+    refresh: async () => {
+      const plans = await fetchMealPlans();
+      setMealPlans(plans);
+    },
   };
 }
