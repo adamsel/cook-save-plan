@@ -264,16 +264,19 @@ export function useMealPlansData() {
         : mp
     ));
 
-    // Record engagement for public recipes (fire-and-forget)
+    // Record engagement for plan_add (fire-and-forget)
+    // If this is a copied recipe, record against the original so the creator sees it
     supabase
       .from('recipes')
-      .select('is_public')
+      .select('is_public, original_recipe_id')
       .eq('id', recipeId)
       .single()
       .then(({ data: recipeData }) => {
-        if (recipeData?.is_public) {
+        if (!recipeData) return;
+        const targetRecipeId = recipeData.original_recipe_id || (recipeData.is_public ? recipeId : null);
+        if (targetRecipeId) {
           supabase.from('recipe_engagement').insert({
-            recipe_id: recipeId,
+            recipe_id: targetRecipeId,
             user_id: user.id,
             event_type: 'plan_add',
           }).then(() => {});

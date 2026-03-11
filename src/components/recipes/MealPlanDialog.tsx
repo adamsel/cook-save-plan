@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Recipe, DAYS_OF_WEEK, MEAL_SLOTS, DisplayMealItem, MealSlot, DayOfWeek } from '@/types/recipe';
 import { useRecipes } from '@/context/RecipeContext';
 import { useHouseholdSettings } from '@/hooks/useHouseholdSettings';
@@ -7,10 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar, Clock, Users, Flame, Utensils } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Clock, Users, Flame, Utensils, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 
 interface MealPlanDialogProps {
   open: boolean;
@@ -26,8 +29,21 @@ export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, we
   const { addToMealPlan, updateMealPlanItem } = useRecipes();
   const { toast } = useToast();
   const { householdSize } = useHouseholdSettings();
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Reset week offset when dialog opens
+  useEffect(() => {
+    if (open) setWeekOffset(0);
+  }, [open]);
 
   if (!recipe) return null;
+
+  const hasWeekData = displayItemsMap && displayItemsMap.size > 0;
+
+  // When parent provides weekStartDate (MealPlanPage), use it directly.
+  // Otherwise compute from weekOffset (RecipesPage fallback).
+  const effectiveWeekStart = weekStartDate
+    ?? startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
 
   const handleAddToSlot = async (day: DayOfWeek, slot: MealSlot) => {
     // If parent wants to handle slot selection (e.g., for linked recipes prompt)
@@ -38,7 +54,7 @@ export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, we
     }
 
     // Direct add (fallback behavior)
-    const weekStartStr = weekStartDate ? format(weekStartDate, 'yyyy-MM-dd') : undefined;
+    const weekStartStr = format(effectiveWeekStart, 'yyyy-MM-dd');
     const result = await addToMealPlan(recipe.id, day, slot, weekStartStr);
 
     // Auto-adjust servings and leftovers based on household size
@@ -90,8 +106,6 @@ export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, we
     if (!displayItemsMap) return [];
     return displayItemsMap.get(`${day}-${slot}`) || [];
   };
-
-  const hasWeekData = displayItemsMap && displayItemsMap.size > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,17 +237,45 @@ export function MealPlanDialog({ open, onOpenChange, recipe, displayItemsMap, we
             </div>
           </div>
         ) : (
-          /* Fallback: List View (no week data) */
+          /* Fallback: List View with Week Picker */
           <div className="space-y-3 mt-2">
+            {/* Week picker */}
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setWeekOffset(prev => prev - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-center min-w-[160px]">
+                <div className="text-sm font-medium">
+                  {format(effectiveWeekStart, 'MMM d')} – {format(addDays(effectiveWeekStart, 6), 'MMM d')}
+                </div>
+                {weekOffset === 0 && (
+                  <Badge variant="secondary" className="text-[10px] mt-0.5">This week</Badge>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setWeekOffset(prev => prev + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
             <p className="text-xs text-muted-foreground text-center">
               Choose when to have this recipe
             </p>
 
             <div className="grid gap-2">
-              {DAYS_OF_WEEK.map(day => (
+              {DAYS_OF_WEEK.map((day, idx) => (
                 <div key={day} className="flex items-center gap-2">
-                  <span className="w-10 text-xs font-medium capitalize text-muted-foreground">
-                    {day.slice(0, 3)}
+                  <span className="w-14 text-xs font-medium text-muted-foreground">
+                    {day.slice(0, 3).toUpperCase()} {format(addDays(effectiveWeekStart, idx), 'd')}
                   </span>
                   <div className="flex gap-1.5 flex-1">
                     {MEAL_SLOTS.map(slot => (

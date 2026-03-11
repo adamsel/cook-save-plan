@@ -90,16 +90,18 @@ export default function MealPlanPage() {
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(
-    new Set(MEAL_SLOTS as unknown as string[])
+  const [expandedSlotsArray, setExpandedSlotsArray] = useLocalStorage<string[]>(
+    'mealplan-expanded-slots',
+    [...MEAL_SLOTS]
   );
+  const expandedSlots = new Set(expandedSlotsArray);
 
   const toggleSlot = (slot: string) => {
-    setExpandedSlots(prev => {
+    setExpandedSlotsArray(prev => {
       const next = new Set(prev);
       if (next.has(slot)) next.delete(slot);
       else next.add(slot);
-      return next;
+      return [...next];
     });
   };
 
