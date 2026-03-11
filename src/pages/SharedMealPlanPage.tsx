@@ -4,13 +4,23 @@ import { useSharedMealPlan } from '@/hooks/useSharedMealPlan';
 import { useCloneMealPlan } from '@/hooks/useCloneMealPlan';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { ReadOnlyMealPlanCalendar } from '@/components/recipes/ReadOnlyMealPlanCalendar';
+import { ReadOnlyDayListView } from '@/components/recipes/ReadOnlyDayListView';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock, UserPlus, UserCheck } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Loader2, Calendar, UtensilsCrossed, Clock, Users, ChefHat, Check, Lock, UserPlus, UserCheck, BookmarkPlus } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Navigation } from '@/components/layout/Navigation';
 import { PublicNav } from '@/components/layout/PublicNav';
 import { format, parseISO } from 'date-fns';
 import { Recipe } from '@/types/recipe';
@@ -19,11 +29,15 @@ export default function SharedMealPlanPage() {
   const { shareSlug } = useParams<{ shareSlug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { mealPlan, recipes, creator, isLoading, error } = useSharedMealPlan(shareSlug);
   const { cloneMealPlan, isCloning, getDefaultTargetWeek } = useCloneMealPlan();
   const { isFollowing, follow, unfollow, isLoading: followLoading } = useFollowCreator(creator?.userId);
+  const { toast } = useToast();
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [cloneComplete, setCloneComplete] = useState(false);
+  const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
+  const [isSavingRecipe, setIsSavingRecipe] = useState(false);
 
   // Record view (debounced per session to avoid duplicates)
   useEffect(() => {
@@ -76,6 +90,52 @@ export default function SharedMealPlanPage() {
       localStorage.setItem('pendingMealPlanClone', shareSlug || '');
       navigate(`/auth?redirect=/plan/${shareSlug}`);
     }
+  };
+
+  const saveIndividualRecipe = async (recipe: Recipe) => {
+    if (!user) {
+      localStorage.setItem('pendingMealPlanClone', shareSlug || '');
+      navigate(`/auth?redirect=/plan/${shareSlug}`);
+      return;
+    }
+
+    setIsSavingRecipe(true);
+    const { error: insertError } = await supabase
+      .from('recipes')
+      .insert([{
+        user_id: user.id,
+        title: recipe.title,
+        source_url: recipe.sourceUrl || null,
+        image_url: recipe.imageUrl || null,
+        description: recipe.description || null,
+        category: recipe.category || '',
+        tags: recipe.tags || [],
+        prep_time: recipe.prepTime || null,
+        cook_time: recipe.cookTime || null,
+        total_time: recipe.totalTime || null,
+        servings: recipe.servings,
+        ingredients: JSON.parse(JSON.stringify(recipe.ingredients || [])),
+        instructions: recipe.instructions || [],
+        is_favorite: false,
+        is_archived: false,
+        cuisine: recipe.cuisine || null,
+        dietary: recipe.dietary || [],
+        meal_types: recipe.mealTypes || [],
+        author: recipe.author || null,
+        nutrition: recipe.nutrition ? JSON.parse(JSON.stringify(recipe.nutrition)) : null,
+        import_method: recipe.importMethod || null,
+        is_public: false,
+        is_library: false,
+        original_recipe_id: recipe.id,
+      }]);
+
+    if (insertError) {
+      toast({ title: 'Failed to save recipe', description: insertError.message, variant: 'destructive' });
+    } else {
+      setSavedRecipeIds(prev => new Set(prev).add(recipe.id));
+      toast({ title: 'Recipe saved to your collection' });
+    }
+    setIsSavingRecipe(false);
   };
 
   const getCreatorInitials = () => {
@@ -134,10 +194,10 @@ export default function SharedMealPlanPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <PublicNav />
+      {user ? <Navigation /> : <PublicNav />}
 
       {/* Creator attribution */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 pt-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 pt-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
             <Avatar className="h-12 w-12 sm:h-14 sm:w-14 shrink-0">
@@ -206,7 +266,7 @@ export default function SharedMealPlanPage() {
           )}
         </div>
 
-        {/* Fix 2c: Plan title and metadata */}
+        {/* Plan title and metadata */}
         <div className="mt-4 sm:mt-5">
           <h1 className="font-serif text-2xl sm:text-3xl font-bold">
             {mealPlan.title || 'Weekly Meal Plan'}
@@ -236,53 +296,70 @@ export default function SharedMealPlanPage() {
         </div>
       </div>
 
-      {/* Calendar */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <ReadOnlyMealPlanCalendar
-          items={mealPlan.items}
-          recipes={recipes}
-          weekStartDate={mealPlan.weekStartDate}
-          onRecipeClick={setSelectedRecipe}
-        />
+      {/* Calendar / List view */}
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
+        {isMobile ? (
+          <ReadOnlyDayListView
+            items={mealPlan.items}
+            recipes={recipes}
+            weekStartDate={mealPlan.weekStartDate}
+            onRecipeClick={setSelectedRecipe}
+          />
+        ) : (
+          <ReadOnlyMealPlanCalendar
+            items={mealPlan.items}
+            recipes={recipes}
+            weekStartDate={mealPlan.weekStartDate}
+            onRecipeClick={setSelectedRecipe}
+          />
+        )}
       </div>
 
       {/* Recipe list */}
-      <div className="max-w-6xl mx-auto px-4 py-6 border-t">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 border-t">
         <h2 className="text-lg font-semibold mb-4">Recipes in this plan</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {recipes.map(recipe => (
             <Card
               key={recipe.id}
-              className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+              className="group overflow-hidden cursor-pointer hover:shadow-md transition-all"
               onClick={() => setSelectedRecipe(recipe)}
             >
-              {recipe.imageUrl && (
-                <div className="aspect-video overflow-hidden">
+              <div className="aspect-[4/3] overflow-hidden">
+                {recipe.imageUrl ? (
                   <img
                     src={recipe.imageUrl}
                     alt={recipe.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                </div>
-              )}
-              <CardContent className="p-4">
-                <h3 className="font-semibold line-clamp-1">{recipe.title}</h3>
-                <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/70">
+                    <UtensilsCrossed className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                )}
+              </div>
+              <CardContent className="p-3">
+                <h3 className="font-semibold text-sm line-clamp-1">{recipe.title}</h3>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground">
                   {recipe.totalTime && (
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {recipe.totalTime} min
+                      <Clock className="h-3 w-3" />
+                      {recipe.totalTime}m
                     </span>
                   )}
                   <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {recipe.servings} servings
+                    <Users className="h-3 w-3" />
+                    {recipe.servings}
                   </span>
                 </div>
-                {recipe.description && (
-                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                    {recipe.description}
-                  </p>
+                {recipe.tags && recipe.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {recipe.tags.slice(0, 3).map(tag => (
+                      <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -290,7 +367,7 @@ export default function SharedMealPlanPage() {
         </div>
       </div>
 
-      {/* Fix 2e: 3-state CTA */}
+      {/* CTA bar */}
       <div className="fixed bottom-0 left-0 right-0 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 z-40">
         <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-4">
           <div className="hidden sm:block min-w-0">
@@ -330,16 +407,13 @@ export default function SharedMealPlanPage() {
         </div>
       </div>
 
-      {/* Fix 2f: Recipe detail modal with CTA */}
-      {selectedRecipe && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-          onClick={() => setSelectedRecipe(null)}
-        >
-          <Card className="max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <CardContent className="p-6 space-y-4">
+      {/* Recipe detail Dialog */}
+      <Dialog open={!!selectedRecipe} onOpenChange={(open) => !open && setSelectedRecipe(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] p-0 overflow-hidden">
+          {selectedRecipe && (
+            <div className="overflow-y-auto max-h-[80vh]">
               {selectedRecipe.imageUrl && (
-                <div className="aspect-video rounded-lg overflow-hidden">
+                <div className="aspect-video overflow-hidden">
                   <img
                     src={selectedRecipe.imageUrl}
                     alt={selectedRecipe.title}
@@ -347,80 +421,104 @@ export default function SharedMealPlanPage() {
                   />
                 </div>
               )}
-              <h2 className="text-xl font-bold">{selectedRecipe.title}</h2>
-              {selectedRecipe.description && (
-                <p className="text-muted-foreground">{selectedRecipe.description}</p>
-              )}
 
-              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                {selectedRecipe.totalTime && (
+              <div className="p-6 space-y-4">
+                <DialogHeader>
+                  <DialogTitle>{selectedRecipe.title}</DialogTitle>
+                </DialogHeader>
+
+                {selectedRecipe.description && (
+                  <p className="text-muted-foreground text-sm">{selectedRecipe.description}</p>
+                )}
+
+                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                  {selectedRecipe.totalTime && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" /> {selectedRecipe.totalTime} min
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" /> {selectedRecipe.totalTime} min
+                    <Users className="h-4 w-4" /> {selectedRecipe.servings} servings
                   </span>
+                </div>
+
+                {selectedRecipe.ingredients?.filter(ing => ing.item?.trim()).length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Ingredients</h3>
+                    <ul className="space-y-1 text-sm">
+                      {selectedRecipe.ingredients.filter(ing => ing.item?.trim()).map((ing, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                          <span>
+                            {ing.quantity && <span className="font-medium">{ing.quantity} </span>}
+                            {ing.unit && <span>{ing.unit} </span>}
+                            {ing.item ? (ing.item.charAt(0).toUpperCase() + ing.item.slice(1)) : ((ing as any).name || '')}
+                            {ing.notes && <span className="text-muted-foreground"> ({ing.notes})</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" /> {selectedRecipe.servings} servings
-                </span>
+
+                {selectedRecipe.instructions?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Instructions</h3>
+                    <ol className="space-y-2 text-sm list-decimal list-inside">
+                      {selectedRecipe.instructions.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-2">
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => selectedRecipe && saveIndividualRecipe(selectedRecipe)}
+                    disabled={isSavingRecipe || (selectedRecipe ? savedRecipeIds.has(selectedRecipe.id) : false)}
+                  >
+                    {selectedRecipe && savedRecipeIds.has(selectedRecipe.id) ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Saved to My Recipes
+                      </>
+                    ) : isSavingRecipe ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <BookmarkPlus className="h-4 w-4" />
+                        Save This Recipe
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => {
+                      setSelectedRecipe(null);
+                      handleGetPlan();
+                    }}
+                    disabled={isCloning || cloneComplete}
+                  >
+                    {!user ? (
+                      <>
+                        <Lock className="h-4 w-4" />
+                        Get Full Meal Plan
+                      </>
+                    ) : (
+                      'Get Full Meal Plan'
+                    )}
+                  </Button>
+                </div>
               </div>
-
-              {selectedRecipe.ingredients.filter(ing => ing.item?.trim()).length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Ingredients</h3>
-                  <ul className="space-y-1 text-sm">
-                    {selectedRecipe.ingredients.filter(ing => ing.item?.trim()).map((ing, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-muted-foreground min-w-[60px]">
-                          {ing.quantity} {ing.unit}
-                        </span>
-                        <span>{ing.item.charAt(0).toUpperCase() + ing.item.slice(1)}{ing.notes ? ` (${ing.notes})` : ''}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedRecipe.instructions.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Instructions</h3>
-                  <ol className="space-y-2 text-sm list-decimal list-inside">
-                    {selectedRecipe.instructions.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-
-              {/* CTA inside recipe modal */}
-              <Button
-                className="w-full gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRecipe(null);
-                  handleGetPlan();
-                }}
-                disabled={isCloning || cloneComplete}
-              >
-                {!user ? (
-                  <>
-                    <Lock className="h-4 w-4" />
-                    Get this plan to save all recipes
-                  </>
-                ) : (
-                  'Get this plan to save all recipes'
-                )}
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setSelectedRecipe(null)}
-              >
-                Close
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

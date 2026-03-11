@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DAYS_OF_WEEK,
   MEAL_SLOTS,
@@ -9,7 +9,11 @@ import {
   DisplayMealItem,
 } from '@/types/recipe';
 import { MealCard } from '@/components/recipes/MealCard';
-import { format, addDays, parseISO } from 'date-fns';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format, addDays, parseISO, isSameDay } from 'date-fns';
 
 interface ReadOnlyMealPlanCalendarProps {
   items: MealPlanItem[];
@@ -26,6 +30,22 @@ export function ReadOnlyMealPlanCalendar({
   householdSize = 2,
   onRecipeClick,
 }: ReadOnlyMealPlanCalendarProps) {
+  const today = new Date();
+
+  // Track which slots are expanded (all by default)
+  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(
+    new Set(MEAL_SLOTS as unknown as string[])
+  );
+
+  const toggleSlot = (slot: string) => {
+    setExpandedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(slot)) next.delete(slot);
+      else next.add(slot);
+      return next;
+    });
+  };
+
   // Build display items map (same logic as MealPlanPage)
   const displayItemsMap = useMemo(() => {
     const map = new Map<string, DisplayMealItem[]>();
@@ -104,8 +124,8 @@ export function ReadOnlyMealPlanCalendar({
   const activeSlots = useMemo(() => {
     return MEAL_SLOTS.filter(slot =>
       DAYS_OF_WEEK.some(day => {
-        const items = displayItemsMap.get(`${day}-${slot}`) || [];
-        return items.length > 0;
+        const slotItems = displayItemsMap.get(`${day}-${slot}`) || [];
+        return slotItems.length > 0;
       })
     );
   }, [displayItemsMap]);
@@ -117,49 +137,123 @@ export function ReadOnlyMealPlanCalendar({
     dinner: 'Dinner',
   };
 
+  // Count items per slot across all days
+  const getSlotItemCount = (slot: string) => {
+    return DAYS_OF_WEEK.reduce((count, day) => {
+      return count + (displayItemsMap.get(`${day}-${slot}`) || []).length;
+    }, 0);
+  };
+
   return (
     <div className="relative overflow-x-auto pl-4 sm:pl-0 scroll-smooth" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
       <div className="min-w-[700px]" style={{ scrollSnapAlign: 'start' }}>
-        {/* Day headers */}
-        <div className="grid grid-cols-7 gap-2 mb-3">
-          {DAYS_OF_WEEK.map((day, i) => (
-            <div key={day} className="text-center">
-              <div className="text-sm font-semibold capitalize">{day}</div>
-              <div className="text-xs text-muted-foreground">
-                {format(addDays(weekStart, i), 'MMM d')}
+        {/* Styled day headers */}
+        <div className="grid grid-cols-7 gap-3 mb-4">
+          {DAYS_OF_WEEK.map((day, i) => {
+            const date = addDays(weekStart, i);
+            const isToday = isSameDay(date, today);
+
+            return (
+              <div
+                key={day}
+                className={cn(
+                  "text-center p-3 rounded-2xl transition-all",
+                  isToday
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-primary/30"
+                    : "bg-card/50 hover:bg-card"
+                )}
+              >
+                <div className={cn(
+                  "text-xs font-semibold uppercase tracking-wider mb-1",
+                  isToday ? "text-primary-foreground/80" : "text-muted-foreground"
+                )}>
+                  {format(date, 'EEE')}
+                </div>
+                <div className={cn(
+                  "text-2xl font-serif font-bold",
+                  isToday ? "text-primary-foreground" : "text-foreground"
+                )}>
+                  {format(date, 'd')}
+                </div>
+                {/* Meal slot dots */}
+                <div className="flex justify-center gap-1.5 mt-2">
+                  {MEAL_SLOTS.map(slot => {
+                    const hasItems = (displayItemsMap.get(`${day}-${slot}`) || []).length > 0;
+                    return (
+                      <div
+                        key={slot}
+                        className={cn(
+                          "w-2 h-2 rounded-full transition-all",
+                          hasItems
+                            ? isToday ? "bg-primary-foreground" : "bg-primary"
+                            : isToday ? "bg-primary-foreground/30" : "bg-muted-foreground/20"
+                        )}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Meal slots */}
-        {activeSlots.map(slot => (
-          <div key={slot} className="mb-4">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
-              {slotLabels[slot]}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-              {DAYS_OF_WEEK.map(day => {
-                const cellItems = displayItemsMap.get(`${day}-${slot}`) || [];
-                return (
-                  <div key={`${day}-${slot}`} className="min-h-[60px] rounded-lg border border-border/30 bg-muted/20 p-1">
-                    {cellItems.map(displayItem => (
-                      <MealCard
-                        key={displayItem.item.id}
-                        recipe={displayItem.recipe}
-                        item={displayItem.item}
-                        isLeftover={displayItem.isLeftover}
-                        sourceLeftoverMeals={displayItem.sourceItem?.leftoverMeals}
-                        householdSize={householdSize}
-                        onClick={() => onRecipeClick?.(displayItem.recipe)}
-                      />
-                    ))}
+        {/* Collapsible meal slots */}
+        {activeSlots.map(slot => {
+          const isOpen = expandedSlots.has(slot);
+          const itemCount = getSlotItemCount(slot);
+
+          return (
+            <Collapsible key={slot} open={isOpen} onOpenChange={() => toggleSlot(slot)}>
+              <div className="mb-4">
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center gap-2 mb-2 px-1 py-1 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {slotLabels[slot]}
+                    </span>
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                      {itemCount}
+                    </Badge>
+                    <div className="flex-1 h-px bg-border/30" />
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      isOpen && "rotate-180"
+                    )} />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-7 gap-2">
+                    {DAYS_OF_WEEK.map(day => {
+                      const cellItems = displayItemsMap.get(`${day}-${slot}`) || [];
+                      return (
+                        <div
+                          key={`${day}-${slot}`}
+                          className={cn(
+                            "min-h-[60px] rounded-2xl p-1 transition-all",
+                            cellItems.length > 0
+                              ? "bg-transparent"
+                              : "border border-dashed border-muted-foreground/20 bg-muted/10"
+                          )}
+                        >
+                          {cellItems.map(displayItem => (
+                            <MealCard
+                              key={displayItem.item.id}
+                              recipe={displayItem.recipe}
+                              item={displayItem.item}
+                              isLeftover={displayItem.isLeftover}
+                              sourceLeftoverMeals={displayItem.sourceItem?.leftoverMeals}
+                              householdSize={householdSize}
+                              onClick={() => onRecipeClick?.(displayItem.recipe)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          );
+        })}
 
         {activeSlots.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">

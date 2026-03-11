@@ -8,6 +8,10 @@ interface CreatorProfile {
   avatarUrl: string | null;
   username: string;
   bio: string | null;
+  instagramHandle: string | null;
+  tiktokHandle: string | null;
+  youtubeHandle: string | null;
+  websiteUrl: string | null;
 }
 
 interface SharedMealPlanSummary {
@@ -44,7 +48,7 @@ export function useCreatorProfile(username: string | undefined) {
     // 1. Fetch the creator's profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, display_name, avatar_url, username, bio, is_creator')
+      .select('user_id, display_name, avatar_url, username, bio, is_creator, instagram_handle, tiktok_handle, youtube_handle, website_url')
       .eq('username', uname)
       .eq('is_creator', true)
       .single();
@@ -61,6 +65,10 @@ export function useCreatorProfile(username: string | undefined) {
       avatarUrl: profileData.avatar_url,
       username: profileData.username!,
       bio: profileData.bio,
+      instagramHandle: profileData.instagram_handle,
+      tiktokHandle: profileData.tiktok_handle,
+      youtubeHandle: profileData.youtube_handle,
+      websiteUrl: profileData.website_url,
     });
 
     // 2. Fetch their shared meal plans

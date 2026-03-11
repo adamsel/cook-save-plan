@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCreatorProfile } from '@/hooks/useCreatorProfile';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
@@ -9,19 +9,33 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, Eye, Copy, MoreVertical, EyeOff } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, Eye, Copy, MoreVertical, EyeOff, Camera, Instagram, Youtube, Globe, ExternalLink } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMealPlansData } from '@/hooks/useMealPlansData';
 import { useRecipesData } from '@/hooks/useRecipesData';
 import { useToast } from '@/hooks/use-toast';
 import { PublicNav } from '@/components/layout/PublicNav';
+import { Navigation } from '@/components/layout/Navigation';
 import { format, parseISO } from 'date-fns';
+import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog';
+import { Recipe } from '@/types/recipe';
+
+// TikTok icon (not in lucide)
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.78 1.54V6.84a4.84 4.84 0 0 1-1.02-.15z"/>
+    </svg>
+  );
+}
+
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
 
 export default function CreatorProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateProfile: updateAuthProfile } = useAuth();
   const { profile, sharedMealPlans, publicRecipes, isLoading, error, removeMealPlan, removeRecipe } = useCreatorProfile(username);
   const { isFollowing, followerCount, isAuthenticated, follow, unfollow, isLoading: followLoading } = useFollowCreator(profile?.userId);
 
@@ -30,7 +44,13 @@ export default function CreatorProfilePage() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ views: number; clones: number } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: 'meal-plan' | 'recipe'; id: string; title: string } | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
+  const [isSavingRecipe, setIsSavingRecipe] = useState(false);
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const { unshareMealPlan } = useMealPlansData();
   const { makeRecipePublic } = useRecipesData();
   const { toast } = useToast();
@@ -102,6 +122,112 @@ export default function CreatorProfilePage() {
     setConfirmAction(null);
   };
 
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > MAX_AVATAR_SIZE) {
+      toast({ title: 'File too large', description: 'Profile photo must be under 2MB.', variant: 'destructive' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result as string);
+    reader.readAsDataURL(file);
+
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
+
+    setIsUploadingAvatar(true);
+    const path = `${user.id}/avatar.png`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, blob, { upsert: true, contentType: 'image/png' });
+
+    if (uploadError) {
+      toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' });
+      setIsUploadingAvatar(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(path);
+
+    const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
+
+    const { error: dbError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: urlWithCacheBust })
+      .eq('user_id', user.id);
+
+    if (dbError) {
+      toast({ title: 'Failed to save', description: dbError.message, variant: 'destructive' });
+      setIsUploadingAvatar(false);
+      return;
+    }
+
+    await updateAuthProfile({ avatar_url: urlWithCacheBust });
+    toast({ title: 'Profile photo updated' });
+    setIsUploadingAvatar(false);
+  };
+
+  const saveRecipeToPersonal = async (recipe: Recipe) => {
+    if (!user) {
+      setShowAuthDialog(true);
+      return;
+    }
+
+    setIsSavingRecipe(true);
+    const { error: insertError } = await supabase
+      .from('recipes')
+      .insert([{
+        user_id: user.id,
+        title: recipe.title,
+        source_url: recipe.sourceUrl || null,
+        image_url: recipe.imageUrl || null,
+        description: recipe.description || null,
+        category: recipe.category || '',
+        tags: recipe.tags || [],
+        prep_time: recipe.prepTime || null,
+        cook_time: recipe.cookTime || null,
+        total_time: recipe.totalTime || null,
+        servings: recipe.servings,
+        ingredients: JSON.parse(JSON.stringify(recipe.ingredients || [])),
+        instructions: recipe.instructions || [],
+        is_favorite: false,
+        is_archived: false,
+        cuisine: recipe.cuisine || null,
+        dietary: recipe.dietary || [],
+        meal_types: recipe.mealTypes || [],
+        author: recipe.author || null,
+        nutrition: recipe.nutrition ? JSON.parse(JSON.stringify(recipe.nutrition)) : null,
+        import_method: recipe.importMethod || null,
+        is_public: false,
+        is_library: false,
+        original_recipe_id: recipe.id,
+      }]);
+
+    if (insertError) {
+      toast({ title: 'Failed to save recipe', description: insertError.message, variant: 'destructive' });
+    } else {
+      setSavedRecipeIds(prev => new Set(prev).add(recipe.id));
+      toast({ title: 'Recipe saved to your collection' });
+    }
+    setIsSavingRecipe(false);
+  };
+
+  const socialLinks = profile ? [
+    profile.instagramHandle && { icon: Instagram, href: `https://instagram.com/${profile.instagramHandle}`, label: 'Instagram' },
+    profile.tiktokHandle && { icon: TikTokIcon, href: `https://tiktok.com/@${profile.tiktokHandle}`, label: 'TikTok' },
+    profile.youtubeHandle && { icon: Youtube, href: `https://youtube.com/@${profile.youtubeHandle}`, label: 'YouTube' },
+    profile.websiteUrl && { icon: Globe, href: profile.websiteUrl.startsWith('http') ? profile.websiteUrl : `https://${profile.websiteUrl}`, label: 'Website' },
+  ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; href: string; label: string }[] : [];
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -131,18 +257,43 @@ export default function CreatorProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PublicNav />
+      {/* Show main nav for logged-in users, public nav for visitors */}
+      {user ? <Navigation /> : <PublicNav />}
 
       {/* Profile header */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-6">
-        {/* Avatar + name + action row */}
+      <div className="max-w-4xl mx-auto px-4 md:px-8 pt-6">
         <div className="flex items-start gap-4">
-          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
-            <AvatarImage src={profile.avatarUrl || undefined} alt={profile.displayName || profile.username} />
-            <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
+          {/* Avatar with upload overlay for own profile */}
+          <div className="relative shrink-0">
+            <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
+              <AvatarImage src={profile.avatarUrl || undefined} alt={profile.displayName || profile.username} />
+              <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+            {isOwnProfile && (
+              <>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 hover:bg-black/40 transition-colors group cursor-pointer"
+                >
+                  {isUploadingAvatar ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleAvatarFileSelect}
+                  className="hidden"
+                />
+              </>
+            )}
+          </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
@@ -212,31 +363,55 @@ export default function CreatorProfilePage() {
                 </Link>
               </p>
             ) : null}
+
+            {/* Social links */}
+            {socialLinks.length > 0 && (
+              <div className="flex items-center gap-1 mt-2">
+                {socialLinks.map(({ icon: Icon, href, label }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title={label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {isOwnProfile && socialLinks.length === 0 && (
+              <Link to="/settings" className="inline-flex items-center gap-1 mt-2 text-xs text-muted-foreground hover:text-primary">
+                <ExternalLink className="h-3 w-3" />
+                Add social links
+              </Link>
+            )}
           </div>
         </div>
 
         {/* Stats row */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-4 pb-4 border-b text-sm">
-          <span className="text-muted-foreground">
+        <div className="flex items-center gap-x-4 gap-y-1 mt-4 pb-4 border-b text-sm overflow-x-auto">
+          <span className="text-muted-foreground whitespace-nowrap">
             <span className="font-semibold text-foreground">{publicRecipes.length}</span>{' '}
             {publicRecipes.length === 1 ? 'Recipe' : 'Recipes'}
           </span>
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground whitespace-nowrap">
             <span className="font-semibold text-foreground">{sharedMealPlans.length}</span>{' '}
             {sharedMealPlans.length === 1 ? 'Plan' : 'Plans'}
           </span>
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground whitespace-nowrap">
             <span className="font-semibold text-foreground">{followerCount}</span>{' '}
             {followerCount === 1 ? 'Follower' : 'Followers'}
           </span>
           {isOwnProfile && engagementStats && (
             <>
-              <span className="text-muted-foreground flex items-center gap-1">
+              <span className="text-muted-foreground flex items-center gap-1 whitespace-nowrap">
                 <Eye className="h-3 w-3" />
                 <span className="font-semibold text-foreground">{engagementStats.views}</span>{' '}
                 Views
               </span>
-              <span className="text-muted-foreground flex items-center gap-1">
+              <span className="text-muted-foreground flex items-center gap-1 whitespace-nowrap">
                 <Copy className="h-3 w-3" />
                 <span className="font-semibold text-foreground">{engagementStats.clones}</span>{' '}
                 Saves
@@ -246,12 +421,12 @@ export default function CreatorProfilePage() {
         </div>
       </div>
 
-      {/* Content sections — unchanged */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 space-y-10">
+      {/* Content sections */}
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 space-y-10">
         {/* Shared meal plans */}
         {sharedMealPlans.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               Meal Plans
             </h2>
@@ -260,7 +435,7 @@ export default function CreatorProfilePage() {
                 <div key={plan.id} className="relative snap-start shrink-0 w-[280px] sm:w-auto">
                   <Link to={`/plan/${plan.shareSlug}`}>
                     <div
-                      className="relative h-[160px] rounded-lg overflow-hidden hover:scale-[1.02] transition-transform"
+                      className="relative h-[180px] rounded-xl overflow-hidden hover:scale-[1.02] transition-transform"
                       style={plan.previewImageUrl
                         ? { backgroundImage: `url(${plan.previewImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                         : { backgroundColor: '#2D6A4F' }
@@ -311,11 +486,11 @@ export default function CreatorProfilePage() {
         {/* Empty meal plan state */}
         {sharedMealPlans.length === 0 && isOwnProfile && (
           <section>
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               Meal Plans
             </h2>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground">
+            <div className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground">
               No plans shared yet — share a meal plan from your planner to show it here.
             </div>
           </section>
@@ -330,36 +505,60 @@ export default function CreatorProfilePage() {
 
           return (
             <section>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <UtensilsCrossed className="h-5 w-5" />
                 Recipes
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {visibleRecipes.map(recipe => (
-                  <Card key={recipe.id} className="overflow-hidden relative">
-                    {recipe.imageUrl && (
-                      <div className="aspect-video overflow-hidden">
+                  <Card key={recipe.id} className="overflow-hidden relative group cursor-pointer" onClick={() => setSelectedRecipe(recipe)}>
+                    {recipe.imageUrl ? (
+                      <div className="aspect-[4/3] overflow-hidden">
                         <img
                           src={recipe.imageUrl}
                           alt={recipe.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
+                    ) : (
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                        <UtensilsCrossed className="h-8 w-8 text-muted-foreground/30" />
+                      </div>
                     )}
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold line-clamp-1">{recipe.title}</h3>
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                    {recipe.sourceUrl && (
+                      <a
+                        href={recipe.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-2 left-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    <CardContent className="p-3">
+                      <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{recipe.title}</h3>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                         {recipe.totalTime && (
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {recipe.totalTime} min
+                            <Clock className="h-3 w-3" />
+                            {recipe.totalTime}m
                           </span>
                         )}
                         <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" />
-                          {recipe.servings} servings
+                          <Users className="h-3 w-3" />
+                          {recipe.servings}
                         </span>
                       </div>
+                      {recipe.tags && recipe.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {recipe.tags.slice(0, 3).map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                     {isOwnProfile && (
                       <DropdownMenu>
@@ -379,7 +578,7 @@ export default function CreatorProfilePage() {
                   </Card>
                 ))}
                 {blurredRecipes.length > 0 && (
-                  <div className="col-span-full bg-muted/40 rounded-lg p-3 flex items-center justify-between gap-3 -mt-1 mb-1">
+                  <div className="col-span-full bg-muted/40 rounded-lg p-3 flex items-center justify-between gap-3">
                     <p className="text-sm text-muted-foreground">
                       Follow @{profile.username} to see all {publicRecipes.length} recipes
                     </p>
@@ -396,25 +595,23 @@ export default function CreatorProfilePage() {
                 {blurredRecipes.map(recipe => (
                   <div key={recipe.id} className="relative">
                     <Card className="overflow-hidden blur-[6px] pointer-events-none select-none">
-                      {recipe.imageUrl && (
-                        <div className="aspect-video overflow-hidden">
-                          <img
-                            src={recipe.imageUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
+                      {recipe.imageUrl ? (
+                        <div className="aspect-[4/3] overflow-hidden">
+                          <img src={recipe.imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>
+                      ) : (
+                        <div className="aspect-[4/3] bg-muted" />
                       )}
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold line-clamp-1">{recipe.title}</h3>
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                      <CardContent className="p-3">
+                        <h3 className="font-semibold text-sm line-clamp-2">{recipe.title}</h3>
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            -- min
+                            <Clock className="h-3 w-3" />
+                            --m
                           </span>
                           <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            -- servings
+                            <Users className="h-3 w-3" />
+                            --
                           </span>
                         </div>
                       </CardContent>
@@ -465,7 +662,6 @@ export default function CreatorProfilePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Fix 3d: Auth dialog for unauthenticated follow */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -484,6 +680,107 @@ export default function CreatorProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Recipe detail dialog */}
+      <Dialog open={!!selectedRecipe} onOpenChange={(open) => !open && setSelectedRecipe(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] p-0 overflow-hidden">
+          {selectedRecipe && (
+            <div className="overflow-y-auto max-h-[85vh]">
+              {selectedRecipe.imageUrl && (
+                <div className="aspect-video overflow-hidden">
+                  <img src={selectedRecipe.imageUrl} alt={selectedRecipe.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <div className="p-6 space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="text-xl">{selectedRecipe.title}</DialogTitle>
+                  {selectedRecipe.description && (
+                    <DialogDescription>{selectedRecipe.description}</DialogDescription>
+                  )}
+                </DialogHeader>
+
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  {selectedRecipe.totalTime && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {selectedRecipe.totalTime} min
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    {selectedRecipe.servings} servings
+                  </span>
+                </div>
+
+                {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-sm mb-2">Ingredients</h3>
+                    <ul className="space-y-1">
+                      {selectedRecipe.ingredients.map((ing, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2">
+                          <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                          <span>
+                            {ing.quantity && <span className="font-medium">{ing.quantity} </span>}
+                            {ing.unit && <span>{ing.unit} </span>}
+                            {ing.item || (ing as any).name || ''}
+                            {ing.notes && <span className="text-muted-foreground"> ({ing.notes})</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedRecipe.instructions && selectedRecipe.instructions.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-sm mb-2">Instructions</h3>
+                    <ol className="space-y-2">
+                      {selectedRecipe.instructions.map((step, i) => (
+                        <li key={i} className="text-sm flex gap-3">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">{i + 1}</span>
+                          <span className="pt-0.5">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {!isOwnProfile && (
+                  <div className="pt-2">
+                    <Button
+                      onClick={() => saveRecipeToPersonal(selectedRecipe)}
+                      disabled={isSavingRecipe || savedRecipeIds.has(selectedRecipe.id)}
+                      className="w-full"
+                    >
+                      {savedRecipeIds.has(selectedRecipe.id) ? (
+                        'Saved to My Recipes'
+                      ) : isSavingRecipe ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save to My Recipes'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Avatar crop dialog */}
+      {cropImageSrc && (
+        <AvatarCropDialog
+          open={!!cropImageSrc}
+          onOpenChange={(open) => !open && setCropImageSrc(null)}
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCroppedUpload}
+        />
+      )}
     </div>
   );
 }

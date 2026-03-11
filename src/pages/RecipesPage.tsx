@@ -4,6 +4,8 @@ import { useRecipes } from '@/context/RecipeContext';
 import { RecipeCard } from '@/components/recipes/RecipeCard';
 import { RecipeFilters, SortOption } from '@/components/recipes/RecipeFilters';
 import { AddRecipeDialog } from '@/components/recipes/AddRecipeDialog';
+import { BulkImportDialog } from '@/components/recipes/BulkImportDialog';
+import { PremiumGate } from '@/components/PremiumGate';
 import { MealPlanDialog } from '@/components/recipes/MealPlanDialog';
 import { RecipeDetailDialog } from '@/components/recipes/RecipeDetailDialog';
 import { SpoonacularRecipeCard } from '@/components/recipes/SpoonacularRecipeCard';
@@ -14,7 +16,7 @@ import { useDiscoverCreators, type DiscoverCreator } from '@/hooks/useDiscoverCr
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck } from 'lucide-react';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -161,6 +163,9 @@ export default function RecipesPage() {
   
   // Spoonacular detail dialog state
   const [showSpoonacularDetailDialog, setShowSpoonacularDetailDialog] = useState(false);
+
+  // Bulk import dialog
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // Bulk edit state
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
@@ -450,16 +455,30 @@ export default function RecipesPage() {
           </TabsList>
         </Tabs>
 
-        {/* Bulk Edit - hide on mobile */}
-        {!isMobile && activeTab === 'personal' && filteredRecipes.length > 0 && (
-          <Button
-            variant={bulkEditMode ? 'secondary' : 'outline'}
-            size="sm"
-            onClick={() => setBulkEditMode(!bulkEditMode)}
-          >
-            <CheckSquare className="h-4 w-4 mr-2" />
-            {bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'}
-          </Button>
+        {/* Bulk actions - hide on mobile */}
+        {!isMobile && activeTab === 'personal' && (
+          <div className="flex items-center gap-2">
+            <PremiumGate feature="bulk-import">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkImport(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Import
+              </Button>
+            </PremiumGate>
+            {filteredRecipes.length > 0 && (
+              <Button
+                variant={bulkEditMode ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setBulkEditMode(!bulkEditMode)}
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                {bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -793,6 +812,11 @@ export default function RecipesPage() {
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
         editingRecipe={editingRecipe}
+      />
+
+      <BulkImportDialog
+        open={showBulkImport}
+        onOpenChange={setShowBulkImport}
       />
 
       <MealPlanDialog

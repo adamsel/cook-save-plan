@@ -1,7 +1,5 @@
-import { Ingredient, RecipeNutrition } from '@/types/recipe';
-
-export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual';
-export type ParsingConfidence = 'high' | 'medium' | 'low';
+import { Ingredient, RecipeNutrition, ImportMethod, ParsingConfidence } from '@/types/recipe';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ParsedRecipe {
   title: string;
@@ -431,44 +429,97 @@ export function parseFromText(text: string): ParsedRecipe {
   };
 }
 
+// Extract recipe via AI (Firecrawl + Gemini) — server-side, no CORS issues
+async function extractViaAI(url: string): Promise<ParsedRecipe | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('recipe-extract', {
+      body: { url },
+    });
+
+    if (error || !data?.recipe) {
+      console.warn('AI extraction failed for', url, '— error:', error, 'data:', data);
+      return null;
+    }
+
+    const r = data.recipe;
+
+    // Map AI response to ParsedRecipe format
+    const ingredients: Ingredient[] = (r.ingredients || []).map(
+      (ing: { id?: string; item: string; quantity?: number | null; unit?: string; notes?: string }, i: number) => ({
+        id: ing.id || `ing-${i}-${Date.now()}`,
+        item: ing.item || '',
+        quantity: ing.quantity ?? null,
+        unit: ing.unit || '',
+        notes: ing.notes,
+      })
+    );
+
+    return {
+      title: r.title || 'Untitled Recipe',
+      description: r.description,
+      imageUrl: r.imageUrl,
+      author: r.author,
+      prepTime: r.prepTime,
+      cookTime: r.cookTime,
+      totalTime: r.prepTime && r.cookTime ? r.prepTime + r.cookTime : undefined,
+      servings: r.servings,
+      ingredients: ingredients.filter((ing: Ingredient) => ing.item?.trim()),
+      instructions: (r.instructions || []).filter((s: string) => s?.trim()),
+      sourceUrl: r.sourceUrl || url,
+      importMethod: 'schema',
+      confidence: 'high',
+      nutrition: r.nutrition,
+    };
+  } catch (err) {
+    console.warn('AI extraction failed:', err);
+    return null;
+  }
+}
+
+// Parse HTML into a recipe (shared logic for direct fetch fallback)
+function parseHtmlToRecipe(html: string, url: string): ParsedRecipe | null {
+  const schemaData = extractJsonLdRecipe(html);
+  if (schemaData) {
+    const parsed = parseFromSchema(schemaData, url);
+    if (parsed && (parsed.ingredients.length > 0 || parsed.instructions.length > 0)) {
+      parsed.rawImportSnapshot = html.slice(0, 5000);
+      return parsed;
+    }
+  }
+
+  const domParsed = parseFromDom(html, url);
+  if (domParsed) {
+    domParsed.rawImportSnapshot = html.slice(0, 5000);
+    return domParsed;
+  }
+
+  return null;
+}
+
 // Main function to parse recipe from URL
 export async function parseRecipeFromUrl(url: string): Promise<{ recipe: ParsedRecipe | null; error?: string }> {
+  // Try AI extraction first (Firecrawl + Gemini, server-side)
+  const aiRecipe = await extractViaAI(url);
+  if (aiRecipe) return { recipe: aiRecipe };
+
+  // Fall back to direct fetch + HTML parsing (works for some CORS-friendly sites)
   try {
-    // Try to fetch the page
     const response = await fetch(url, {
-      headers: {
-        'Accept': 'text/html',
-      },
+      headers: { 'Accept': 'text/html' },
     });
-    
+
     if (!response.ok) {
       return { recipe: null, error: `Failed to fetch URL: ${response.status}` };
     }
-    
+
     const html = await response.text();
-    
-    // Step A: Try JSON-LD schema first
-    const schemaData = extractJsonLdRecipe(html);
-    if (schemaData) {
-      const parsed = parseFromSchema(schemaData, url);
-      if (parsed && (parsed.ingredients.length > 0 || parsed.instructions.length > 0)) {
-        parsed.rawImportSnapshot = html.slice(0, 5000);
-        return { recipe: parsed };
-      }
-    }
-    
-    // Step B: Try DOM heuristics
-    const domParsed = parseFromDom(html, url);
-    if (domParsed) {
-      domParsed.rawImportSnapshot = html.slice(0, 5000);
-      return { recipe: domParsed };
-    }
-    
+    const recipe = parseHtmlToRecipe(html, url);
+    if (recipe) return { recipe };
+
     return { recipe: null, error: 'Could not extract recipe from page' };
   } catch (error) {
-    // CORS or network error
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      return { recipe: null, error: 'CORS_BLOCKED' };
+      return { recipe: null, error: 'Could not extract recipe — try pasting the content instead' };
     }
     return { recipe: null, error: error instanceof Error ? error.message : 'Unknown error' };
   }

@@ -26,10 +26,13 @@ import {
   Target,
   ChevronDown,
   ChefHat,
+  Crown,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   getAllDietaryRestrictions,
@@ -51,6 +54,8 @@ export default function SettingsPage() {
   } = useDietaryPreferences();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { isPremium, checkout, manageSubscription } = useSubscription();
+  const { profile } = useAuth();
   const [searchParams] = useSearchParams();
   const creatorSectionRef = useRef<HTMLElement>(null);
   const isCreatorSetup = searchParams.get('setup') === 'creator';
@@ -128,6 +133,48 @@ export default function SettingsPage() {
             Share your meal plans publicly so others can clone them and generate shopping lists.
           </p>
           <CreatorSettings />
+        </section>
+
+        <Separator />
+
+        {/* Subscription */}
+        <section className="space-y-3 md:space-y-4">
+          <div className="flex items-center gap-2">
+            <Crown className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
+            <h2 className="font-serif text-lg md:text-xl font-semibold">Subscription</h2>
+          </div>
+          <div className="rounded-xl bg-muted/30 border border-border/50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">
+                  {isPremium ? 'Premium' : 'Free'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isPremium
+                    ? 'Unlimited recipes, AI features, and meal plan analysis.'
+                    : 'Up to 25 recipes. Upgrade for AI features and unlimited storage.'}
+                </p>
+                {isPremium && profile?.subscription_expires_at && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Renews {new Date(profile.subscription_expires_at).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <Badge variant={isPremium ? 'default' : 'secondary'} className="shrink-0">
+                {isPremium ? 'Premium' : 'Free'}
+              </Badge>
+            </div>
+            {isPremium ? (
+              <Button variant="outline" size="sm" onClick={manageSubscription}>
+                Manage subscription
+              </Button>
+            ) : (
+              <Button size="sm" onClick={checkout} className="gap-2">
+                <Crown className="h-4 w-4" />
+                Upgrade to Premium — $4.99/mo
+              </Button>
+            )}
+          </div>
         </section>
 
         <Separator />

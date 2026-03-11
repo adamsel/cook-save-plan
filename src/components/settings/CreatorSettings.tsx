@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChefHat, ExternalLink, Loader2, Check, X, Camera } from 'lucide-react';
+import { ChefHat, ExternalLink, Loader2, Check, X, Camera, Instagram, Youtube, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog';
 
 const RESERVED_USERNAMES = [
   'auth', 'settings', 'dashboard', 'recipes', 'plan', 'creator',
@@ -29,8 +30,13 @@ export function CreatorSettings() {
   const [isCreator, setIsCreator] = useState(false);
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [tiktokHandle, setTiktokHandle] = useState('');
+  const [youtubeHandle, setYoutubeHandle] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
 
   // Initialize from profile
@@ -39,6 +45,10 @@ export function CreatorSettings() {
       setIsCreator(profile.is_creator || false);
       setUsername(profile.username || '');
       setBio(profile.bio || '');
+      setInstagramHandle(profile.instagram_handle || '');
+      setTiktokHandle(profile.tiktok_handle || '');
+      setYoutubeHandle(profile.youtube_handle || '');
+      setWebsiteUrl(profile.website_url || '');
     }
   }, [profile]);
 
@@ -88,7 +98,7 @@ export function CreatorSettings() {
     setUsernameStatus('idle');
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
@@ -97,12 +107,24 @@ export function CreatorSettings() {
       return;
     }
 
+    // Read as data URL and open crop dialog
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result as string);
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be re-selected
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
+
     setIsUploadingAvatar(true);
-    const path = `${user.id}/avatar.${file.name.split('.').pop()}`;
+    const path = `${user.id}/avatar.png`;
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: 'image/png' });
 
     if (uploadError) {
       toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' });
@@ -114,10 +136,8 @@ export function CreatorSettings() {
       .from('avatars')
       .getPublicUrl(path);
 
-    // Append timestamp to bust cache
     const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
 
-    // Update profile directly so we can catch errors
     const { error: dbError } = await supabase
       .from('profiles')
       .update({ avatar_url: urlWithCacheBust })
@@ -129,14 +149,9 @@ export function CreatorSettings() {
       return;
     }
 
-    // Sync local state
     await updateProfile({ avatar_url: urlWithCacheBust });
-
     toast({ title: 'Profile photo updated' });
     setIsUploadingAvatar(false);
-
-    // Reset input so same file can be re-selected
-    if (avatarInputRef.current) avatarInputRef.current.value = '';
   };
 
   const handleSave = async () => {
@@ -163,6 +178,10 @@ export function CreatorSettings() {
     const updates: Record<string, unknown> = {
       is_creator: isCreator,
       bio: bio || null,
+      instagram_handle: instagramHandle || null,
+      tiktok_handle: tiktokHandle || null,
+      youtube_handle: youtubeHandle || null,
+      website_url: websiteUrl || null,
     };
 
     if (isCreator && username) {
@@ -238,7 +257,7 @@ export function CreatorSettings() {
                 ref={avatarInputRef}
                 type="file"
                 accept="image/jpeg,image/png"
-                onChange={handleAvatarUpload}
+                onChange={handleAvatarFileSelect}
                 className="hidden"
               />
             </div>
@@ -296,6 +315,57 @@ export function CreatorSettings() {
             <p className="text-xs text-muted-foreground text-right">{bio.length}/500</p>
           </div>
 
+          {/* Social links */}
+          <div className="space-y-3">
+            <Label>Social links</Label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Instagram className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                  <Input
+                    value={instagramHandle}
+                    onChange={e => setInstagramHandle(e.target.value.replace(/[^a-zA-Z0-9._]/g, ''))}
+                    placeholder="instagram"
+                    className="pl-7"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="h-4 w-4 text-muted-foreground shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.78 1.54V6.84a4.84 4.84 0 0 1-1.02-.15z"/></svg>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                  <Input
+                    value={tiktokHandle}
+                    onChange={e => setTiktokHandle(e.target.value.replace(/[^a-zA-Z0-9._]/g, ''))}
+                    placeholder="tiktok"
+                    className="pl-7"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Youtube className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                  <Input
+                    value={youtubeHandle}
+                    onChange={e => setYoutubeHandle(e.target.value.replace(/[^a-zA-Z0-9._-]/g, ''))}
+                    placeholder="youtube"
+                    className="pl-7"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  value={websiteUrl}
+                  onChange={e => setWebsiteUrl(e.target.value)}
+                  placeholder="https://yourwebsite.com"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Preview link */}
           {username && usernameStatus === 'available' && (
             <div className="flex items-center gap-2 text-sm">
@@ -329,6 +399,16 @@ export function CreatorSettings() {
           'Save creator settings'
         )}
       </Button>
+
+      {/* Avatar crop dialog */}
+      {cropImageSrc && (
+        <AvatarCropDialog
+          open={!!cropImageSrc}
+          onOpenChange={(open) => !open && setCropImageSrc(null)}
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCroppedUpload}
+        />
+      )}
     </div>
   );
 }

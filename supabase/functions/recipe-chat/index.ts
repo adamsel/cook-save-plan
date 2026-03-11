@@ -163,7 +163,7 @@ serve(async (req) => {
   }
 
   try {
-    // Log auth info if available (but don't require it)
+    // Authenticate and check premium subscription
     const authHeader = req.headers.get("Authorization");
     if (authHeader?.startsWith("Bearer ")) {
       try {
@@ -175,6 +175,20 @@ serve(async (req) => {
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (user) {
           console.log("Authenticated request from user:", user.id);
+
+          // Check premium subscription
+          const { data: profile } = await supabaseClient
+            .from("profiles")
+            .select("subscription_tier")
+            .eq("user_id", user.id)
+            .single();
+
+          if (profile?.subscription_tier !== "premium") {
+            return new Response(
+              JSON.stringify({ error: "Premium subscription required for AI recipe chat." }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
       } catch (authError) {
         console.log("Auth check failed, proceeding anyway:", authError);

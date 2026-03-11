@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { PremiumGate } from '@/components/PremiumGate';
 import {
   DAYS_OF_WEEK,
   MEAL_SLOTS,
@@ -32,8 +33,10 @@ import {
   PanelLeft,
   LayoutGrid,
   List,
-  Share2
+  Share2,
+  ChevronDown
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DayListView } from '@/components/recipes/DayListView';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -87,6 +90,18 @@ export default function MealPlanPage() {
   const [showSummary, setShowSummary] = useState(true);
   const [showRecipePanel, setShowRecipePanel] = useState(true);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(
+    new Set(MEAL_SLOTS as unknown as string[])
+  );
+
+  const toggleSlot = (slot: string) => {
+    setExpandedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(slot)) next.delete(slot);
+      else next.add(slot);
+      return next;
+    });
+  };
 
   // View mode (auto-detect mobile)
   const isMobile = useIsMobile();
@@ -846,72 +861,82 @@ export default function MealPlanPage() {
 
                 {/* Meal Slots */}
                 {MEAL_SLOTS.map(slot => (
-                  <div key={slot} className="mb-5">
-                    <div className="flex items-center gap-2 mb-3 pl-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        {slot}
-                      </span>
-                      <div className="flex-1 h-px bg-border/30" />
-                    </div>
+                  <Collapsible key={slot} open={expandedSlots.has(slot)} onOpenChange={() => toggleSlot(slot)}>
+                    <div className="mb-5">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center gap-2 mb-3 pl-1 py-1 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            {slot}
+                          </span>
+                          <div className="flex-1 h-px bg-border/30" />
+                          <ChevronDown className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform",
+                            expandedSlots.has(slot) && "rotate-180"
+                          )} />
+                        </div>
+                      </CollapsibleTrigger>
 
-                    <div className="grid grid-cols-7 gap-3">
-                      {DAYS_OF_WEEK.map(day => {
-                        const slotId = `${day}-${slot}`;
-                        const displayItems = getDisplayItemsForSlot(day, slot);
-                        const isOver = dragOverSlot === slotId;
-                        const hasItems = displayItems.length > 0;
+                      <CollapsibleContent>
+                        <div className="grid grid-cols-7 gap-3">
+                          {DAYS_OF_WEEK.map(day => {
+                            const slotId = `${day}-${slot}`;
+                            const displayItems = getDisplayItemsForSlot(day, slot);
+                            const isOver = dragOverSlot === slotId;
+                            const hasItems = displayItems.length > 0;
 
-                        return (
-                          <div
-                            key={slotId}
-                            onDrop={(e) => handleDrop(e, day, slot)}
-                            onDragOver={(e) => handleDragOver(e, slotId)}
-                            onDragLeave={handleDragLeave}
-                            className={cn(
-                              "min-h-[140px] rounded-2xl transition-all duration-300 p-2",
-                              hasItems
-                                ? "bg-transparent"
-                                : "glass-subtle border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40",
-                              isOver && "bg-primary/10 border-primary drop-target scale-[1.02] shadow-lg shadow-primary/10",
-                              !canEdit && "opacity-70 cursor-not-allowed"
-                            )}
-                          >
-                            {hasItems ? (
-                              <div className="space-y-2">
-                                {displayItems.map((displayItem) => (
-                                  <MealCard
-                                    key={displayItem.item.id}
-                                    recipe={displayItem.recipe}
-                                    item={displayItem.item}
-                                    isLeftover={displayItem.isLeftover}
-                                    leftoverSource={displayItem.sourceItem ? {
-                                      day: displayItem.sourceItem.day,
-                                      mealSlot: displayItem.sourceItem.mealSlot
-                                    } : undefined}
-                                    sourceLeftoverMeals={displayItem.sourceItem?.leftoverMeals}
-                                    householdSize={householdSize}
-                                    isDragging={draggingItem?.itemId === displayItem.item.id}
-                                    onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe, displayItem)}
-                                    onDragEnd={handleMealItemDragEnd}
-                                    onClick={() => handleCardClick(displayItem)}
-                                  />
-                                ))}
+                            return (
+                              <div
+                                key={slotId}
+                                onDrop={(e) => handleDrop(e, day, slot)}
+                                onDragOver={(e) => handleDragOver(e, slotId)}
+                                onDragLeave={handleDragLeave}
+                                className={cn(
+                                  "min-h-[140px] rounded-2xl transition-all duration-300 p-2",
+                                  hasItems
+                                    ? "bg-transparent"
+                                    : "glass-subtle border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40",
+                                  isOver && "bg-primary/10 border-primary drop-target scale-[1.02] shadow-lg shadow-primary/10",
+                                  !canEdit && "opacity-70 cursor-not-allowed"
+                                )}
+                              >
+                                {hasItems ? (
+                                  <div className="space-y-2">
+                                    {displayItems.map((displayItem) => (
+                                      <MealCard
+                                        key={displayItem.item.id}
+                                        recipe={displayItem.recipe}
+                                        item={displayItem.item}
+                                        isLeftover={displayItem.isLeftover}
+                                        leftoverSource={displayItem.sourceItem ? {
+                                          day: displayItem.sourceItem.day,
+                                          mealSlot: displayItem.sourceItem.mealSlot
+                                        } : undefined}
+                                        sourceLeftoverMeals={displayItem.sourceItem?.leftoverMeals}
+                                        householdSize={householdSize}
+                                        isDragging={draggingItem?.itemId === displayItem.item.id}
+                                        onDragStart={(e) => handleMealItemDragStart(e, displayItem.item, displayItem.recipe, displayItem)}
+                                        onDragEnd={handleMealItemDragEnd}
+                                        onClick={() => handleCardClick(displayItem)}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="h-full flex flex-col items-center justify-center py-6 group/slot">
+                                    <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-2 group-hover/slot:bg-primary/10 transition-colors">
+                                      <Plus className="h-5 w-5 text-muted-foreground/40 group-hover/slot:text-primary transition-colors" />
+                                    </div>
+                                    <span className="text-xs text-muted-foreground/50 group-hover/slot:text-muted-foreground transition-colors">
+                                      {canEdit ? 'Drop recipe' : 'No meal'}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="h-full flex flex-col items-center justify-center py-6 group/slot">
-                                <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-2 group-hover/slot:bg-primary/10 transition-colors">
-                                  <Plus className="h-5 w-5 text-muted-foreground/40 group-hover/slot:text-primary transition-colors" />
-                                </div>
-                                <span className="text-xs text-muted-foreground/50 group-hover/slot:text-muted-foreground transition-colors">
-                                  {canEdit ? 'Drop recipe' : 'No meal'}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                  </div>
+                  </Collapsible>
                 ))}
               </div>
             ) : (
@@ -947,12 +972,14 @@ export default function MealPlanPage() {
             {/* Weekly Summary Panel */}
             {showSummary && (
               <div className="mt-6">
-                <WeeklySummary
-                  recipes={recipes}
-                  mealPlanItems={selectedWeekPlan.items}
-                  pantryStaples={pantryStaples}
-                  householdSize={householdSize}
-                />
+                <PremiumGate feature="meal-analysis">
+                  <WeeklySummary
+                    recipes={recipes}
+                    mealPlanItems={selectedWeekPlan.items}
+                    pantryStaples={pantryStaples}
+                    householdSize={householdSize}
+                  />
+                </PremiumGate>
               </div>
             )}
           </div>

@@ -8,11 +8,16 @@ interface Profile {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
-  cover_image_url: string | null;
-  cover_image_position: number;
   username: string | null;
   bio: string | null;
   is_creator: boolean;
+  subscription_tier: 'free' | 'premium';
+  stripe_customer_id: string | null;
+  subscription_expires_at: string | null;
+  instagram_handle: string | null;
+  tiktok_handle: string | null;
+  youtube_handle: string | null;
+  website_url: string | null;
 }
 
 interface AuthContextType {

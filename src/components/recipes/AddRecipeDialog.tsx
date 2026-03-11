@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { IngredientEditor, parseMultipleIngredients } from './IngredientEditor';
 import { InstructionEditor, InstructionStep, parseMultipleInstructions } from './InstructionEditor';
 import { RecipeAIChat } from './RecipeAIChat';
+import { PremiumGate } from '@/components/PremiumGate';
 import {
   Dialog,
   DialogContent,
@@ -177,7 +178,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setSelectedMealTypes([]);
     setImportMethod('manual');
     setNutrition(null);
-    setImportStep('chat'); // Default to AI chat
+    setImportStep('input');
     setParseError(null);
     setShowPasteFallback(false);
     setSuggestedCategory(null);
@@ -843,6 +844,23 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
 
   // Input step content - defined as JSX to avoid remounting on state changes
   const inputStepContent = (
+    <>
+      {/* AI Chat entry point */}
+      <button
+        type="button"
+        onClick={() => setImportStep('chat')}
+        className="w-full mt-4 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-3 text-left"
+      >
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 shrink-0">
+          <Sparkles className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">AI Recipe Chat</p>
+          <p className="text-xs text-muted-foreground">Describe any meal and we'll create the full recipe</p>
+        </div>
+        <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 shrink-0" />
+      </button>
+
     <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="url" className="gap-1.5 text-xs sm:text-sm">
@@ -945,6 +963,7 @@ Instructions:
       </TabsContent>
 
       <TabsContent value="photo" className="space-y-4 mt-4">
+        <PremiumGate feature="photo-import">
         {!photoPreview ? (
           <div
             className={cn(
@@ -1055,6 +1074,7 @@ Instructions:
             </Button>
           </div>
         )}
+        </PremiumGate>
       </TabsContent>
 
       <TabsContent value="manual" className="mt-4">
@@ -1069,6 +1089,7 @@ Instructions:
         </div>
       </TabsContent>
     </Tabs>
+    </>
   );
 
   // Review step content - defined as JSX to avoid remounting on state changes
@@ -1469,10 +1490,12 @@ Instructions:
     switch (importStep) {
       case 'chat':
         return (
-          <RecipeAIChat
-            onRecipeReady={handleAIRecipeReady}
-            onCancel={() => onOpenChange(false)}
-          />
+          <PremiumGate feature="ai-chat">
+            <RecipeAIChat
+              onRecipeReady={handleAIRecipeReady}
+              onCancel={() => onOpenChange(false)}
+            />
+          </PremiumGate>
         );
       case 'input':
         return inputStepContent;

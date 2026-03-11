@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Recipe, Ingredient, MealPlan, MealPlanItem, RecipeNutrition, MealType, ImportMethod } from '@/types/recipe';
 import { useToast } from '@/hooks/use-toast';
+import { FREE_RECIPE_LIMIT } from '@/hooks/useSubscription';
 
 // Database recipe row type
 interface DbRecipe {
@@ -109,7 +110,7 @@ function recipeToDb(recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>, user
 export type RecipeSource = 'personal' | 'library' | 'shared' | 'all';
 
 export function useRecipesData() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -216,6 +217,16 @@ export function useRecipesData() {
       toast({
         title: 'Please sign in',
         description: 'You need to be signed in to add recipes.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    // Free users: enforce recipe limit
+    if (profile?.subscription_tier !== 'premium' && recipes.length >= FREE_RECIPE_LIMIT) {
+      toast({
+        title: 'Recipe limit reached',
+        description: `Free accounts can store up to ${FREE_RECIPE_LIMIT} recipes. Upgrade to Premium for unlimited storage.`,
         variant: 'destructive',
       });
       return null;
@@ -674,6 +685,9 @@ export function useRecipesData() {
     revokeShare,
     revokePendingShare,
     copyToPersonal,
+    // Subscription limits
+    recipeCount: recipes.length,
+    recipeLimit: profile?.subscription_tier === 'premium' ? null : FREE_RECIPE_LIMIT,
     // Refresh functions
     refreshPersonal: fetchPersonalRecipes,
     refreshLibrary: fetchLibraryRecipes,

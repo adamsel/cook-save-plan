@@ -6,7 +6,7 @@ export interface Ingredient {
   notes?: string;
 }
 
-export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual' | 'spoonacular' | 'photo';
+export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual' | 'spoonacular' | 'photo' | 'bulk_url' | 'bulk_csv';
 export type ParsingConfidence = 'high' | 'medium' | 'low';
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 export type NutritionSource = 'provided_by_site' | 'ai_estimate' | 'manual';
