@@ -35,7 +35,7 @@ export default function SharedMealPlanPage() {
   const { cloneMealPlan, isCloning, getDefaultTargetWeek } = useCloneMealPlan();
   const { isFollowing, follow, unfollow, isLoading: followLoading } = useFollowCreator(creator?.userId);
   const { toast } = useToast();
-  const { refreshMealPlans } = useRecipes();
+  const { refreshMealPlans, refreshRecipes } = useRecipes();
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [cloneComplete, setCloneComplete] = useState(false);
   const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
@@ -85,8 +85,8 @@ export default function SharedMealPlanPage() {
       setCloneComplete(true);
       // Set the week offset so MealPlanPage opens to the correct week
       localStorage.setItem('mealPlanWeekOffset', JSON.stringify(weekOffset));
-      // Refresh meal plan data so it's available when we navigate
-      await refreshMealPlans();
+      // Refresh recipes and meal plan data so it's available when we navigate
+      await Promise.all([refreshMealPlans(), refreshRecipes()]);
       setTimeout(() => navigate('/meal-plan'), 1500);
     }
   };

@@ -746,5 +746,15 @@ export function useRecipesData() {
     refreshPersonal: fetchPersonalRecipes,
     refreshLibrary: fetchLibraryRecipes,
     refreshShared: fetchSharedRecipes,
+    refresh: async () => {
+      const [personal, library, shared] = await Promise.all([
+        fetchPersonalRecipes(),
+        fetchLibraryRecipes(),
+        fetchSharedRecipes(),
+      ]);
+      setRecipes(personal);
+      setLibraryRecipes(library);
+      setSharedRecipes(shared);
+    },
   };
 }

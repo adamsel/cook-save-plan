@@ -70,7 +70,8 @@ interface RecipeContextType {
   getMealPlanShareInfo: (planId: string) => Promise<{ isShared: boolean; shareSlug: string | null; title: string | null; description: string | null } | null>;
   makeRecipesPublicBatch: (recipeIds: string[]) => Promise<boolean>;
   refreshMealPlans: () => Promise<void>;
-  
+  refreshRecipes: () => Promise<void>;
+
   // Settings Actions
   addCategory: (category: string) => void;
   addTag: (tag: string) => void;
@@ -396,6 +397,11 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
     await mealPlansData.refresh();
   };
 
+  const refreshRecipes = async () => {
+    if (!user) return;
+    await recipesData.refresh();
+  };
+
   const makeRecipesPublicBatch = async (recipeIds: string[]) => {
     if (!user) return false;
     return await recipesData.makeRecipesPublicBatch(recipeIds);
@@ -456,6 +462,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       getMealPlanShareInfo,
       makeRecipesPublicBatch,
       refreshMealPlans,
+      refreshRecipes,
       addCategory,
       addTag,
       updatePantryStaples,
