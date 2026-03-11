@@ -18,6 +18,39 @@ const fuse = new Fuse(allSearchableNames, {
 });
 
 /**
+ * Normalize compound words for matching.
+ * Handles cases like "chickpeas" ↔ "chick peas", "cornstarch" ↔ "corn starch"
+ */
+function normalizeCompoundWord(ingredient: string): string[] {
+  const variants: string[] = [ingredient];
+
+  // Split compound words: "chickpeas" → "chick peas"
+  const compoundSplits: Record<string, string> = {
+    'chickpea': 'chick pea',
+    'cornstarch': 'corn starch',
+    'breadcrumb': 'bread crumb',
+    'buttermilk': 'butter milk',
+    'cheesecloth': 'cheese cloth',
+    'eggplant': 'egg plant',
+    'grapefruit': 'grape fruit',
+    'watermelon': 'water melon',
+    'pineapple': 'pine apple',
+    'arrowroot': 'arrow root',
+    'cornmeal': 'corn meal',
+  };
+
+  for (const [compound, split] of Object.entries(compoundSplits)) {
+    if (ingredient.includes(compound)) {
+      variants.push(ingredient.replace(compound, split));
+    } else if (ingredient.includes(split)) {
+      variants.push(ingredient.replace(split, compound));
+    }
+  }
+
+  return variants;
+}
+
+/**
  * Find best fuzzy match for an ingredient name
  * Returns canonical form if a good match is found, null otherwise
  *
@@ -30,6 +63,19 @@ export function fuzzyMatchIngredient(ingredient: string): string | null {
     return null;
   }
 
+  // Try compound word variants first
+  const variants = normalizeCompoundWord(ingredient);
+
+  for (const variant of variants) {
+    // Direct alias check for compound variants (skip first which is the original)
+    if (variant !== ingredient && INGREDIENT_ALIASES[variant]) {
+      return INGREDIENT_ALIASES[variant];
+    }
+  }
+
+  // Use adaptive threshold: stricter for short names, more lenient for longer ones
+  const threshold = ingredient.length > 8 ? 0.25 : 0.3;
+
   const results = fuse.search(ingredient);
 
   if (results.length === 0) {
@@ -39,8 +85,7 @@ export function fuzzyMatchIngredient(ingredient: string): string | null {
   const best = results[0];
 
   // Only accept if score is good enough (lower score = better match)
-  // Score of 0 is perfect match, 1 is complete mismatch
-  if (best.score === undefined || best.score > 0.3) {
+  if (best.score === undefined || best.score > threshold) {
     return null;
   }
 

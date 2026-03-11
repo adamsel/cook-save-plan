@@ -737,3 +737,20 @@ export const INGREDIENT_CATEGORIES: Record<string, string> = {
 export function getCategoryFromLookup(normalizedIngredient: string): string | undefined {
   return INGREDIENT_CATEGORIES[normalizedIngredient];
 }
+
+/**
+ * Common pantry staples that most people already have at home.
+ * Used to filter out these items from the shopping list by default.
+ */
+export const PANTRY_STAPLES = new Set([
+  'salt',
+  'kosher salt',
+  'sea salt',
+  'black pepper',
+  'white pepper',
+  'water',
+  'cooking spray',
+  'nonstick spray',
+  'ice',
+  'ice water',
+]);

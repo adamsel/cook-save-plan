@@ -1,9 +1,10 @@
 // Main ingredient normalization module
 // Combines alias mapping, unit conversion, and smart merging
 
+import { parseIngredient } from 'parse-ingredient';
 import { INGREDIENT_ALIASES, DESCRIPTORS_TO_REMOVE } from './aliases';
 import { fuzzyMatchIngredient } from './fuzzyMatcher';
-import { INGREDIENT_CATEGORIES } from './categories';
+import { INGREDIENT_CATEGORIES, PANTRY_STAPLES } from './categories';
 import {
   normalizeUnit,
   toBaseUnits,
@@ -13,6 +14,7 @@ import {
   getUnitInfo,
   convertVolumeToWeight,
   shouldPreferWeight,
+  isContainerUnit,
   type NormalizedQuantity
 } from './unitConversion';
 
@@ -174,6 +176,7 @@ export interface MergedIngredient {
   category: string;
   alternatives: string[];  // e.g., ["almond butter"] for "peanut butter or almond butter"
   alternativeNote?: string; // e.g., "butter already on list" for "coconut oil or butter"
+  isPantryStaple: boolean; // Whether this is a common pantry staple (salt, pepper, water, etc.)
 }
 
 /**
@@ -181,6 +184,8 @@ export interface MergedIngredient {
  * Examples:
  *   "peanut butter or almond butter" → { primary: "peanut butter", alternatives: ["almond butter"] }
  *   "coconut oil (or butter)" → { primary: "coconut oil", alternatives: ["butter"] }
+ *   "butter/margarine" → { primary: "butter", alternatives: ["margarine"] }
+ *   "sour cream, or yogurt" → { primary: "sour cream", alternatives: ["yogurt"] }
  */
 function parseAlternatives(item: string): { primary: string; alternatives: string[] } {
   // Guard against null/undefined input
@@ -188,8 +193,17 @@ function parseAlternatives(item: string): { primary: string; alternatives: strin
     return { primary: '', alternatives: [] };
   }
 
-  // Match patterns like "X or Y" or "X (or Y)"
-  const orMatch = item.match(/^(.+?)\s+(?:\()?or\s+(.+?)(?:\))?$/i);
+  // Match "X/Y" pattern (e.g., "butter/margarine")
+  const slashMatch = item.match(/^([^/]+)\/([^/]+)$/);
+  if (slashMatch) {
+    return {
+      primary: slashMatch[1].trim(),
+      alternatives: [slashMatch[2].trim()]
+    };
+  }
+
+  // Match patterns like "X or Y", "X (or Y)", "X, or Y", "X and/or Y"
+  const orMatch = item.match(/^(.+?)\s*[,]?\s+(?:\()?(?:and\/)?or\s+(.+?)(?:\))?$/i);
   if (orMatch) {
     return {
       primary: orMatch[1].trim(),
@@ -214,6 +228,44 @@ export interface RawIngredientInput {
 }
 
 /**
+ * Try to extract structured data from a free-text ingredient string using parse-ingredient.
+ * Returns updated item/quantity/unit if parsing succeeds, or original values if not.
+ */
+function tryParseIngredientText(item: string, quantity: number | null, unit: string): {
+  item: string;
+  quantity: number | null;
+  unit: string;
+} {
+  // Only parse if quantity is missing but the item text looks like it contains one
+  // (e.g., "2 cups flour", "1/2 lb ground beef", "3 tablespoons olive oil")
+  if (quantity !== null && unit) {
+    return { item, quantity, unit };
+  }
+
+  // Check if the item text contains a number at the start (likely has embedded quantity)
+  const hasEmbeddedQty = /^\s*[\d½¼¾⅓⅔⅛⅜⅝⅞]/.test(item);
+  if (!hasEmbeddedQty && quantity !== null) {
+    return { item, quantity, unit };
+  }
+
+  try {
+    const parsed = parseIngredient(item);
+    if (parsed.length > 0 && parsed[0].description) {
+      const p = parsed[0];
+      return {
+        item: p.description,
+        quantity: p.quantity ?? quantity,
+        unit: p.unitOfMeasureID || p.unitOfMeasure || unit,
+      };
+    }
+  } catch {
+    // Parsing failed, return original values
+  }
+
+  return { item, quantity, unit };
+}
+
+/**
  * Merge multiple ingredients into a combined shopping list
  */
 export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient[] {
@@ -224,10 +276,16 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     recipeIds: Set<string>;
     sources: IngredientSource[];
     alternatives: Set<string>;
+    isPantryStaple: boolean;
   }>();
 
-  // Filter out inputs with null/undefined items
-  const validInputs = inputs.filter(input => input.item && input.item.trim());
+  // Pre-process inputs: try to parse free-text ingredients
+  const validInputs = inputs
+    .filter(input => input.item && input.item.trim())
+    .map(input => {
+      const parsed = tryParseIngredientText(input.item, input.quantity, input.unit);
+      return { ...input, ...parsed };
+    });
 
   // First pass: collect all normalized keys (to check if alternatives are already on list)
   const allKeys = new Set<string>();
@@ -253,6 +311,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
         recipeIds: new Set(),
         sources: [],
         alternatives: new Set(),
+        isPantryStaple: PANTRY_STAPLES.has(key),
       });
     }
 
@@ -277,8 +336,22 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
       let quantity = toBaseUnits(input.quantity * multiplier, normalizedUnit);
       let unitInfo = getUnitInfo(normalizedUnit);
 
+      // Container units (can, jar, box, etc.) — keep as-is, don't convert
+      if (isContainerUnit(normalizedUnit)) {
+        const containerKey = `container_${normalizedUnit}`;
+        const existing = group.quantities.get(containerKey);
+        if (existing) {
+          existing.baseValue += quantity.baseValue;
+          existing.count += 1;
+        } else {
+          group.quantities.set(containerKey, {
+            ...quantity,
+            count: 1,
+          });
+        }
+      }
       // Convert volume to weight for ingredients like butter (for better consolidation)
-      if (unitInfo.type === 'volume' && shouldPreferWeight(key)) {
+      else if (unitInfo.type === 'volume' && shouldPreferWeight(key)) {
         const weightInGrams = convertVolumeToWeight(quantity.baseValue, key);
         if (weightInGrams !== null) {
           quantity = {
@@ -289,32 +362,57 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
           };
           unitInfo = { toBase: 1, type: 'weight' };
         }
-      }
 
-      // Group by unit type for merging
-      const typeKey = unitInfo.type;
-      const existing = group.quantities.get(typeKey);
-      
-      if (existing && areUnitsCompatible(existing.unit, normalizedUnit)) {
-        existing.baseValue += quantity.baseValue;
-        existing.count += 1;
-      } else if (!existing) {
-        group.quantities.set(typeKey, {
-          ...quantity,
-          count: 1,
-        });
-      } else {
-        // Incompatible units - keep separate
-        const altKey = `${typeKey}_${normalizedUnit}`;
-        const altExisting = group.quantities.get(altKey);
-        if (altExisting) {
-          altExisting.baseValue += quantity.baseValue;
-          altExisting.count += 1;
-        } else {
-          group.quantities.set(altKey, {
+        // Group by unit type for merging
+        const typeKey = unitInfo.type;
+        const existing = group.quantities.get(typeKey);
+
+        if (existing && areUnitsCompatible(existing.unit, normalizedUnit)) {
+          existing.baseValue += quantity.baseValue;
+          existing.count += 1;
+        } else if (!existing) {
+          group.quantities.set(typeKey, {
             ...quantity,
             count: 1,
           });
+        } else {
+          const altKey = `${typeKey}_${normalizedUnit}`;
+          const altExisting = group.quantities.get(altKey);
+          if (altExisting) {
+            altExisting.baseValue += quantity.baseValue;
+            altExisting.count += 1;
+          } else {
+            group.quantities.set(altKey, {
+              ...quantity,
+              count: 1,
+            });
+          }
+        }
+      } else {
+        // Standard grouping by unit type for merging
+        const typeKey = unitInfo.type;
+        const existing = group.quantities.get(typeKey);
+
+        if (existing && areUnitsCompatible(existing.unit, normalizedUnit)) {
+          existing.baseValue += quantity.baseValue;
+          existing.count += 1;
+        } else if (!existing) {
+          group.quantities.set(typeKey, {
+            ...quantity,
+            count: 1,
+          });
+        } else {
+          const altKey = `${typeKey}_${normalizedUnit}`;
+          const altExisting = group.quantities.get(altKey);
+          if (altExisting) {
+            altExisting.baseValue += quantity.baseValue;
+            altExisting.count += 1;
+          } else {
+            group.quantities.set(altKey, {
+              ...quantity,
+              count: 1,
+            });
+          }
         }
       }
     } else {
@@ -385,14 +483,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
     // Create total display string
     let totalDisplay = '';
     if (displayParts.length > 0) {
-      // If we have container counts like cans, show that nicely
-      const containerQty = quantities.find(q => q.type === 'container');
-      if (containerQty && containerQty.value > 0) {
-        const count = Math.ceil(containerQty.value);
-        totalDisplay = `${count} ${containerQty.unit}${count !== 1 ? 's' : ''}`;
-      } else {
-        totalDisplay = displayParts.join(' + ');
-      }
+      totalDisplay = displayParts.join(' + ');
     }
     
     // Process alternatives and check if any are already on the shopping list
@@ -419,6 +510,7 @@ export function mergeIngredients(inputs: RawIngredientInput[]): MergedIngredient
       category: categorizeIngredient(key),
       alternatives,
       alternativeNote,
+      isPantryStaple: group.isPantryStaple,
     });
   }
 

@@ -13,10 +13,11 @@ import { SpoonacularRecipeDetailDialog } from '@/components/recipes/SpoonacularR
 import { SpoonacularSearchForm } from '@/components/recipes/SpoonacularSearchForm';
 import { useSpoonacularRecipes, SpoonacularRecipeSearchResult, SpoonacularRecipeDetails } from '@/hooks/useSpoonacularRecipes';
 import { useDiscoverCreators, type DiscoverCreator } from '@/hooks/useDiscoverCreators';
+import { usePopularRecipes, type PopularRecipe } from '@/hooks/usePopularRecipes';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload } from 'lucide-react';
+import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload, BookmarkPlus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -130,6 +131,7 @@ export default function RecipesPage() {
 
   // Creator discovery
   const { creators: featuredCreators } = useDiscoverCreators();
+  const { data: popularRecipes = [] } = usePopularRecipes(8);
 
   const [activeTab, setActiveTab] = useState<RecipeTab>('personal');
 
@@ -558,6 +560,57 @@ export default function RecipesPage() {
               <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
                 {featuredCreators.slice(0, 6).map(creator => (
                   <CompactCreatorCard key={creator.userId} creator={creator} />
+                ))}
+              </div>
+              <Separator className="my-5" />
+            </>
+          )}
+
+          {/* Popular Recipes */}
+          {popularRecipes.length > 0 && (
+            <>
+              <h2 className="font-serif text-lg font-semibold mb-3">Popular Recipes</h2>
+              <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+                {popularRecipes.map((pr: PopularRecipe) => (
+                  <Link
+                    key={pr.recipeId}
+                    to={`/recipe/${pr.recipeId}`}
+                    className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                      {pr.imageUrl ? (
+                        <img src={pr.imageUrl} alt={pr.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      {pr.saveCount > 0 && (
+                        <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                          <BookmarkPlus className="h-3 w-3" />
+                          {pr.saveCount}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="font-medium text-sm line-clamp-2 leading-snug">{pr.title}</p>
+                      {pr.creatorUsername && (
+                        <p className="text-xs text-muted-foreground mt-1">by @{pr.creatorUsername}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        {pr.totalTime && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {pr.totalTime}m
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {pr.servings}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
                 ))}
               </div>
               <Separator className="my-5" />

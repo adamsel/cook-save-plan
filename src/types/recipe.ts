@@ -9,7 +9,8 @@ export interface Ingredient {
 export type ImportMethod = 'schema' | 'dom' | 'text' | 'manual' | 'spoonacular' | 'photo' | 'bulk_url' | 'bulk_csv';
 export type ParsingConfidence = 'high' | 'medium' | 'low';
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
-export type NutritionSource = 'provided_by_site' | 'ai_estimate' | 'manual';
+export type NutritionSource = 'provided_by_site' | 'ai_estimate' | 'manual' | 'calculated';
+export type VideoPlatform = 'youtube' | 'instagram' | 'tiktok' | 'vimeo';
 export type NutritionConfidence = 'High' | 'Medium' | 'Low';
 
 export interface NutritionInfo {
@@ -60,6 +61,11 @@ export interface Recipe {
   author?: string;
   // Nutrition
   nutrition?: RecipeNutrition;
+  // Video
+  videoUrl?: string;
+  videoPlatform?: VideoPlatform;
+  // Attribution — set when recipe was copied from a public recipe
+  originalRecipeId?: string;
   // Computed: true if data quality issues detected
   dataQualityWarning?: boolean;
 }

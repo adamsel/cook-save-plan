@@ -22,6 +22,18 @@ export default function PublicRecipePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Record view event (fire-and-forget)
+  useEffect(() => {
+    if (!recipe) return;
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase.from('recipe_engagement').insert({
+        recipe_id: recipe.id,
+        user_id: user?.id || null,
+        event_type: 'view',
+      }).then(() => {});
+    });
+  }, [recipe?.id]);
+
   // Auto-save if user just signed up/logged in with a pending save
   useEffect(() => {
     if (!user || !recipe || saving || saved) return;
@@ -79,6 +91,7 @@ export default function PublicRecipePage() {
           author: recipe.author || creator?.displayName || null,
           nutrition: recipe.nutrition as unknown as Record<string, unknown> || null,
           import_method: 'manual',
+          original_recipe_id: recipe.id,
         });
 
       if (insertError) {
@@ -86,6 +99,26 @@ export default function PublicRecipePage() {
       } else {
         setSaved(true);
         toast({ title: 'Recipe saved!', description: 'Added to your stash.' });
+
+        // Record engagement event (fire-and-forget)
+        supabase.from('recipe_engagement').insert({
+          recipe_id: recipe.id,
+          user_id: user.id,
+          event_type: 'save',
+        }).then(() => {});
+
+        // Notify original recipe creator (fire-and-forget)
+        if (creator?.userId && creator.userId !== user.id) {
+          supabase.from('notifications').insert({
+            user_id: creator.userId,
+            type: 'recipe_saved',
+            data: {
+              recipe_id: recipe.id,
+              recipe_title: recipe.title,
+              saver_name: 'A user',
+            },
+          }).then(() => {});
+        }
       }
     } catch {
       toast({ title: 'Error', description: 'Something went wrong.', variant: 'destructive' });

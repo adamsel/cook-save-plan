@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, Eye, Copy, MoreVertical, EyeOff, Camera, Instagram, Youtube, Globe, ExternalLink } from 'lucide-react';
+import { Loader2, Calendar, UtensilsCrossed, ChefHat, Clock, Users, UserPlus, UserCheck, Settings, Lock, Eye, Copy, MoreVertical, EyeOff, Camera, Instagram, Youtube, Globe, ExternalLink, BookmarkPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMealPlansData } from '@/hooks/useMealPlansData';
@@ -20,6 +20,7 @@ import { Navigation } from '@/components/layout/Navigation';
 import { format, parseISO } from 'date-fns';
 import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog';
 import { Recipe } from '@/types/recipe';
+import { useCreatorRecipeStats } from '@/hooks/useCreatorRecipeStats';
 
 // TikTok icon (not in lucide)
 function TikTokIcon({ className }: { className?: string }) {
@@ -38,6 +39,7 @@ export default function CreatorProfilePage() {
   const { user, updateProfile: updateAuthProfile } = useAuth();
   const { profile, sharedMealPlans, publicRecipes, isLoading, error, removeMealPlan, removeRecipe } = useCreatorProfile(username);
   const { isFollowing, followerCount, isAuthenticated, follow, unfollow, isLoading: followLoading } = useFollowCreator(profile?.userId);
+  const { stats: recipeStats } = useCreatorRecipeStats(profile?.userId);
 
   const [unfollowHover, setUnfollowHover] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
@@ -217,6 +219,25 @@ export default function CreatorProfilePage() {
     } else {
       setSavedRecipeIds(prev => new Set(prev).add(recipe.id));
       toast({ title: 'Recipe saved to your collection' });
+
+      // Record engagement event (fire-and-forget)
+      supabase.from('recipe_engagement').insert({
+        recipe_id: recipe.id,
+        user_id: user.id,
+        event_type: 'save',
+      }).then(() => {});
+
+      // Notify creator (fire-and-forget)
+      if (profile?.userId && profile.userId !== user.id) {
+        supabase.from('notifications').insert({
+          user_id: profile.userId,
+          type: 'recipe_saved',
+          data: {
+            recipe_id: recipe.id,
+            recipe_title: recipe.title,
+          },
+        }).then(() => {});
+      }
     }
     setIsSavingRecipe(false);
   };
@@ -535,6 +556,12 @@ export default function CreatorProfilePage() {
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
+                    )}
+                    {(recipeStats.get(recipe.id)?.saveCount ?? 0) > 0 && (
+                      <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                        <BookmarkPlus className="h-3 w-3" />
+                        {recipeStats.get(recipe.id)!.saveCount}
+                      </Badge>
                     )}
                     <CardContent className="p-3">
                       <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{recipe.title}</h3>

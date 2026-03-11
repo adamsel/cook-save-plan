@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu, Bell, UserPlus, Copy, CheckCheck, Compass } from 'lucide-react';
+import { UtensilsCrossed, Calendar, ShoppingCart, Settings, Plus, User, LogOut, LogIn, Library, Menu, Bell, UserPlus, Copy, CheckCheck, Compass, BookmarkPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -195,12 +195,16 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                             setNotificationsOpen(false);
                           } else if (notification.type === 'plan_cloned' && notification.data.meal_plan_id) {
                             setNotificationsOpen(false);
+                          } else if (notification.type === 'recipe_saved') {
+                            setNotificationsOpen(false);
                           }
                         }}
                       >
                         <div className="shrink-0 mt-0.5">
                           {notification.type === 'new_follower' ? (
                             <UserPlus className="h-4 w-4 text-primary" />
+                          ) : notification.type === 'recipe_saved' ? (
+                            <BookmarkPlus className="h-4 w-4 text-primary" />
                           ) : (
                             <Copy className="h-4 w-4 text-primary" />
                           )}
@@ -209,6 +213,8 @@ export function Navigation({ onAddRecipe }: NavigationProps) {
                           <p className="text-sm">
                             {notification.type === 'new_follower'
                               ? <><span className="font-medium">{notification.data.follower_name}</span> started following you</>
+                              : notification.type === 'recipe_saved'
+                              ? <><span className="font-medium">{notification.data.saver_name || 'Someone'}</span> saved your recipe: {notification.data.recipe_title}</>
                               : <><span className="font-medium">{notification.data.cloner_name}</span> saved your meal plan: {notification.data.plan_title}</>
                             }
                           </p>

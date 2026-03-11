@@ -236,12 +236,40 @@ const VOLUME_TO_WEIGHT: Record<string, { tbsp: number; tsp: number; cup: number 
   'oil': { tbsp: 13, tsp: 4.5, cup: 218 },
   'olive oil': { tbsp: 13, tsp: 4.5, cup: 218 },
   'neutral oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'avocado oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'coconut oil': { tbsp: 13, tsp: 4.5, cup: 218 },
+  'sesame oil': { tbsp: 13, tsp: 4.5, cup: 218 },
   'honey': { tbsp: 21, tsp: 7, cup: 340 },
+  'maple syrup': { tbsp: 20, tsp: 7, cup: 322 },
+  'molasses': { tbsp: 20, tsp: 7, cup: 328 },
   'flour': { tbsp: 8, tsp: 2.6, cup: 125 },
+  'whole wheat flour': { tbsp: 8, tsp: 2.6, cup: 120 },
+  'almond flour': { tbsp: 7, tsp: 2.3, cup: 112 },
   'sugar': { tbsp: 12.5, tsp: 4, cup: 200 },
   'brown sugar': { tbsp: 12, tsp: 4, cup: 200 },
   'confectioners sugar': { tbsp: 8, tsp: 2.5, cup: 120 },
+  'tomato paste': { tbsp: 16, tsp: 5, cup: 262 },
+  'sour cream': { tbsp: 14, tsp: 5, cup: 230 },
+  'cream cheese': { tbsp: 14.5, tsp: 5, cup: 232 },
+  'yogurt': { tbsp: 15, tsp: 5, cup: 245 },
+  'greek yogurt': { tbsp: 16, tsp: 5, cup: 260 },
+  'peanut butter': { tbsp: 16, tsp: 5, cup: 258 },
+  'almond butter': { tbsp: 16, tsp: 5, cup: 258 },
+  'tahini': { tbsp: 15, tsp: 5, cup: 240 },
+  'soy sauce': { tbsp: 16, tsp: 5, cup: 255 },
+  'rice': { tbsp: 12, tsp: 4, cup: 185 },
+  'cornstarch': { tbsp: 8, tsp: 2.6, cup: 128 },
+  'cocoa powder': { tbsp: 5, tsp: 1.7, cup: 86 },
 };
+
+/**
+ * Check if a unit is a container type (can, jar, box, etc.)
+ * Container units should not be converted to weight/volume — keep as "2 cans"
+ */
+export function isContainerUnit(unit: string): boolean {
+  const containerUnits = ['can', 'jar', 'bottle', 'package', 'box', 'bag'];
+  return containerUnits.includes(unit.toLowerCase());
+}
 
 /**
  * Check if an ingredient should only use count units (not volume like tbsp/cup)
@@ -371,8 +399,19 @@ export function formatQuantity(
   // Check if this is an herb or similar that shouldn't use ml
   const isHerbOrSpice = ingredientName && /basil|cilantro|parsley|mint|dill|thyme|rosemary|oregano|sage|tarragon|chive|coriander|herb/.test(ingredientName.toLowerCase());
 
-  // For counts and containers, round up to nearest whole
-  if (type === 'count' || type === 'container' || type === 'unknown') {
+  // For containers, preserve the container unit and pluralize
+  if (type === 'container') {
+    const rounded = Math.ceil(baseValue);
+    const unit = preferredUnit || '';
+    // Pluralize container units: "1 can" vs "2 cans"
+    const displayUnit = rounded !== 1 && unit && !unit.endsWith('s')
+      ? (unit === 'box' ? 'boxes' : `${unit}s`)
+      : unit;
+    return { value: rounded, unit: displayUnit };
+  }
+
+  // For counts, round up to nearest whole
+  if (type === 'count' || type === 'unknown') {
     const rounded = Math.ceil(baseValue);
     return { value: rounded, unit: preferredUnit || '' };
   }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { Recipe, Ingredient, MealPlan, MealPlanItem, RecipeNutrition, MealType, ImportMethod } from '@/types/recipe';
+import { Recipe, Ingredient, MealPlan, MealPlanItem, RecipeNutrition, MealType, ImportMethod, VideoPlatform } from '@/types/recipe';
 import { useToast } from '@/hooks/use-toast';
 import { FREE_RECIPE_LIMIT } from '@/hooks/useSubscription';
 
@@ -33,6 +33,8 @@ interface DbRecipe {
   is_public: boolean;
   is_library: boolean;
   original_recipe_id: string | null;
+  video_url: string | null;
+  video_platform: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +71,9 @@ function dbToRecipe(db: DbRecipe): Recipe {
     mealTypes: (db.meal_types || []) as MealType[],
     author: db.author || undefined,
     nutrition,
+    videoUrl: db.video_url || undefined,
+    videoPlatform: db.video_platform as VideoPlatform || undefined,
+    originalRecipeId: db.original_recipe_id || undefined,
     importMethod: db.import_method as ImportMethod || undefined,
     rawImportSnapshot: db.raw_import_snapshot || undefined,
     createdAt: db.created_at,
@@ -100,6 +105,8 @@ function recipeToDb(recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>, user
     meal_types: recipe.mealTypes || [],
     author: recipe.author || null,
     nutrition: recipe.nutrition ? JSON.parse(JSON.stringify(recipe.nutrition)) : null,
+    video_url: recipe.videoUrl || null,
+    video_platform: recipe.videoPlatform || null,
     import_method: recipe.importMethod || null,
     raw_import_snapshot: recipe.rawImportSnapshot || null,
     is_public: false,
@@ -297,6 +304,8 @@ export function useRecipesData() {
         meal_types: recipe.mealTypes || [],
         author: recipe.author || null,
         nutrition: recipe.nutrition ? JSON.parse(JSON.stringify(recipe.nutrition)) : null,
+        video_url: recipe.videoUrl || null,
+        video_platform: recipe.videoPlatform || null,
       })
       .eq('id', recipe.id);
     
@@ -375,11 +384,29 @@ export function useRecipesData() {
 
   // Make recipe public
   const makeRecipePublic = async (id: string, isPublic: boolean) => {
+    // Attribution notice for cloned recipes
+    if (isPublic) {
+      const recipe = recipes.find(r => r.id === id);
+      if (recipe?.originalRecipeId) {
+        const { data: attribution } = await supabase.rpc('get_recipe_attribution', {
+          target_recipe_id: id,
+        });
+        if (attribution && Array.isArray(attribution) && attribution.length > 0) {
+          const creator = attribution[0];
+          const name = creator.creator_display_name || (creator.creator_username ? `@${creator.creator_username}` : 'the original creator');
+          toast({
+            title: 'Attribution notice',
+            description: `This recipe will show "Originally by ${name}" since it was saved from their collection.`,
+          });
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('recipes')
       .update({ is_public: isPublic })
       .eq('id', id);
-    
+
     if (error) {
       toast({
         title: 'Error updating recipe visibility',
@@ -395,7 +422,7 @@ export function useRecipesData() {
     // Refresh library recipes
     const library = await fetchLibraryRecipes();
     setLibraryRecipes(library);
-    
+
     return true;
   };
 
@@ -624,6 +651,32 @@ export function useRecipesData() {
     
     const newRecipe = dbToRecipe(data as unknown as DbRecipe);
     setRecipes(prev => [newRecipe, ...prev]);
+
+    // Record engagement event (fire-and-forget)
+    supabase.from('recipe_engagement').insert({
+      recipe_id: recipeId,
+      user_id: user.id,
+      event_type: 'save',
+    }).then(() => {});
+
+    // Notify original recipe creator (fire-and-forget)
+    supabase
+      .from('recipes')
+      .select('user_id')
+      .eq('id', recipeId)
+      .single()
+      .then(({ data: origRecipe }) => {
+        if (origRecipe?.user_id && origRecipe.user_id !== user.id) {
+          supabase.from('notifications').insert({
+            user_id: origRecipe.user_id,
+            type: 'recipe_saved',
+            data: {
+              recipe_id: recipeId,
+              recipe_title: sourceRecipe.title,
+            },
+          }).then(() => {});
+        }
+      });
 
     return newRecipe;
   };

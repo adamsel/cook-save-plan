@@ -264,6 +264,22 @@ export function useMealPlansData() {
         : mp
     ));
 
+    // Record engagement for public recipes (fire-and-forget)
+    supabase
+      .from('recipes')
+      .select('is_public')
+      .eq('id', recipeId)
+      .single()
+      .then(({ data: recipeData }) => {
+        if (recipeData?.is_public) {
+          supabase.from('recipe_engagement').insert({
+            recipe_id: recipeId,
+            user_id: user.id,
+            event_type: 'plan_add',
+          }).then(() => {});
+        }
+      });
+
     return newItem;
   };
 

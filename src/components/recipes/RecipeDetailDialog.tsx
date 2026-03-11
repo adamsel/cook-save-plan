@@ -13,9 +13,13 @@ import {
 import { cn } from '@/lib/utils';
 import { ShareRecipeDialog } from './ShareRecipeDialog';
 import { RecipeLinkPicker } from './RecipeLinkPicker';
+import { VideoEmbed } from './VideoEmbed';
 import { IngredientReplacementPicker } from './IngredientReplacementPicker';
 import { useRecipeLinks } from '@/hooks/useRecipeLinks';
+import { useRecipeAttribution } from '@/hooks/useRecipeAttribution';
 import { useRecipes } from '@/context/RecipeContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Link } from 'react-router-dom';
 
 interface RecipeDetailDialogProps {
   recipe: Recipe | null;
@@ -63,6 +67,7 @@ export function RecipeDetailDialog({
 
   const { recipes: allRecipes } = useRecipes();
   const { linkedRecipes, isLoading: isLoadingLinks, addLink, removeLink, updateReplacements } = useRecipeLinks(recipe?.id);
+  const { attribution } = useRecipeAttribution(recipe?.id, recipe?.originalRecipeId);
 
   if (!recipe) return null;
 
@@ -164,18 +169,53 @@ export function RecipeDetailDialog({
             )}
           </div>
 
+          {/* Video embed */}
+          {recipe.videoUrl && (
+            <div className="px-6 pt-4">
+              <VideoEmbed url={recipe.videoUrl} platform={recipe.videoPlatform} />
+            </div>
+          )}
+
           <div className="p-6">
             <DialogHeader className="text-left mb-4">
               <DialogTitle className="font-serif text-2xl md:text-3xl font-bold leading-tight">
                 {recipe.title}
               </DialogTitle>
-              
+
               {recipe.author && (
                 <p className="text-muted-foreground text-sm mt-1">
                   by {recipe.author}
                 </p>
               )}
             </DialogHeader>
+
+            {/* Attribution banner for saved/cloned recipes */}
+            {attribution && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border mb-4">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={attribution.creatorAvatarUrl || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {attribution.creatorDisplayName?.[0]?.toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Originally by </span>
+                  {attribution.creatorUsername ? (
+                    <Link
+                      to={`/creator/${attribution.creatorUsername}`}
+                      className="font-medium text-primary hover:underline"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      @{attribution.creatorUsername}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">
+                      {attribution.creatorDisplayName || 'Unknown creator'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Meta info */}
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
@@ -242,7 +282,8 @@ export function RecipeDetailDialog({
                   Nutrition per serving
                   {recipe.nutrition?.source !== 'provided_by_site' && (
                     <Badge variant="outline" className="text-xs font-normal">
-                      {recipe.nutrition?.source === 'ai_estimate' ? 'Estimated' : 'Manual'}
+                      {recipe.nutrition?.source === 'calculated' ? 'Calculated' :
+                       recipe.nutrition?.source === 'ai_estimate' ? 'Estimated' : 'Manual'}
                     </Badge>
                   )}
                 </h3>

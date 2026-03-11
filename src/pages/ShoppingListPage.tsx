@@ -78,6 +78,7 @@ export default function ShoppingListPage() {
     isSyncing
   } = useShoppingListState();
   const [selectedDays, setSelectedDays] = useLocalStorage<DayOfWeek[]>('shoppingListDays', [...DAYS_OF_WEEK]);
+  const [hidePantryStaples, setHidePantryStaples] = useLocalStorage<boolean>('shoppingListHidePantryStaples', true);
   const [newItemText, setNewItemText] = useState('');
   const [groupByAisle, setGroupByAisle] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -227,8 +228,9 @@ export default function ShoppingListPage() {
     // Use the smart merging system
     const mergedIngredients = mergeIngredients(rawIngredients);
 
-    // Convert to ShoppingListItem format
+    // Convert to ShoppingListItem format, filtering pantry staples if enabled
     const items: ShoppingListItem[] = mergedIngredients
+      .filter(item => !hidePantryStaples || !item.isPantryStaple)
       .map(item => {
         // Extract the primary quantity for display
         const primaryQty = item.quantities[0];
@@ -252,6 +254,7 @@ export default function ShoppingListPage() {
           _alternativeNote: item.alternativeNote,
           _sources: item.sources,
           _hasOverride: !!categoryOverrides[item.key],
+          _isPantryStaple: item.isPantryStaple,
         } as ShoppingListItem & {
           _totalDisplay?: string;
           _originalNames?: string[];
@@ -259,6 +262,7 @@ export default function ShoppingListPage() {
           _alternativeNote?: string;
           _sources?: Array<{ recipeId: string; amount: string }>;
           _hasOverride?: boolean;
+          _isPantryStaple?: boolean;
         };
       });
 
@@ -272,7 +276,7 @@ export default function ShoppingListPage() {
     });
 
     return items;
-  }, [allMealPlanItems, recipes, customItems, checkedItems, selectedDays, categoryOverrides, weekCount, replacementsMap]);
+  }, [allMealPlanItems, recipes, customItems, checkedItems, selectedDays, categoryOverrides, weekCount, replacementsMap, hidePantryStaples]);
 
   const toggleDay = (day: DayOfWeek) => {
     setSelectedDays(prev => {
@@ -463,8 +467,8 @@ export default function ShoppingListPage() {
         )}
       </div>
 
-      {/* Group by aisle toggle — sticky on mobile, above day selector */}
-      <div className="sticky top-16 z-10 bg-background py-2 -mx-4 px-4 md:static md:mx-0 md:px-0 md:py-0 mb-4">
+      {/* List options — sticky on mobile */}
+      <div className="sticky top-16 z-10 bg-background py-2 -mx-4 px-4 md:static md:mx-0 md:px-0 md:py-0 mb-4 space-y-1">
         <label className="flex items-center gap-3 py-2 cursor-pointer">
           <Switch
             id="group-by-aisle"
@@ -472,6 +476,15 @@ export default function ShoppingListPage() {
             onCheckedChange={setGroupByAisle}
           />
           <span className="text-sm">Group by aisle</span>
+        </label>
+        <label className="flex items-center gap-3 py-2 cursor-pointer">
+          <Switch
+            id="hide-pantry-staples"
+            checked={hidePantryStaples}
+            onCheckedChange={setHidePantryStaples}
+          />
+          <span className="text-sm">Hide pantry staples</span>
+          <span className="text-xs text-muted-foreground">(salt, pepper, water)</span>
         </label>
       </div>
 

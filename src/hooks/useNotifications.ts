@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface Notification {
   id: string;
-  type: 'new_follower' | 'plan_cloned';
+  type: 'new_follower' | 'plan_cloned' | 'recipe_saved';
   data: Record<string, string>;
   read: boolean;
   created_at: string;

@@ -37,6 +37,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateNutrition } from '@/lib/nutritionCalculator';
+import { detectPlatform as detectVideoPlatform } from './VideoEmbed';
 
 interface AddRecipeDialogProps {
   open: boolean;
@@ -88,6 +90,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
   const [servings, setServings] = useState('4');
   const [imageUrl, setImageUrl] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [instructions, setInstructions] = useState<InstructionStep[]>([]);
   const [selectedMealTypes, setSelectedMealTypes] = useState<MealType[]>([]);
@@ -131,7 +134,8 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       setServings(editingRecipe.servings.toString());
       setImageUrl(editingRecipe.imageUrl || '');
       setSourceUrl(editingRecipe.sourceUrl || '');
-      
+      setVideoUrl(editingRecipe.videoUrl || '');
+
       // Ensure each ingredient has a stable ID
       const loadedIngredients = editingRecipe.ingredients.length > 0 
         ? editingRecipe.ingredients.map(i => ({
@@ -173,6 +177,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     setServings('4');
     setImageUrl('');
     setSourceUrl('');
+    setVideoUrl('');
     setIngredients([createEmptyIngredient()]);
     setInstructions([createEmptyInstruction()]);
     setSelectedMealTypes([]);
@@ -341,13 +346,13 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     }
   };
 
-  // Estimate nutrition using AI
-  const handleEstimateNutrition = async () => {
+  // Calculate nutrition using USDA FoodData Central
+  const handleCalculateNutrition = async () => {
     const validIngredients = ingredients.filter(i => i.item.trim());
     if (validIngredients.length === 0) {
       toast({
         title: "No ingredients",
-        description: "Add some ingredients first to estimate nutrition.",
+        description: "Add some ingredients first to calculate nutrition.",
         variant: "destructive",
       });
       return;
@@ -355,95 +360,24 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
 
     setIsEstimatingNutrition(true);
 
-    // Format ingredients for the prompt
-    const ingredientList = validIngredients
-      .map(i => {
-        let str = '';
-        if (i.quantity) str += `${i.quantity} `;
-        if (i.unit) str += `${i.unit} `;
-        str += i.item;
-        if (i.notes) str += ` (${i.notes})`;
-        return str.trim();
-      })
-      .join('\n');
-
-    const servingsNum = parseInt(servings) || 4;
-
-    // Simulate AI estimation
-    setTimeout(() => {
-      const estimatedNutrition = estimateNutritionFromIngredients(ingredientList, validIngredients, servingsNum);
-      setNutrition(estimatedNutrition);
-      setIsEstimatingNutrition(false);
+    try {
+      const servingsNum = parseInt(servings) || 4;
+      const { nutrition: calculatedNutrition } = await calculateNutrition(validIngredients, servingsNum);
+      setNutrition(calculatedNutrition);
       toast({
-        title: "Rough estimate generated",
-        description: "These values are approximate. Edit manually for accuracy, or import a recipe with nutrition data.",
+        title: "Nutrition calculated",
+        description: `Based on USDA data for ${validIngredients.length} ingredients. You can edit values manually.`,
       });
-    }, 1500);
-  };
-
-  // Simple nutrition estimation
-  const estimateNutritionFromIngredients = (ingredientList: string, ings: Ingredient[], servingsNum: number): RecipeNutrition => {
-    const lower = ingredientList.toLowerCase();
-    
-    let calories = 250;
-    let protein = 15;
-    let carbs = 30;
-    let fat = 10;
-    let fiber = 3;
-    let sugar = 5;
-    const sodium = 400;
-    
-    if (/chicken|turkey|beef|pork|lamb|fish|salmon|shrimp/.test(lower)) {
-      protein += 20;
-      calories += 150;
+    } catch (error) {
+      console.error('Nutrition calculation error:', error);
+      toast({
+        title: "Calculation failed",
+        description: "Could not look up nutrition data. You can enter values manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEstimatingNutrition(false);
     }
-    if (/pasta|rice|noodle|bread|flour/.test(lower)) {
-      carbs += 40;
-      calories += 200;
-    }
-    if (/butter|cream|cheese|oil/.test(lower)) {
-      fat += 15;
-      calories += 150;
-    }
-    if (/sugar|honey|syrup|chocolate/.test(lower)) {
-      sugar += 15;
-      carbs += 20;
-      calories += 100;
-    }
-    if (/spinach|broccoli|lettuce|kale|vegetable/.test(lower)) {
-      fiber += 4;
-      calories -= 50;
-    }
-    if (/bean|lentil|chickpea|tofu/.test(lower)) {
-      protein += 10;
-      fiber += 5;
-    }
-    
-    const notes: string[] = [];
-    const hasAmbiguousQuantities = /to taste|pinch|some|few/.test(lower);
-    const hasMissingQuantities = ings.some(i => i.item.trim() && !i.quantity);
-    
-    if (hasAmbiguousQuantities || hasMissingQuantities) {
-      notes.push("Some ingredient quantities were assumed based on typical recipe amounts.");
-    }
-    
-    const roundedCalories = Math.round(calories);
-
-    return {
-      perServing: {
-        calories: roundedCalories,
-        protein: Math.round(protein),
-        carbs: Math.round(carbs),
-        fat: Math.round(fat),
-        fiber: Math.round(fiber),
-        sugar: Math.round(sugar),
-        sodium: Math.round(sodium),
-      },
-      source: 'ai_estimate',
-      confidence: 'Low',
-      verified: roundedCalories <= 1500,
-      notes: 'Rough estimate based on ingredient types. Does not account for actual quantities.',
-    };
   };
 
   // Update nutrition field
@@ -496,6 +430,9 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
     const finalIngredients = ingredients.filter(i => i.item.trim());
     const finalInstructions = instructions.filter(i => i.text.trim()).map(i => i.text);
 
+    // Auto-detect video platform
+    const detectedPlatform = videoUrl ? detectVideoPlatform(videoUrl) : undefined;
+
     const recipeData = {
       title: title.trim(),
       sourceUrl: sourceUrl || undefined,
@@ -515,6 +452,8 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
       mealTypes: selectedMealTypes.length > 0 ? selectedMealTypes : undefined,
       rawImportSnapshot: parsedRecipe?.rawImportSnapshot,
       nutrition: nutrition || undefined,
+      videoUrl: videoUrl || undefined,
+      videoPlatform: detectedPlatform,
     };
 
     if (editingRecipe) {
@@ -564,17 +503,18 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
           {nutrition && (
             <Badge variant={nutrition.source === 'ai_estimate' ? 'secondary' : 'default'} className="text-xs">
               {nutrition.source === 'ai_estimate' && <Sparkles className="h-3 w-3 mr-1" />}
-              {nutrition.source === 'provided_by_site' ? 'From source' : 
+              {nutrition.source === 'provided_by_site' ? 'From source' :
+               nutrition.source === 'calculated' ? 'Calculated' :
                nutrition.source === 'ai_estimate' ? 'Estimated' : 'Manual'}
             </Badge>
           )}
         </Label>
         {!nutrition && (
-          <Button 
+          <Button
             type="button"
-            variant="outline" 
-            size="sm" 
-            onClick={handleEstimateNutrition}
+            variant="outline"
+            size="sm"
+            onClick={handleCalculateNutrition}
             disabled={isEstimatingNutrition}
           >
             {isEstimatingNutrition ? (
@@ -582,7 +522,7 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
             ) : (
               <Zap className="h-4 w-4 mr-2" />
             )}
-            Estimate Nutrition
+            Calculate from Ingredients
           </Button>
         )}
       </div>
@@ -667,10 +607,10 @@ export function AddRecipeDialog({ open, onOpenChange, editingRecipe }: AddRecipe
               </Button>
             </div>
           </div>
-          {nutrition.source === 'ai_estimate' && (
+          {(nutrition.source === 'ai_estimate' || nutrition.source === 'calculated') && (
             <p className="text-xs text-muted-foreground">
               <AlertCircle className="h-3 w-3 inline mr-1" />
-              {nutrition.confidence} confidence estimate. Values are approximate and not medical advice.
+              {nutrition.confidence} confidence{nutrition.source === 'calculated' ? ' (USDA data)' : ' estimate'}.
               {nutrition.notes && ` ${nutrition.notes}`}
             </p>
           )}
@@ -1361,6 +1301,24 @@ Instructions:
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="videoUrl">Video URL</Label>
+          <Input
+            id="videoUrl"
+            placeholder="YouTube, Instagram, or TikTok link"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+          />
+          {videoUrl && detectVideoPlatform(videoUrl) && (
+            <p className="text-xs text-muted-foreground">
+              {detectVideoPlatform(videoUrl) === 'youtube' ? '▶ YouTube' :
+               detectVideoPlatform(videoUrl) === 'instagram' ? '📷 Instagram' :
+               detectVideoPlatform(videoUrl) === 'tiktok' ? '🎵 TikTok' :
+               detectVideoPlatform(videoUrl) === 'vimeo' ? '▶ Vimeo' : ''} video detected
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
