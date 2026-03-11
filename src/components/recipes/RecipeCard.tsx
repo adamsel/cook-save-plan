@@ -168,7 +168,7 @@ export function RecipeCard({
             onClick={(e) => e.stopPropagation()}
             className={cn(
               "absolute rounded-full bg-background/80 text-muted-foreground hover:text-foreground backdrop-blur-sm transition-all",
-              isMobile ? "top-2 left-2 p-1.5" : "top-3 left-3 p-2"
+              isMobile ? "bottom-2 left-2 p-1.5" : "bottom-3 left-3 p-2"
             )}
           >
             <ExternalLink className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />

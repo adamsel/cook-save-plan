@@ -16,6 +16,7 @@ import { useDiscoverCreators, type DiscoverCreator } from '@/hooks/useDiscoverCr
 import { usePopularRecipes, type PopularRecipe } from '@/hooks/usePopularRecipes';
 import { useFollowingFeed, type FeedItem } from '@/hooks/useFollowingFeed';
 import { useFollowCreator } from '@/hooks/useFollowCreator';
+import { FeedRecipePreviewDialog } from '@/components/recipes/FeedRecipePreviewDialog';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { UtensilsCrossed, CheckSquare, X, Tag, FolderOpen, BookUser, Globe, Loader2, ChevronLeft, ChevronRight, Heart, Clock, UserPlus, UserCheck, Upload, BookmarkPlus, Users, Calendar } from 'lucide-react';
@@ -134,6 +135,10 @@ export default function RecipesPage() {
   const { creators: featuredCreators } = useDiscoverCreators();
   const { data: popularRecipes = [] } = usePopularRecipes(8);
   const { data: feedItems = [], isLoading: isFeedLoading } = useFollowingFeed();
+  const feedRecipes = useMemo(() => feedItems.filter(item => item.contentType === 'recipe'), [feedItems]);
+  const feedMealPlans = useMemo(() => feedItems.filter(item => item.contentType === 'meal_plan'), [feedItems]);
+  const [previewRecipeId, setPreviewRecipeId] = useState<string | null>(null);
+  const [previewCardData, setPreviewCardData] = useState<FeedItem | null>(null);
 
   const [activeTab, setActiveTab] = useState<RecipeTab>('personal');
 
@@ -550,78 +555,157 @@ export default function RecipesPage() {
 
       {/* Show different content based on active tab */}
       {activeTab === 'following' ? (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {isFeedLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : feedItems.length > 0 ? (
-            <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {feedItems.map((item: FeedItem) => (
-                <Link
-                  key={`${item.contentType}-${item.contentId}`}
-                  to={item.contentType === 'recipe' ? `/recipe/${item.contentId}` : `/plan/${item.contentId}`}
-                  className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  <div className="relative aspect-[4/3] bg-muted overflow-hidden">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center" style={item.contentType === 'meal_plan' ? { backgroundColor: '#2D6A4F' } : undefined}>
-                        {item.contentType === 'meal_plan' ? (
-                          <Calendar className="h-8 w-8 text-white/60" />
-                        ) : (
-                          <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
-                        )}
-                      </div>
-                    )}
-                    {item.saveCount > 0 && (
-                      <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
-                        <BookmarkPlus className="h-3 w-3" />
-                        {item.saveCount}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="p-3 min-h-[110px] flex flex-col">
-                    <p className="font-medium text-sm line-clamp-2 leading-snug min-h-[2.5rem]">{item.title}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <Avatar className="h-5 w-5">
-                        <AvatarImage src={item.creatorAvatarUrl || undefined} />
-                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
-                          {(item.creatorDisplayName || item.creatorUsername || 'C')[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {item.creatorDisplayName || `@${item.creatorUsername}`}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-auto pt-1.5 text-xs text-muted-foreground">
-                      {item.contentType === 'meal_plan' ? (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Meal Plan
-                        </span>
-                      ) : (
-                        <>
-                          {item.totalTime && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {item.totalTime}m
-                            </span>
+            <>
+              {/* Recipes section */}
+              {feedRecipes.length > 0 && (
+                <div>
+                  <h2 className="font-serif text-lg font-semibold mb-3">Recipes</h2>
+                  <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {feedRecipes.map((item: FeedItem) => (
+                      <button
+                        key={`recipe-${item.contentId}`}
+                        type="button"
+                        onClick={() => {
+                          setPreviewRecipeId(item.contentId);
+                          setPreviewCardData(item);
+                        }}
+                        className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow text-left"
+                      >
+                        <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           )}
-                          {item.servings && (
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {item.servings}
-                            </span>
+                          {item.saveCount > 0 && (
+                            <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                              <BookmarkPlus className="h-3 w-3" />
+                              {item.saveCount}
+                            </Badge>
                           )}
-                        </>
-                      )}
-                    </div>
+                        </div>
+                        <div className="p-3 min-h-[110px] flex flex-col">
+                          <p className="font-medium text-sm line-clamp-2 leading-snug min-h-[2.5rem]">{item.title}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={item.creatorAvatarUrl || undefined} />
+                              <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                {(item.creatorDisplayName || item.creatorUsername || 'C')[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {item.creatorDisplayName || `@${item.creatorUsername}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-auto pt-1.5 text-xs text-muted-foreground">
+                            {item.totalTime && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {item.totalTime}m
+                              </span>
+                            )}
+                            {item.servings && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {item.servings}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </Link>
-              ))}
-            </div>
+                </div>
+              )}
+
+              {/* Meal Plans section */}
+              {feedMealPlans.length > 0 && (
+                <div>
+                  <h2 className="font-serif text-lg font-semibold mb-3">Meal Plans</h2>
+                  <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {feedMealPlans.map((item: FeedItem) => (
+                      <Link
+                        key={`plan-${item.contentId}`}
+                        to={`/plan/${item.shareSlug || item.contentId}`}
+                        className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow"
+                      >
+                        <div className="relative aspect-[4/3] overflow-hidden">
+                          {item.recipeImageUrls.length >= 4 ? (
+                            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+                              {item.recipeImageUrls.slice(0, 4).map((url, i) => (
+                                <img key={i} src={url} alt="" className="w-full h-full object-cover" />
+                              ))}
+                            </div>
+                          ) : item.recipeImageUrls.length > 0 ? (
+                            <div className="w-full h-full grid grid-cols-2 gap-0.5">
+                              {item.recipeImageUrls.slice(0, 2).map((url, i) => (
+                                <img key={i} src={url} alt="" className="w-full h-full object-cover" />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#2D6A4F' }}>
+                              <Calendar className="h-8 w-8 text-white/60" />
+                            </div>
+                          )}
+                          {item.saveCount > 0 && (
+                            <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                              <BookmarkPlus className="h-3 w-3" />
+                              {item.saveCount}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="p-3 min-h-[110px] flex flex-col">
+                          <p className="font-medium text-sm line-clamp-2 leading-snug min-h-[2.5rem]">{item.title}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={item.creatorAvatarUrl || undefined} />
+                              <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                {(item.creatorDisplayName || item.creatorUsername || 'C')[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {item.creatorDisplayName || `@${item.creatorUsername}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-auto pt-1.5 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Meal Plan
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <FeedRecipePreviewDialog
+                recipeId={previewRecipeId}
+                open={!!previewRecipeId}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setPreviewRecipeId(null);
+                    setPreviewCardData(null);
+                  }
+                }}
+                cardData={previewCardData ? {
+                  title: previewCardData.title,
+                  imageUrl: previewCardData.imageUrl,
+                  creatorDisplayName: previewCardData.creatorDisplayName,
+                  creatorUsername: previewCardData.creatorUsername,
+                  creatorAvatarUrl: previewCardData.creatorAvatarUrl,
+                } : null}
+              />
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">

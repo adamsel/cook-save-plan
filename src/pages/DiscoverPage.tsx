@@ -7,7 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Compass, Search, UserPlus, UserCheck, Loader2, ChefHat, UtensilsCrossed } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { usePopularRecipes, type PopularRecipe } from '@/hooks/usePopularRecipes';
+import { FeedRecipePreviewDialog } from '@/components/recipes/FeedRecipePreviewDialog';
+import { Compass, Search, UserPlus, UserCheck, Loader2, ChefHat, UtensilsCrossed, Clock, Users, BookmarkPlus } from 'lucide-react';
 
 function CreatorCard({ creator }: { creator: DiscoverCreator }) {
   const navigate = useNavigate();
@@ -114,8 +118,11 @@ function CreatorCard({ creator }: { creator: DiscoverCreator }) {
 
 export default function DiscoverPage() {
   const { creators, isLoading } = useDiscoverCreators();
+  const { data: popularRecipes = [] } = usePopularRecipes(8);
   const { user } = useAuth();
   const [search, setSearch] = useState('');
+  const [previewRecipeId, setPreviewRecipeId] = useState<string | null>(null);
+  const [previewCardData, setPreviewCardData] = useState<{ title: string; imageUrl: string | null; creatorDisplayName: string | null; creatorUsername: string | null; creatorAvatarUrl: string | null } | null>(null);
 
   const filtered = search.trim()
     ? creators.filter(c =>
@@ -134,16 +141,80 @@ export default function DiscoverPage() {
 
   return (
     <div className="container py-6 max-w-4xl animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold flex items-center gap-2">
-            <Compass className="h-6 w-6 text-primary" />
-            Discover Creators
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Find creators to follow and get inspired by their meal plans
-          </p>
+      <div className="mb-6">
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Compass className="h-6 w-6 text-primary" />
+          Discover
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Find recipes and creators to follow
+        </p>
+      </div>
+
+      {/* Popular Recipes */}
+      {popularRecipes.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-serif text-lg font-semibold mb-3">Popular Recipes</h2>
+          <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+            {popularRecipes.map((pr: PopularRecipe) => (
+              <button
+                key={pr.recipeId}
+                type="button"
+                onClick={() => {
+                  setPreviewRecipeId(pr.recipeId);
+                  setPreviewCardData({
+                    title: pr.title,
+                    imageUrl: pr.imageUrl,
+                    creatorDisplayName: pr.creatorDisplayName,
+                    creatorUsername: pr.creatorUsername,
+                    creatorAvatarUrl: pr.creatorAvatarUrl,
+                  });
+                }}
+                className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow text-left"
+              >
+                <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                  {pr.imageUrl ? (
+                    <img src={pr.imageUrl} alt={pr.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UtensilsCrossed className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  )}
+                  {pr.saveCount > 0 && (
+                    <Badge className="absolute top-2 right-2 bg-black/60 text-white border-0 text-xs gap-1">
+                      <BookmarkPlus className="h-3 w-3" />
+                      {pr.saveCount}
+                    </Badge>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="font-medium text-sm line-clamp-2 leading-snug">{pr.title}</p>
+                  {pr.creatorUsername && (
+                    <p className="text-xs text-muted-foreground mt-1">by @{pr.creatorUsername}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    {pr.totalTime && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {pr.totalTime}m
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {pr.servings}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <Separator className="mt-8" />
         </div>
+      )}
+
+      {/* Creators */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <h2 className="font-serif text-lg font-semibold">Creators</h2>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -200,6 +271,18 @@ export default function DiscoverPage() {
           </Button>
         </div>
       )}
+
+      <FeedRecipePreviewDialog
+        recipeId={previewRecipeId}
+        open={!!previewRecipeId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewRecipeId(null);
+            setPreviewCardData(null);
+          }
+        }}
+        cardData={previewCardData}
+      />
     </div>
   );
 }

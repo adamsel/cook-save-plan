@@ -78,8 +78,14 @@ const App = () => {
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/plan/:shareSlug" element={<Suspense fallback={<PageLoader />}><SharedMealPlanPage /></Suspense>} />
-                  <Route path="/creator/:username" element={<Suspense fallback={<PageLoader />}><CreatorProfilePage /></Suspense>} />
                   <Route path="/recipe/:id" element={<Suspense fallback={<PageLoader />}><PublicRecipePage /></Suspense>} />
+                  <Route path="/creator/dashboard" element={
+                    <ProtectedRoute>
+                      <Navigation onAddRecipe={() => setShowAddRecipe(true)} />
+                      <Suspense fallback={<PageLoader />}><CreatorDashboardPage /></Suspense>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/creator/:username" element={<Suspense fallback={<PageLoader />}><CreatorProfilePage /></Suspense>} />
 
                   {/* Protected routes - lazy loaded */}
                   <Route path="/*" element={
@@ -92,7 +98,6 @@ const App = () => {
                           <Route path="/meal-plan" element={<MealPlanPage />} />
                           <Route path="/shopping-list" element={<ShoppingListPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
-                          <Route path="/creator/dashboard" element={<CreatorDashboardPage />} />
                           <Route path="/discover" element={<DiscoverPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>

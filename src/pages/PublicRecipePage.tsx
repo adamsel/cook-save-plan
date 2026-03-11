@@ -13,7 +13,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRecipes } from '@/context/RecipeContext';
 import { PublicNav } from '@/components/layout/PublicNav';
-import { ReviewSection } from '@/components/recipes/ReviewSection';
 
 export default function PublicRecipePage() {
   const { id } = useParams<{ id: string }>();
@@ -258,10 +257,6 @@ export default function PublicRecipePage() {
           </div>
         )}
 
-        {/* Reviews */}
-        <div className="mt-8">
-          <ReviewSection recipeId={recipe.id} recipeOwnerId={creator?.userId} />
-        </div>
 
         {/* Source link */}
         {recipe.sourceUrl && (

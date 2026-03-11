@@ -18,6 +18,8 @@ export interface FeedItem {
   creatorDisplayName: string | null;
   creatorUsername: string | null;
   creatorAvatarUrl: string | null;
+  recipeImageUrls: string[];
+  shareSlug: string | null;
 }
 
 export function useFollowingFeed(limit = 20, offset = 0) {
@@ -52,6 +54,8 @@ export function useFollowingFeed(limit = 20, offset = 0) {
         creatorDisplayName: row.creator_display_name as string | null,
         creatorUsername: row.creator_username as string | null,
         creatorAvatarUrl: row.creator_avatar_url as string | null,
+        recipeImageUrls: (row.recipe_image_urls as string[]) || [],
+        shareSlug: (row.share_slug as string) || null,
       })) as FeedItem[];
     },
     enabled: !!user,
