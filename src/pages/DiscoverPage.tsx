@@ -170,7 +170,7 @@ export default function DiscoverPage() {
                     creatorAvatarUrl: pr.creatorAvatarUrl,
                   });
                 }}
-                className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow text-left"
+                className="group rounded-xl border bg-card overflow-hidden hover:shadow-md transition-shadow text-left h-full flex flex-col"
               >
                 <div className="relative aspect-[4/3] bg-muted overflow-hidden">
                   {pr.imageUrl ? (
@@ -187,12 +187,12 @@ export default function DiscoverPage() {
                     </Badge>
                   )}
                 </div>
-                <div className="p-3">
-                  <p className="font-medium text-sm line-clamp-2 leading-snug">{pr.title}</p>
+                <div className="p-3 min-h-[110px] flex flex-col">
+                  <p className="font-medium text-sm line-clamp-2 leading-snug min-h-[2.5rem]">{pr.title}</p>
                   {pr.creatorUsername && (
                     <p className="text-xs text-muted-foreground mt-1">by @{pr.creatorUsername}</p>
                   )}
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-auto pt-2 text-xs text-muted-foreground">
                     {pr.totalTime && (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />

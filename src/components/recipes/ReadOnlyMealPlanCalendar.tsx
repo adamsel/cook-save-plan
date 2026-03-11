@@ -148,7 +148,7 @@ export function ReadOnlyMealPlanCalendar({
     <div className="relative overflow-x-auto pl-4 sm:pl-0 scroll-smooth" style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
       <div className="min-w-[700px]" style={{ scrollSnapAlign: 'start' }}>
         {/* Styled day headers */}
-        <div className="grid grid-cols-7 gap-3 mb-4">
+        <div className="grid grid-cols-7 gap-2 mb-3">
           {DAYS_OF_WEEK.map((day, i) => {
             const date = addDays(weekStart, i);
             const isToday = isSameDay(date, today);
@@ -157,7 +157,7 @@ export function ReadOnlyMealPlanCalendar({
               <div
                 key={day}
                 className={cn(
-                  "text-center p-3 rounded-2xl transition-all",
+                  "text-center p-2 rounded-xl transition-all",
                   isToday
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-primary/30"
                     : "bg-card/50 hover:bg-card"
@@ -170,7 +170,7 @@ export function ReadOnlyMealPlanCalendar({
                   {format(date, 'EEE')}
                 </div>
                 <div className={cn(
-                  "text-2xl font-serif font-bold",
+                  "text-lg font-serif font-bold",
                   isToday ? "text-primary-foreground" : "text-foreground"
                 )}>
                   {format(date, 'd')}
@@ -221,14 +221,14 @@ export function ReadOnlyMealPlanCalendar({
                   </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="grid grid-cols-7 gap-2">
+                  <div className="grid grid-cols-7 gap-1.5">
                     {DAYS_OF_WEEK.map(day => {
                       const cellItems = displayItemsMap.get(`${day}-${slot}`) || [];
                       return (
                         <div
                           key={`${day}-${slot}`}
                           className={cn(
-                            "min-h-[60px] rounded-2xl p-1 transition-all",
+                            "min-h-[50px] rounded-xl p-1 transition-all",
                             cellItems.length > 0
                               ? "bg-transparent"
                               : "border border-dashed border-muted-foreground/20 bg-muted/10"

@@ -801,7 +801,7 @@ export default function MealPlanPage() {
                 )}
 
                 {/* Day Headers - Hero treatment for today */}
-                <div className="sticky top-16 z-20 bg-background pt-2 pb-4 -mx-2 px-2 grid grid-cols-7 gap-3">
+                <div className="sticky top-16 z-20 bg-background pt-2 pb-3 -mx-2 px-2 grid grid-cols-7 gap-2">
                   {DAYS_OF_WEEK.map((day, index) => {
                     const date = addDays(selectedWeekStart, index);
                     const isToday = isSameWeek(date, today, { weekStartsOn: 1 }) && date.getDate() === today.getDate();
@@ -811,7 +811,7 @@ export default function MealPlanPage() {
                       <div
                         key={day}
                         className={cn(
-                          "text-center p-4 rounded-2xl transition-all duration-300",
+                          "text-center p-2.5 rounded-xl transition-all duration-300",
                           isToday
                             ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-primary/30"
                             : "bg-card/50 hover:bg-card"
@@ -824,7 +824,7 @@ export default function MealPlanPage() {
                           {dayLabels[day]}
                         </div>
                         <div className={cn(
-                          "text-3xl font-serif font-bold",
+                          "text-xl font-serif font-bold",
                           isToday ? "text-primary-foreground" : "text-foreground"
                         )}>
                           {format(date, 'd')}
@@ -877,7 +877,7 @@ export default function MealPlanPage() {
                       </CollapsibleTrigger>
 
                       <CollapsibleContent>
-                        <div className="grid grid-cols-7 gap-3">
+                        <div className="grid grid-cols-7 gap-2">
                           {DAYS_OF_WEEK.map(day => {
                             const slotId = `${day}-${slot}`;
                             const displayItems = getDisplayItemsForSlot(day, slot);
@@ -891,7 +891,7 @@ export default function MealPlanPage() {
                                 onDragOver={(e) => handleDragOver(e, slotId)}
                                 onDragLeave={handleDragLeave}
                                 className={cn(
-                                  "min-h-[140px] rounded-2xl transition-all duration-300 p-2",
+                                  "min-h-[100px] rounded-xl transition-all duration-300 p-1.5",
                                   hasItems
                                     ? "bg-transparent"
                                     : "glass-subtle border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40",
@@ -921,12 +921,12 @@ export default function MealPlanPage() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="h-full flex flex-col items-center justify-center py-6 group/slot">
-                                    <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-2 group-hover/slot:bg-primary/10 transition-colors">
-                                      <Plus className="h-5 w-5 text-muted-foreground/40 group-hover/slot:text-primary transition-colors" />
+                                  <div className="h-full flex flex-col items-center justify-center py-3 group/slot">
+                                    <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover/slot:bg-primary/10 transition-colors">
+                                      <Plus className="h-4 w-4 text-muted-foreground/40 group-hover/slot:text-primary transition-colors" />
                                     </div>
-                                    <span className="text-xs text-muted-foreground/50 group-hover/slot:text-muted-foreground transition-colors">
-                                      {canEdit ? 'Drop recipe' : 'No meal'}
+                                    <span className="text-[10px] text-muted-foreground/50 group-hover/slot:text-muted-foreground transition-colors mt-1">
+                                      {canEdit ? 'Drop recipe' : ''}
                                     </span>
                                   </div>
                                 )}
