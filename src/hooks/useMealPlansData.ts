@@ -308,6 +308,28 @@ export function useMealPlansData() {
     })));
   };
 
+  // Clear all items from a meal plan week
+  const clearMealPlanWeek = async (planId: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('meal_plan_items')
+      .delete()
+      .eq('meal_plan_id', planId);
+
+    if (error) {
+      toast({
+        title: 'Error clearing meal plan',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    setMealPlans(prev => prev.map(mp =>
+      mp.id === planId ? { ...mp, items: [] } : mp
+    ));
+    return true;
+  };
+
   // Update meal plan item
   const updateMealPlanItem = async (itemId: string, updates: Partial<MealPlanItem>) => {
     const dbUpdates: Record<string, unknown> = {};
@@ -536,6 +558,7 @@ export function useMealPlansData() {
     getCurrentMealPlan,
     addToMealPlan,
     removeFromMealPlan,
+    clearMealPlanWeek,
     updateMealPlanItem,
     updateLeftoverPosition,
     deleteLeftoverPosition,

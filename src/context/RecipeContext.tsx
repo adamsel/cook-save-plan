@@ -61,6 +61,7 @@ interface RecipeContextType {
   getMealPlanForWeek: (weekStartDate: string) => Promise<MealPlan | null>;
   addToMealPlan: (recipeId: string, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack', weekStartDate?: string) => Promise<MealPlanItem | null>;
   removeFromMealPlan: (itemId: string) => Promise<void>;
+  clearMealPlanWeek: (planId: string) => Promise<boolean>;
   updateMealPlanItem: (itemId: string, updates: Partial<MealPlanItem>) => Promise<void>;
   updateLeftoverPosition: (itemId: string, leftoverIndex: number, day: string, mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack') => Promise<void>;
 
@@ -271,6 +272,16 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearMealPlanWeek = async (planId: string): Promise<boolean> => {
+    if (user) {
+      return await mealPlansData.clearMealPlanWeek(planId);
+    }
+    setLocalMealPlans(prev => prev.map(mp =>
+      mp.id === planId ? { ...mp, items: [] } : mp
+    ));
+    return true;
+  };
+
   const updateMealPlanItem = async (itemId: string, updates: Partial<MealPlanItem>) => {
     if (user) {
       await mealPlansData.updateMealPlanItem(itemId, updates);
@@ -455,6 +466,7 @@ export function RecipeProvider({ children }: { children: ReactNode }) {
       getMealPlanForWeek,
       addToMealPlan,
       removeFromMealPlan,
+      clearMealPlanWeek,
       updateMealPlanItem,
       updateLeftoverPosition,
       shareMealPlan,

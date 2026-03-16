@@ -34,9 +34,21 @@ import {
   LayoutGrid,
   List,
   Share2,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { DayListView } from '@/components/recipes/DayListView';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +75,7 @@ export default function MealPlanPage() {
     getCurrentMealPlan,
     addToMealPlan,
     removeFromMealPlan,
+    clearMealPlanWeek,
     updateMealPlanItem,
     updateLeftoverPosition,
     categories,
@@ -641,6 +654,46 @@ export default function MealPlanPage() {
                 <Share2 className="h-4 w-4 mr-1" />
                 Share
               </Button>
+            )}
+
+            {selectedWeekPlan.id && selectedWeekPlan.items.length > 0 && canEdit && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear this week?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove all {selectedWeekPlan.items.length} meal{selectedWeekPlan.items.length !== 1 ? 's' : ''} from this week. This can't be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={async () => {
+                        const success = await clearMealPlanWeek(selectedWeekPlan.id);
+                        if (success) {
+                          toast({
+                            title: 'Week cleared',
+                            description: 'All meals have been removed from this week.',
+                          });
+                        }
+                      }}
+                    >
+                      Clear all meals
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </div>

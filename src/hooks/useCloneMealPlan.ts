@@ -200,8 +200,8 @@ export function useCloneMealPlan() {
       }
 
       toast({
-        title: 'Meal plan cloned!',
-        description: `${recipesCloned} new recipe${recipesCloned !== 1 ? 's' : ''} added and ${itemInserts.length} meal${itemInserts.length !== 1 ? 's' : ''} planned. Your shopping list is ready.`,
+        title: 'Added to your week!',
+        description: `${itemInserts.length} meal${itemInserts.length !== 1 ? 's' : ''} planned. Your shopping list is ready.`,
       });
 
       setIsCloning(false);
